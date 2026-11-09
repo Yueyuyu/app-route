@@ -1,0 +1,19 @@
+name: 问题反馈
+description: 报告界面、扫描或分流相关问题
+body:
+  - type: markdown
+    attributes:
+      value: 请勿提交订阅地址、代理密码、控制接口密钥或含个人路径的完整扫描结果。
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: Windows、AppRoute、代理客户端和内核的版本；当前预览尚未接入实际分流。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤、预期结果和实际结果
+    validations:
+      required: true
