@@ -1,65 +1,66 @@
 # AppRoute 应用分流
 
-为每个应用选择联网方式：按现有规则、直接联网或使用指定代理出口。
+为每个应用选择联网方式：按 Clash Party 原有规则、直接联网或使用指定代理出口。
 
-**当前版本：`0.1.0-preview.1`，可运行的开发预览。** 已有 Ant Design 界面、Windows 本机只读应用扫描和本地草稿管理；尚未接入任何代理内核，不会改变实际网络。首个正式集成目标是 Clash Party，架构同时为其他内核和客户端保留接入边界。
+**当前版本：0.2.0-preview.1，Windows 集成测试版。** Ant Design 页面已接入 Clash Party / Mihomo，支持真实规则应用、连接生效检查、120 秒试运行回退和独立离线恢复。当前仍以 Vite 本机服务运行，没有 Electron 安装包，不属于稳定发行版。
 
-## 当前可以做什么
+## 使用
 
-- 搜索、分类、筛选应用，批量设置三种联网方式。
-- 扫描开始菜单、安装登记和有可见窗口的进程；手动添加应用及子进程。
-- 查看应用详情，将选择保存到浏览器本地，导出设置草稿。
-- 阅读三种联网方式的说明。初始八个应用均为示例，扫描后才有真实本机数据。
+需要 Node.js 24 LTS、Windows，以及正在运行的 Clash Party 标准模式与 Mihomo 稳定内核。已实测 Clash Party 2.0.4 / Mihomo v1.19.32；其他版本尚未验证。
 
-草稿不是可直接导入 Clash 的配置。导出中的 `applied: false`、`proxyProvider: null` 和 `proxyGroup: null` 表明尚未接入实际执行端。
-
-![AppRoute 开发预览，仅含示例应用](docs/design/preview.jpg)
-
-## 本地运行
-
-需要 Node.js 24 LTS（24.11 或更新的 24.x）和 npm。界面可在其他桌面系统预览；本机扫描只支持 Windows。
-
-```sh
+~~~sh
 git clone https://github.com/Yueyuyu/app-route.git
 cd app-route
 npm ci
 npm run dev
-```
+~~~
 
-打开 <http://127.0.0.1:4318/>。开发预览仅监听本机；使用固定端口以校验扫描请求来源。
+打开 http://127.0.0.1:4318/。
 
-```sh
-npm run check    # 测试、TypeScript 检查和生产构建
-npm run preview  # 构建完成后的本机预览，同样使用 4318 端口
-```
+1. 扫描或手动添加真实应用。初始八行是示例，不能直接应用。
+2. 修改联网方式，勾选应用；选择“走代理”时在顶部选择代理出口。
+3. 点击“应用所选”，审阅变更并开始 120 秒试运行。
+4. 让目标应用建立新连接，在“生效检查与离线恢复”中查看结果；确认网络正常后点击“保留设置”。未确认会自动撤销。
+5. 选择“按 Clash 规则”后再次应用，只移除该应用的专属规则。页面“恢复网络”会停用全部 AppRoute 专属规则。
 
-开发服务器和构建预览不能同时占用 4318。纯静态部署只能预览界面、编辑草稿，不能调用 Windows 扫描。当前没有 Electron 安装包，也没有开机后台服务。
+首次登记的覆写列表可能被 Clash Party 缓存：需要正常退出并重新打开一次 Clash Party，再检查规则是否仍已加载。界面分别显示运行加载、连接观测、客户端持久化观测，不能互相代替。客户端完整重启和真实订阅切换仍是稳定版发布前的人工验收项。
 
-## 为什么不只支持一个 Clash 客户端
+当前不主动启用 TUN、切换系统代理或关闭已有连接。未进入 Clash 的流量无法按进程分流；已有连接可能需要重新连接。直连是 DIRECT 出口，仍可经过本机内核。代理选项排除包含 DIRECT / REJECT 成员的出口组。
 
-AppRoute 将应用策略、内核运行控制、客户端配置持久化分别管理。
+## 断网也能恢复
 
-| 接入路线 | 作用 | 当前状态 |
-| --- | --- | --- |
-| Mihomo + Clash Party 配置适配 | 使用内核进程规则，由客户端保存长期配置 | 首版计划，尚未实现 |
-| Mihomo + 其他客户端 / 独立配置 | 复用运行控制，分别处理配置生命周期 | 后续规划，尚未验证 |
-| sing-box | 使用独立的规则与配置适配 | 候选路线，尚未实现 |
-| HTTP / SOCKS5 端口 + 流量接管组件 | 把指定应用的流量送入通用代理端口 | 技术预研，尚未实现 |
+首次应用前自动准备独立恢复工具，并创建桌面快捷方式 **AppRoute - Restore Network**；准备失败就不应用规则。
 
-**代理端口只是入口，不会自动让指定软件使用它。** 通用端口路线仍需要流量接管能力；端口可用不代表支持进程规则、UDP、远端节点强制出口或可靠的直接联网。具体见 [兼容性设计](docs/COMPATIBILITY.md)。
+- 试运行未确认：独立守护进程到期恢复，关闭页面和 AppRoute 服务不会取消倒计时。
+- 页面仍可用：点击“恢复网络”。
+- 页面打不开：双击桌面快捷方式，或运行 %LOCALAPPDATA%\AppRoute\recovery\Restore-Network.cmd。
 
-## 项目资料
+工具自带本机 Node 运行时与打包代码，不需要网络、ChatGPT、npm 或项目目录。恢复先停用本工具覆写，再重新加载当前 Clash Party 配置，随后自检；保留用户订阅、原有规则、代理组、系统代理和 TUN 设置。无法连接内核时会明确报告尚未确认恢复，并提示重新启动 Clash Party。它不能修复运营商、网卡或代理服务商故障。
 
-- [项目基础说明](docs/PROJECT.md)：定位、术语、范围与验收标准。
-- [架构和目录职责](docs/ARCHITECTURE.md)：前后端边界、适配层、配置生命周期。
-- [功能规划](docs/ROADMAP.md)：分阶段目标与完成状态。
-- [开发规则](AGENTS.md)：修改代码和配置时必须保持的约定。
-- [贡献指南](CONTRIBUTING.md)、[设计约定](docs/design/README.md)、[验证记录](docs/VERIFICATION.md)。
+详见 [离线恢复说明](docs/RECOVERY.md) 和 [验证记录](docs/VERIFICATION.md)。
+
+## 开发与架构
+
+~~~sh
+npm run check    # 自动测试、类型检查、恢复程序打包、页面构建
+npm run preview  # 构建后的本机预览，端口仍为 4318
+~~~
+
+开发和预览服务只能启动一个；仅监听本机。纯静态部署没有扫描和分流能力。写入接口校验 Host、Origin 和会话令牌。
+
+| 接入路线 | 状态 |
+| --- | --- |
+| Mihomo + Clash Party | Windows 实际接入与恢复，集成测试阶段 |
+| 其他 Mihomo 客户端 / 独立内核 | 规划；运行控制可复用，配置适配需单独实现 |
+| sing-box | 候选路线，未实现 |
+| HTTP / SOCKS5 端口 + 流量接管 | 预研；端口本身不能自动接管应用 |
+
+[项目定位](docs/PROJECT.md) · [架构和目录](docs/ARCHITECTURE.md) · [兼容边界](docs/COMPATIBILITY.md) · [功能规划](docs/ROADMAP.md) · [开发规则](AGENTS.md) · [贡献指南](CONTRIBUTING.md)
 
 ## 数据与许可
 
-应用草稿保存在当前浏览器的 localStorage，键为 `approute.draft.v1`；清除站点数据会删除草稿。不同端口的预览数据互相独立，旧原型的浏览器草稿不会自动迁移。
+草稿保存在浏览器 localStorage（approute.draft.v1）；导出的草稿始终标记 applied: false，不代表运行状态。扫描和草稿可能包含个人程序路径，不要直接公开。
 
-扫描会在本机读取应用名称、进程名、程序位置、发布者和图标。导出的完整草稿可能包含个人程序路径，不适合直接作为公开问题附件。代码不提供遥测或云端上传功能。
+应用状态、事务备份和离线工具保存在 %LOCALAPPDATA%\AppRoute，Clash Party 只增加独立的 AppRoute 覆写及登记项。事务快照可能含订阅凭据，禁止提交或上传；当前尚未实现备份保留限额。代码没有遥测或云上传功能。
 
-自有代码采用 [MIT License](LICENSE)。第三方组件和品牌图标的来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。本仓库当前不分发代理内核或流量接管驱动。
+自有代码采用 [MIT License](LICENSE)，第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。仓库不分发代理内核、Node 二进制或驱动；离线运行时在本机从当前 Node 复制。

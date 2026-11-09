@@ -31,9 +31,9 @@ export function ApplicationEditor({ open, application, applications, onClose, on
       } }]}><Select mode="tags" open={false} placeholder="例如：QQMusic.exe" /></Form.Item>
       <Form.Item label="连接方式" name="mode"><RouteSelector label="应用连接方式" value={mode} onChange={(value) => form.setFieldValue('mode', value)} /></Form.Item>
       <div className="mode-explanation">{routeDescriptions[mode]}</div>
-      {mode === 'proxy' && <div className="proxy-group-note">代理来源：Clash Party<br />代理组：尚未选择，接入后设置</div>}
+      {mode === 'proxy' && <div className="proxy-group-note">代理来源：Clash Party<br />代理出口：在应用管理页顶部选择</div>}
       {application?.path && <div className="path-detail"><span>程序位置</span><code>{application.path}</code></div>}
-      <Space orientation="vertical" style={{ width: '100%', marginTop: 28 }}><Alert type="info" showIcon title="仅保存设置草稿" description="当前版本不会修改 Clash 配置或系统网络。" /></Space>
+      <Space orientation="vertical" style={{ width: '100%', marginTop: 28 }}><Alert type="info" showIcon title="仅保存设置草稿" description="这里仅保存草稿；回到应用管理页点击“应用所选”才会修改分流。" /></Space>
     </Form>
   </Drawer>
 }

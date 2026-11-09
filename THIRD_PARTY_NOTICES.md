@@ -6,6 +6,8 @@ AppRoute 自有代码采用 MIT。依赖及素材仍遵循各自许可证，品�
 
 - React / React DOM、Ant Design、Ant Design Icons、Vite：MIT。
 - TypeScript：Apache-2.0。
+- YAML：ISC；离线恢复程序会打包此依赖。Rolldown：MIT（构建工具）。
+- 离线工具仅在本机复制当前已安装的 Node 运行时；公开仓库不分发该二进制。未来制作独立安装包时需附带 Node 及其第三方许可。
 - 完整安装版本由 `package-lock.json` 固定；包内 LICENSE 和上游声明是对应组件许可的依据。
 
 ## 示例 SVG 图标

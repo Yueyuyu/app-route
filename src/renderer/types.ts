@@ -11,7 +11,7 @@ export const routeLabels: Record<RouteMode, string> = {
 export const routeDescriptions: Record<RouteMode, string> = {
   rule: '遵循 Clash Party 当前的分流规则，按访问的网站决定直连或使用代理节点。',
   direct: '使用本地网络，不经过远端代理节点。实现时仍可能由 Clash 接管后直连。',
-  proxy: '被识别并接管的连接统一交给 Clash Party 的指定代理组。代理组将在接入后选择。',
+  proxy: '被识别并接管的连接统一交给 Clash Party 的指定代理组。请在应用管理页选择代理出口。',
 }
 
 export const categories = ['音乐娱乐', '社交通讯', '浏览器', '开发工具', '游戏平台', '办公效率', '其他应用']

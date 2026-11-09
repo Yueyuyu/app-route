@@ -6,6 +6,7 @@ import { ApplicationEditor } from './components/ApplicationEditor'
 import { ScanApplications } from './components/ScanApplications'
 import { DraftPage, HelpPage } from './components/SecondaryPages'
 import { useApplicationDraft } from './hooks/useApplicationDraft'
+import { RoutingPanel } from './components/RoutingPanel'
 import { routeLabels, type Application, type Page, type RouteMode } from './types'
 
 const pageLabels: Record<Page, string> = { apps: '应用管理', drafts: '规则草稿', help: '使用说明' }
@@ -38,6 +39,7 @@ export default function App() {
 
   function changeMode(ids: string[], mode: RouteMode) {
     draft.changeMode(ids, mode)
+    setSelected(current => [...new Set([...current, ...ids])])
     void message.success(`已更新 ${ids.length} 个应用的草稿：${routeLabels[mode]}`)
   }
   function exportDraft() {
@@ -62,25 +64,26 @@ export default function App() {
   return <div className="app-shell">
     <aside className="sidebar"><div className="brand"><span className="brand-icon"><DeploymentUnitOutlined /></span><div><strong>AppRoute</strong><span>应用分流 · 各走其路</span></div></div>
       {navigation}
-      <div className="sidebar-bottom"><div className="integration-status"><i /><div><strong>Clash Party</strong><span>首版接入目标 · 尚未连接</span></div></div><small>开发预览 0.1.0-preview.1</small></div>
+      <div className="sidebar-bottom"><div className="integration-status"><i /><div><strong>Clash Party</strong><span>连接与恢复状态见页面上方</span></div></div><small>集成测试版 0.2.0-preview.1</small></div>
     </aside>
-    <div className="workspace"><header className="topbar"><div className="topbar-left"><Button type="text" className="mobile-menu-button" icon={<MenuOutlined />} aria-label="打开导航" onClick={() => setMenuOpen(true)} /><Breadcrumb items={[{ title: '工作空间' }, { title: pageLabels[page] }]} /></div><div className="topbar-right"><Tag variant="filled">界面预览</Tag><Avatar size={34} style={{ background: '#e5edff', color: '#3265ed' }}>AR</Avatar></div></header>
+    <div className="workspace"><header className="topbar"><div className="topbar-left"><Button type="text" className="mobile-menu-button" icon={<MenuOutlined />} aria-label="打开导航" onClick={() => setMenuOpen(true)} /><Breadcrumb items={[{ title: '工作空间' }, { title: pageLabels[page] }]} /></div><div className="topbar-right"><Tag variant="filled">集成测试版</Tag><Avatar size={34} style={{ background: '#e5edff', color: '#3265ed' }}>AR</Avatar></div></header>
       <main className="main-content">
         {page === 'apps' ? <section aria-label="应用管理">
           <div className="page-heading"><div><h1>应用管理</h1><p>为每个应用选择连接方式，网络由你掌控。</p></div><div className="heading-actions"><Button icon={<PlusOutlined />} onClick={() => { setEditing(undefined); setEditorOpen(true) }}>添加应用</Button><Button type="primary" icon={<ScanOutlined />} onClick={() => setScanOpen(true)}>扫描应用</Button></div></div>
-          <Alert className="preview-notice" type="info" showIcon title="当前为界面预览，分流设置仅保存为本地草稿，不会改变网络。" />
+          <RoutingPanel selected={draft.applications.filter(app => selected.includes(app.id))} onApplied={() => setSelected([])} />
+          <Alert className="preview-notice" type="info" showIcon title="选择联网方式后，点击“应用所选”才会改变实际分流。示例应用不能直接应用。" />
           <div className="list-toolbar"><Tabs activeKey={filter} onChange={(key) => { setFilter(key); setSelected([]) }} items={[
             { key: 'all', label: <span>全部应用 <b>{counts.all}</b></span> },
             { key: 'proxy', label: <span>强制代理 <b>{counts.proxy}</b></span> },
             { key: 'direct', label: <span>直接联网 <b>{counts.direct}</b></span> },
             { key: 'rule', label: <span>按规则 <b>{counts.rule}</b></span> },
           ]} /><div className="list-search"><Input prefix={<SearchOutlined />} aria-label="搜索应用名称或进程" placeholder="搜索应用名称或进程" value={search} onChange={(event) => { setSearch(event.target.value); setSelected([]) }} allowClear /><Select aria-label="应用分类筛选" value={category} onChange={(value) => { setCategory(value); setSelected([]) }} options={[{ value: 'all', label: '所有分类' }, ...[...new Set(draft.applications.map((app) => app.category))].map((value) => ({ value, label: value }))]} /></div></div>
-          {selected.length > 0 && <div className="bulk-toolbar"><span>已选择 <strong>{selected.length}</strong> 个应用</span><Dropdown trigger={['click']} menu={{ items: (Object.keys(routeLabels) as RouteMode[]).map((mode) => ({ key: mode, label: routeLabels[mode] })), onClick: ({ key }) => { changeMode(selected.map(String), key as RouteMode); setSelected([]) } }}><Button size="small">批量设置连接方式</Button></Dropdown><Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setSelected([])}>取消选择</Button></div>}
+          {selected.length > 0 && <div className="bulk-toolbar"><span>已选择 <strong>{selected.length}</strong> 个应用</span><Dropdown trigger={['click']} menu={{ items: (Object.keys(routeLabels) as RouteMode[]).map((mode) => ({ key: mode, label: routeLabels[mode] })), onClick: ({ key }) => { changeMode(selected.map(String), key as RouteMode) } }}><Button size="small">批量设置连接方式</Button></Dropdown><Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setSelected([])}>取消选择</Button></div>}
           <ApplicationTable applications={visible} selected={selected} setSelected={setSelected} changeMode={changeMode} edit={(app) => { setEditing(app); setEditorOpen(true) }} remove={removeApplication} clearFilters={() => { setSearch(''); setCategory('all'); setFilter('all') }} />
           <div className="table-footer"><span>{visible.length === draft.applications.length ? `共 ${counts.all} 个应用` : `显示 ${visible.length} / ${counts.all} 个应用`} · {hasRealApps ? hasExamples ? '包含本机应用与示例' : '本机与手动添加' : '示例列表'}</span><Button type="link" size="small" icon={<InfoCircleOutlined />} onClick={() => setPage('help')}>这三种连接方式有什么区别？</Button></div>
         </section> : page === 'drafts' ? <DraftPage applications={draft.applications} onExport={exportDraft} /> : <HelpPage />}
       </main>
-      <footer className="workspace-footer"><div className="save-status"><i className={draft.saveError ? 'error' : ''} /><strong>{draft.saveError ? '草稿未能保存' : '草稿已保存'}</strong><span>{draft.saveError ? '本地存储不可用，请导出备份' : '实际分流将在连接 Clash 后启用'}</span></div><Button icon={<ExportOutlined />} onClick={exportDraft}>导出草稿</Button></footer>
+      <footer className="workspace-footer"><div className="save-status"><i className={draft.saveError ? 'error' : ''} /><strong>{draft.saveError ? '草稿未能保存' : '草稿已保存'}</strong><span>{draft.saveError ? '本地存储不可用，请导出备份' : '修改先存为草稿，应用后检查实际连接'}</span></div><Button icon={<ExportOutlined />} onClick={exportDraft}>导出草稿</Button></footer>
     </div>
     <ApplicationEditor open={editorOpen} application={editing} applications={draft.applications} onClose={() => setEditorOpen(false)} onSave={(app) => { draft.saveApplication(app); void message.success('应用设置已保存为草稿') }} />
     <ScanApplications open={scanOpen} onClose={() => setScanOpen(false)} onAdd={(apps) => { draft.addScannedApplications(apps); void message.success(`已将 ${apps.length} 个本机应用添加到草稿`) }} />
