@@ -70,7 +70,7 @@ export default function App() {
       {navigation}
       <div className="sidebar-bottom"><div className="integration-status"><i /><div><strong>Clash Party</strong><span>连接与恢复状态见页面上方</span></div></div><small>集成测试版 0.2.0-preview.1</small></div>
     </aside>
-    <div className="workspace"><header className="topbar"><div className="topbar-left"><Button type="text" className="mobile-menu-button" icon={<MenuOutlined />} aria-label="打开导航" onClick={() => setMenuOpen(true)} /><Breadcrumb items={[{ title: '工作空间' }, { title: pageLabels[page] }]} /></div><div className="topbar-right"><Tag variant="filled">集成测试版</Tag><img className="topbar-app-icon" src="/brand/app-route-128.png" width={34} height={34} alt="AppRoute" /></div></header>
+    <div className="workspace"><header className="topbar"><div className="topbar-left"><Button type="text" className="mobile-menu-button" icon={<MenuOutlined />} aria-label="打开导航" onClick={() => setMenuOpen(true)} /><Breadcrumb items={[{ title: '工作空间' }, { title: pageLabels[page] }]} /></div><div className="topbar-right"><Tag variant="filled">集成测试版</Tag><img className="topbar-app-icon" src="/brand/app-route-inline.svg" width={34} height={34} alt="AppRoute" /></div></header>
       <main className="main-content">
         {page === 'apps' ? <section aria-label="应用管理">
           <div className="page-heading"><div><h1>应用管理</h1><p>为每个应用选择连接方式，网络由你掌控。</p></div><div className="heading-actions"><Button icon={<PlusOutlined />} onClick={() => { setEditing(undefined); setEditorOpen(true) }}>添加应用</Button><Button type="primary" icon={<ScanOutlined />} onClick={() => setScanOpen(true)}>扫描应用</Button></div></div>

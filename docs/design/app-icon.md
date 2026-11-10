@@ -1,29 +1,61 @@
 # AppRoute 应用图标
 
-2026-11-10 确认采用此版。浅蓝圆角底、白色与薄荷绿分流路径，左侧短箭头较低，右侧长箭头较高；两侧保留原有朝向及明显高度差。后续不得自行改为对称、等高或朝外的箭头。
+2026-11-10，用户确认按使用场景搭配两种外观：**应用内使用第三版随形轮廓，桌面使用 02「适中提亮」深灰蓝底，艺术字保持不变。**
 
-![AppRoute 图标](../../public/brand/app-route-512.png)
+两者共用同一张青蓝渐变的手写分流箭头：左支较短，向左上展开；右支较长，向右上展开。固定原有笔势、箭头方向和非对称比例，仅外围处理不同。
 
 ## 文件与用途
 
 | 文件 | 用途 |
 | --- | --- |
-| `public/brand/app-route.png` | 用户确认的生成原图，按原文件完整保留 |
+| `resources/brand/app-icon/brush-routing-source.png` | GPT 生成的原始箭头，原文件完整保留 |
+| `resources/brand/app-icon/route-glyph.png` | 组合评审使用的同一张 256px 透明箭头 |
+| `resources/brand/app-icon/approved.json` | 两种外观的精确参数、用户决定、原图与字标哈希 |
+| `resources/brand/app-icon/source.json` | 原始箭头的实际生成提示词和来源 |
+| `public/brand/app-route-inline.svg` | 应用内第三版随形轮廓，用于侧栏、手机导航、顶部栏 |
+| `public/brand/app-route.png` | 02 深灰蓝桌面主图，1024px，圆角外透明 |
 | `public/brand/app-route-32.png` | 浏览器标签页图标 |
-| `public/brand/app-route-128.png` | 应用界面、README 标识 |
+| `public/brand/app-route-128.png` | README 等独立品牌展示 |
 | `public/brand/app-route-180.png` | Apple touch icon |
-| `public/brand/app-route-512.png` | 通用展示、后续桌面打包 |
-| `public/brand/app-route-wordmark.png` | 2026-11-10 用户确认的稍细连笔艺术字原图，1983 × 793 像素；页面通过视窗去除留白 |
-| `public/favicon.ico` | 浏览器及 Windows 图标，含 16、24、32、48、64、128、256 像素七帧 |
+| `public/brand/app-route-512.png` | 独立图标展示及后续桌面打包 |
+| `public/favicon.ico` | 浏览器及 Windows 图标，含 16、24、32、48、64、128、256px 七帧 |
+| `public/brand/app-route-wordmark.png` | 已确认的艺术字原文件，此次不修改 |
 
-Windows 上执行 `npm run icons:app`，由 `scripts/export-app-icon.ps1` 使用系统 System.Drawing 重新导出尺寸及 ICO，不需要额外依赖。该命令只缩放和封装，不重绘、裁切、改色或修改原图。透明区域随原图保留。
+应用内示意：
 
-当前网页和代码仓库已接入此图标。ICO 可用于 Windows 快捷方式及后续安装包；当前还没有 Electron 安装包，不表示已交付桌面安装版本。
+<img src="../../public/brand/app-route-inline.svg" width="88" height="88" alt="第三版随形轮廓" />
 
-## 来源与生成约束
+桌面图标：
 
-该图标由 GPT 图像生成功能根据本项目设计要求及用户提供的原版参考图调整，并经用户确认用于 AppRoute。它与 `public/icons` 内用于识别第三方应用的示例标识分开管理。
+<img src="../../public/brand/app-route-512.png" width="176" height="176" alt="02 深灰蓝底" />
 
-定稿生成提示词如下；导出无需重新生成。
+## 固定参数与再导出
 
-> Use case: precise-object-edit, minimal color adjustment. The attached image is the user's EXACT chosen AppRoute icon and the sole edit target. The user has corrected previous attempts: they specifically want this original ASYMMETRICAL arrangement. Preserve the fork glyph's exact silhouette, proportions, positions, curves, directions, height difference, and white-left / mint-right color relationship. The LEFT WHITE arrow is clearly LOWER and SHORTER; the RIGHT MINT arrow is clearly HIGHER and LONGER. Keep that pronounced height difference exactly as in the reference. Both arrowheads retain their original orientation. Do NOT align their tops. Do NOT make them symmetric. Do NOT rotate the arrowheads outward. Do NOT normalize the route lengths or move either arrow. Do NOT redesign the stem or junction. Make ONLY a restrained background-color refinement: replace the very dark saturated royal-blue tile with a lighter but still vivid, clean medium cornflower blue, approximately #467FDC, and make its existing gradient much subtler. A very gentle top #528AE5 to bottom #3E74D0 is acceptable, but no dark navy or electric ultramarine area. Preserve the original arrow colors with no significant change and preserve their high contrast. Keep the same rounded-square tile, padding, center placement, image composition, and genuinely transparent outside corners. The result must look like the same original icon with a more comfortable blue background, NOT a new layout. Smooth clean edges, clean fully opaque tile interior, no extra objects, no text, no labels, no mockup, no watermark, no holes or decorative shadows. Deliver one revised icon.
+参数以 `approved.json` 为准。应用内对原箭头的透明轮廓增加浅色包边；SVG 内嵌原始 PNG，避免独立图片无法加载外部引用。桌面保留 28% 圆角、8% 内留白，145° 渐变依次为 `#3f526b`、`#334157`、`#2e3b4f`，停点为 0%、60%、100%。这些参数来自已确认的 02 适中提亮预览。
+
+Windows 上执行：
+
+```sh
+npm run icons:app
+```
+
+`scripts/render-app-icon.ps1` 先核对箭头和字标哈希，导出应用内 SVG、合成桌面 PNG；`scripts/export-app-icon.ps1` 再缩放并封装多尺寸 PNG / ICO。使用系统 System.Drawing，不依赖额外图像生成或 npm 图片库。不会重新生成、重绘或改色箭头，也不会修改艺术字；桌面外投影由使用场景提供，不烘焙进图标的透明外角。
+
+## 品牌组合与桌面边界
+
+`Brand.tsx` 继续使用原来的字标图片、显示视窗、宽度、间距及中文副标题，只将左侧图标替换为随形版本。顶部栏同样使用随形版本。浏览器标签页与桌面独立入口使用深灰蓝底。
+
+本次本机验证使用了桌面 `AppRoute` 快捷方式，引用导出的 ICO，并打开 `http://127.0.0.1:4318/`；它依赖本机预览服务运行，不是 Electron 安装包。快捷方式与试验归档不随仓库分发；两份旧图标试用快捷方式已归档，独立网络恢复入口保持原样。
+
+## 设计过程
+
+先确认与连笔艺术字相近的手写分流箭头，再比较透明、浅冰蓝、深灰蓝和其他浅色底。深灰蓝 02 单独展示获得认可，与字标组合后仍显厚重；随后比较玻璃薄框、局部柔光、随形轮廓。最终用户选择按场景使用：应用内随形、桌面深灰蓝。
+
+旧的浅蓝底白色 / 薄荷绿图标保留在 Git 历史中，不再作为当前定稿。上述资源属于 AppRoute 自身品牌，与 `public/icons` 中的第三方应用标识分开管理。
+
+## 本次验证（2026-11-10）
+
+- 艺术字 SHA-256 保持不变，与定稿记录一致。
+- `npm run check` 通过：34 项测试、类型检查、恢复工具打包和页面构建；保留既有 bundle 体积提示。
+- 实际应用页面已确认侧栏与顶部栏使用随形 SVG，图片成功加载；桌面目录已实际观察到深灰蓝 ICO。
+- 网络恢复快捷方式写入前后哈希一致，未执行网络配置变更。

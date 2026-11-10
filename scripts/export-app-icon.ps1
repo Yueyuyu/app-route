@@ -1,7 +1,7 @@
 ﻿$ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
-# 只缩放、封装已确认的原图，不裁切或改色。
+# 只缩放、封装 render-app-icon.ps1 输出的深灰蓝桌面主图，不裁切或改色。
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $brandDirectory = Join-Path $projectRoot 'public/brand'
 $sourcePath = Join-Path $brandDirectory 'app-route.png'
