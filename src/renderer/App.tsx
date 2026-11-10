@@ -1,15 +1,17 @@
 import { useMemo, useState, type Key } from 'react'
 import { Alert, App as AntApp, Breadcrumb, Button, Drawer, Dropdown, Input, Menu, Select, Tabs, Tag } from 'antd'
-import { AppstoreOutlined, BookOutlined, CloseOutlined, ExportOutlined, FileTextOutlined, InfoCircleOutlined, MenuOutlined, PlusOutlined, ScanOutlined, SearchOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, BookOutlined, CloseOutlined, ExportOutlined, FileTextOutlined, InfoCircleOutlined, MenuOutlined, PlusOutlined, ScanOutlined, SearchOutlined, SettingOutlined, PictureOutlined } from '@ant-design/icons'
 import { ApplicationTable } from './components/ApplicationTable'
 import { ApplicationEditor } from './components/ApplicationEditor'
 import { ScanApplications } from './components/ScanApplications'
 import { DraftPage, HelpPage } from './components/SecondaryPages'
 import { useApplicationDraft } from './hooks/useApplicationDraft'
 import { RoutingPanel } from './components/RoutingPanel'
+import { IconManagement } from './components/IconManagement'
+import { ApplicationIconsProvider } from './hooks/useApplicationIcons'
 import { routeLabels, type Application, type Page, type RouteMode } from './types'
 
-const pageLabels: Record<Page, string> = { apps: '应用管理', drafts: '规则草稿', help: '使用说明' }
+const pageLabels: Record<Page, string> = { apps: '应用管理', drafts: '规则草稿', help: '使用说明', icons: '图标管理' }
 
 export default function App() {
   const draft = useApplicationDraft()
@@ -59,9 +61,10 @@ export default function App() {
     { key: 'apps', icon: <AppstoreOutlined />, label: '应用管理' },
     { key: 'drafts', icon: <FileTextOutlined />, label: '规则草稿' },
     { key: 'help', icon: <BookOutlined />, label: '使用说明' },
+    { key: 'settings', icon: <SettingOutlined />, label: '设置', children: [{ key: 'icons', icon: <PictureOutlined />, label: '图标管理' }] },
   ]} />
 
-  return <div className="app-shell">
+  return <ApplicationIconsProvider applications={draft.applications} onResolved={draft.syncIcons}><div className="app-shell">
     <aside className="sidebar"><div className="brand"><img className="brand-icon" src="/brand/app-route-128.png" width={37} height={37} alt="" /><div><strong>AppRoute</strong><span>应用分流 · 各走其路</span></div></div>
       {navigation}
       <div className="sidebar-bottom"><div className="integration-status"><i /><div><strong>Clash Party</strong><span>连接与恢复状态见页面上方</span></div></div><small>集成测试版 0.2.0-preview.1</small></div>
@@ -81,12 +84,12 @@ export default function App() {
           {selected.length > 0 && <div className="bulk-toolbar"><span>已选择 <strong>{selected.length}</strong> 个应用</span><Dropdown trigger={['click']} menu={{ items: (Object.keys(routeLabels) as RouteMode[]).map((mode) => ({ key: mode, label: routeLabels[mode] })), onClick: ({ key }) => { changeMode(selected.map(String), key as RouteMode) } }}><Button size="small">批量设置连接方式</Button></Dropdown><Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setSelected([])}>取消选择</Button></div>}
           <ApplicationTable applications={visible} selected={selected} setSelected={setSelected} changeMode={changeMode} edit={(app) => { setEditing(app); setEditorOpen(true) }} remove={removeApplication} clearFilters={() => { setSearch(''); setCategory('all'); setFilter('all') }} />
           <div className="table-footer"><span>{visible.length === draft.applications.length ? `共 ${counts.all} 个应用` : `显示 ${visible.length} / ${counts.all} 个应用`} · {hasRealApps ? hasExamples ? '包含本机应用与示例' : '本机与手动添加' : '示例列表'}</span><Button type="link" size="small" icon={<InfoCircleOutlined />} onClick={() => setPage('help')}>这三种连接方式有什么区别？</Button></div>
-        </section> : page === 'drafts' ? <DraftPage applications={draft.applications} onExport={exportDraft} /> : <HelpPage />}
+        </section> : page === 'drafts' ? <DraftPage applications={draft.applications} onExport={exportDraft} /> : page === 'icons' ? <IconManagement /> : <HelpPage />}
       </main>
       <footer className="workspace-footer"><div className="save-status"><i className={draft.saveError ? 'error' : ''} /><strong>{draft.saveError ? '草稿未能保存' : '草稿已保存'}</strong><span>{draft.saveError ? '本地存储不可用，请导出备份' : '修改先存为草稿，应用后检查实际连接'}</span></div><Button icon={<ExportOutlined />} onClick={exportDraft}>导出草稿</Button></footer>
     </div>
     <ApplicationEditor open={editorOpen} application={editing} applications={draft.applications} onClose={() => setEditorOpen(false)} onSave={(app) => { draft.saveApplication(app); void message.success('应用设置已保存为草稿') }} />
     <ScanApplications open={scanOpen} onClose={() => setScanOpen(false)} onAdd={(apps) => { draft.addScannedApplications(apps); void message.success(`已将 ${apps.length} 个本机应用添加到草稿`) }} />
     <Drawer title="AppRoute 应用分流" placement="left" open={menuOpen} onClose={() => setMenuOpen(false)} size={260}>{navigation}</Drawer>
-  </div>
+  </div></ApplicationIconsProvider>
 }

@@ -28,7 +28,7 @@ export function ApplicationTable({ applications, selected, setSelected, changeMo
     </Empty> }}
     columns={[
       { title: '应用名称', key: 'name', render: (_, app) => <div><button className="application-name" onClick={() => edit(app)} aria-label={`查看 ${app.name} 详情`}>
-        <ApplicationIcon name={app.name} icon={app.icon} />
+        <ApplicationIcon name={app.name} icon={app.icon} application={app} />
         <span className="application-label"><strong>{app.name}</strong><span className="process-label">{app.processes[0]}{app.processes.length > 1 && ` +${app.processes.length - 1}`}</span></span>
       </button><div className="mobile-route"><RouteSelector label={`${app.name} 的连接方式`} value={app.mode} onChange={(mode) => changeMode([app.id], mode)} /></div></div> },
       { title: '分类', dataIndex: 'category', key: 'category', width: '18%', responsive: ['lg'], render: (value) => <span className="category-label">{value}</span> },

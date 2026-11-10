@@ -17,7 +17,7 @@ test('真实写入接口必须同源且持有当前会话；拒绝伪造令牌�
   const headers = { host: '127.0.0.1:4318', 'x-approute-ui': '1', 'content-type': 'application/json' }
   function call(route: string, method: string, extra: Record<string, string> = {}, body = '{}') {
     return new Promise<{ code: number; body: any }>((resolve, reject) => {
-      const req = request({ hostname: '127.0.0.1', port, path: `/api/integration/${route}`, method, headers: { ...headers, ...extra } }, res => {
+      const req = request({ agent: false, hostname: '127.0.0.1', port, path: `/api/integration/${route}`, method, headers: { ...headers, ...extra } }, res => {
         let text = ''; res.on('data', chunk => { text += chunk }); res.on('end', () => resolve({ code: res.statusCode!, body: JSON.parse(text) }))
       }); req.on('error', reject); req.end(method === 'POST' ? body : undefined)
     })

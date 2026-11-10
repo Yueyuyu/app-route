@@ -10,7 +10,7 @@ export function DraftPage({ applications, onExport }: { applications: Applicatio
     <Alert type="info" showIcon title="这是一份设置草稿，不是可直接导入 Clash 的配置文件。" description="导出只包含草稿，不代表当前生效状态。请在应用管理页查看实际规则和新连接。" />
     <div className="draft-heading"><h2>应用专属设置</h2><span>{rules.length} 个应用</span></div>
     <Table rowKey="id" pagination={false} dataSource={rules} locale={{ emptyText: '目前所有应用都按 Clash 规则，没有专属设置。' }} columns={[
-      { title: '应用', dataIndex: 'name', render: (_, app) => <div className="draft-app"><ApplicationIcon name={app.name} icon={app.icon} /><strong>{app.name}</strong></div> },
+      { title: '应用', dataIndex: 'name', render: (_, app) => <div className="draft-app"><ApplicationIcon name={app.name} icon={app.icon} application={app} /><strong>{app.name}</strong></div> },
       { title: '连接方式', dataIndex: 'mode', render: (mode: RouteMode) => <Tag color={mode === 'direct' ? 'green' : 'blue'}>{routeLabels[mode]}</Tag> },
       { title: '适用进程', dataIndex: 'processes', responsive: ['md'], render: (processes: string[]) => <span className="process-label">{processes.join('、')}</span> },
     ]} />

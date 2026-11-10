@@ -12,9 +12,11 @@ export interface Application {
   icon?: string
   path?: string
   publisher?: string
+  iconMethod?: import('./applicationIcon.ts').LocalIconMethod
 }
 
 export interface ApplicationScanResult {
   applications: Application[]
   scannedAt: string
+  warnings?: string[]
 }

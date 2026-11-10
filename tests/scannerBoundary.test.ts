@@ -11,7 +11,8 @@ async function start(t: TestContext, scan: Parameters<typeof createScanMiddlewar
   t.after(() => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())))
   const port = (server.address() as AddressInfo).port
   return (headers: Record<string, string>, method = 'GET') => new Promise<{ status: number; body: string; cache?: string }>((resolve, reject) => {
-    const req = request({ hostname: '127.0.0.1', port, path: '/api/applications', headers, method }, (res) => {
+    // 拒绝请求后不复用临时测试服务的连接，避免空闲连接关闭与下次请求竞态。
+    const req = request({ agent: false, hostname: '127.0.0.1', port, path: '/api/applications', headers, method }, (res) => {
       let body = ''
       res.setEncoding('utf8')
       res.on('data', (chunk) => { body += chunk })

@@ -16,7 +16,7 @@ export function ApplicationEditor({ open, application, applications, onClose, on
   const sourceLabel = application?.source === 'example' ? '示例应用' : application?.source === 'scan' ? '本机扫描' : '手动添加'
   return <Drawer title={application ? '应用详情' : '添加应用'} open={open} onClose={onClose} size={460}
     footer={<div className="drawer-footer"><Button onClick={onClose}>取消</Button><Button type="primary" onClick={() => form.submit()}>保存到草稿</Button></div>}>
-    {application && <div className="drawer-app-heading"><ApplicationIcon name={application.name} icon={application.icon} /><div><h2>{application.name}</h2><span>{sourceLabel}</span></div></div>}
+    {application && <div className="drawer-app-heading"><ApplicationIcon name={application.name} icon={application.icon} application={application} /><div><h2>{application.name}</h2><span>{sourceLabel}</span></div></div>}
     <Form form={form} layout="vertical" requiredMark={false} onFinish={(values) => {
       onSave({ ...application, ...values, name: values.name.trim(), processes: [...new Set(values.processes.map((item) => item.trim()))], id: application?.id ?? crypto.randomUUID(), source: application?.source ?? 'manual' })
       onClose()

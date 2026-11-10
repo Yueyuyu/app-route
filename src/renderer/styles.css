@@ -118,6 +118,42 @@ h1 { font-size: 32px; line-height: 1.35; letter-spacing: -.7px; margin: 0; font-
 .help-entry h2 { font-size: 17px; font-weight: 600; margin: 0 0 10px; }
 .help-entry p { font-size: 13px; color: #66768d; line-height: 1.8; margin: 6px 0; }
 .help-entry .help-example { color: #929baa; font-size: 12px; }
+.icon-statistics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 26px 0; }
+.icon-statistics > div { border: 1px solid #e8edf5; border-radius: 12px; background: #fff; padding: 19px 20px; display: flex; flex-direction: column; gap: 8px; }
+.icon-statistics span { color: #65728a; font-size: 13px; }
+.icon-statistics strong { color: #24334d; font-size: 30px; line-height: 1.2; font-weight: 650; }
+.icon-statistics small { color: #8994a5; font-size: 11px; line-height: 1.6; }
+.icon-statistics .icon-attention-count { color: #d48806; }
+.icon-management > .ant-alert { margin-bottom: 16px; }
+.icon-manager-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 17px; flex-wrap: wrap; }
+.icon-manager-toolbar .ant-tabs { margin-bottom: 0; }
+.icon-manager-toolbar .ant-tabs-nav { margin-bottom: 0; }
+.icon-manager-search { display: flex; gap: 12px; }
+.icon-manager-search .ant-input-affix-wrapper { width: 230px; }
+.icon-manager-search .ant-select { width: 135px; }
+.icon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.icon-card { min-width: 0; padding: 20px; border: 1px solid #e5eaf2; border-radius: 12px; background: white; }
+.icon-card-heading { display: flex; align-items: center; gap: 13px; }
+.icon-card-heading > div { min-width: 0; }
+.icon-card-heading .application-icon, .icon-card-heading .application-icon img { width: 42px; height: 42px; flex-basis: 42px; object-fit: contain; }
+.icon-card-heading strong { display: block; font-size: 14px; color: #28354b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.icon-card-heading > div > span { display: block; color: #8b95a5; font-size: 11px; margin-top: 5px; word-break: break-all; }
+.icon-card-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 18px; color: #8a95a7; font-size: 11px; }
+.icon-card-meta .ant-tag { margin: 0; font-size: 11px; }
+.icon-card p { font-size: 12px; color: #8993a3; margin: 12px 0; line-height: 1.6; overflow-wrap: anywhere; }
+.icon-card-actions { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 12px; border-top: 1px solid #f0f2f6; }
+.icon-card-actions .ant-btn { font-size: 12px; }
+.icon-manager-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; color: #8792a3; font-size: 12px; }
+.icon-manager-footer > div { display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
+.icon-manager-note { color: #8b95a5; font-size: 12px; line-height: 1.8; margin-top: 24px; }
+.icon-manager-note .anticon { color: #8093b0; margin-right: 5px; }
+.icon-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-height: 390px; overflow-y: auto; margin-top: 18px; }
+.icon-picker .ant-btn { height: auto; min-height: 74px; display: flex; flex-direction: column; gap: 7px; padding: 10px; }
+.icon-picker .ant-btn img { width: 28px; height: 28px; object-fit: contain; }
+.icon-picker .ant-btn span { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.icon-picker-hint { margin: 18px 0 0; color: #8792a3; font-size: 12px; }
+@media (max-width: 1199px) { .icon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .icon-statistics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 767px) { .icon-manager-search { width: 100%; } .icon-manager-search .ant-input-affix-wrapper { width: auto; flex: 1; min-width: 0; } .icon-grid { grid-template-columns: 1fr; } .icon-manager-footer { align-items: flex-start; flex-direction: column; } .icon-statistics { gap: 10px; } .icon-statistics > div { padding: 14px; } .icon-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .route-flow { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 17px; }
 .route-flow > span { display: flex; align-items: center; gap: 12px; color: #a3acba; font-size: 12px; }
 .route-flow > span > span { padding: 7px 11px; border-radius: 5px; background: #f5f7fa; color: #6e7d94; }
