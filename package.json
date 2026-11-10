@@ -20,6 +20,7 @@
     "check": "npm run test && npm run build",
     "preview": "vite preview",
     "icons": "node scripts/prepare-icons.mjs",
+    "icons:app": "powershell.exe -NoProfile -NonInteractive -File scripts/export-app-icon.ps1",
     "recovery:build": "node scripts/build-recovery.mjs",
     "predev": "npm run recovery:build",
     "prepreview": "npm run recovery:build"

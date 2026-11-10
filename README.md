@@ -1,5 +1,7 @@
 # AppRoute 应用分流
 
+<img src="public/brand/app-route-128.png" width="80" height="80" alt="AppRoute 图标" />
+
 为每个应用选择联网方式：按 Clash Party 原有规则、直接联网或使用指定代理出口。
 
 **当前版本：0.2.0-preview.1，Windows 集成测试版。** Ant Design 页面已接入 Clash Party / Mihomo，支持真实规则应用、连接生效检查、120 秒试运行回退和独立离线恢复。当前仍以 Vite 本机服务运行，没有 Electron 安装包，不属于稳定发行版。

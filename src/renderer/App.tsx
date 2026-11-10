@@ -1,6 +1,6 @@
 import { useMemo, useState, type Key } from 'react'
-import { Alert, App as AntApp, Avatar, Breadcrumb, Button, Drawer, Dropdown, Input, Menu, Select, Tabs, Tag } from 'antd'
-import { AppstoreOutlined, BookOutlined, CloseOutlined, DeploymentUnitOutlined, ExportOutlined, FileTextOutlined, InfoCircleOutlined, MenuOutlined, PlusOutlined, ScanOutlined, SearchOutlined } from '@ant-design/icons'
+import { Alert, App as AntApp, Breadcrumb, Button, Drawer, Dropdown, Input, Menu, Select, Tabs, Tag } from 'antd'
+import { AppstoreOutlined, BookOutlined, CloseOutlined, ExportOutlined, FileTextOutlined, InfoCircleOutlined, MenuOutlined, PlusOutlined, ScanOutlined, SearchOutlined } from '@ant-design/icons'
 import { ApplicationTable } from './components/ApplicationTable'
 import { ApplicationEditor } from './components/ApplicationEditor'
 import { ScanApplications } from './components/ScanApplications'
@@ -62,11 +62,11 @@ export default function App() {
   ]} />
 
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><span className="brand-icon"><DeploymentUnitOutlined /></span><div><strong>AppRoute</strong><span>应用分流 · 各走其路</span></div></div>
+    <aside className="sidebar"><div className="brand"><img className="brand-icon" src="/brand/app-route-128.png" width={37} height={37} alt="" /><div><strong>AppRoute</strong><span>应用分流 · 各走其路</span></div></div>
       {navigation}
       <div className="sidebar-bottom"><div className="integration-status"><i /><div><strong>Clash Party</strong><span>连接与恢复状态见页面上方</span></div></div><small>集成测试版 0.2.0-preview.1</small></div>
     </aside>
-    <div className="workspace"><header className="topbar"><div className="topbar-left"><Button type="text" className="mobile-menu-button" icon={<MenuOutlined />} aria-label="打开导航" onClick={() => setMenuOpen(true)} /><Breadcrumb items={[{ title: '工作空间' }, { title: pageLabels[page] }]} /></div><div className="topbar-right"><Tag variant="filled">集成测试版</Tag><Avatar size={34} style={{ background: '#e5edff', color: '#3265ed' }}>AR</Avatar></div></header>
+    <div className="workspace"><header className="topbar"><div className="topbar-left"><Button type="text" className="mobile-menu-button" icon={<MenuOutlined />} aria-label="打开导航" onClick={() => setMenuOpen(true)} /><Breadcrumb items={[{ title: '工作空间' }, { title: pageLabels[page] }]} /></div><div className="topbar-right"><Tag variant="filled">集成测试版</Tag><img className="topbar-app-icon" src="/brand/app-route-128.png" width={34} height={34} alt="AppRoute" /></div></header>
       <main className="main-content">
         {page === 'apps' ? <section aria-label="应用管理">
           <div className="page-heading"><div><h1>应用管理</h1><p>为每个应用选择连接方式，网络由你掌控。</p></div><div className="heading-actions"><Button icon={<PlusOutlined />} onClick={() => { setEditing(undefined); setEditorOpen(true) }}>添加应用</Button><Button type="primary" icon={<ScanOutlined />} onClick={() => setScanOpen(true)}>扫描应用</Button></div></div>

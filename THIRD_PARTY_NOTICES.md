@@ -10,6 +10,10 @@ AppRoute 自有代码采用 MIT。依赖及素材仍遵循各自许可证，品�
 - 离线工具仅在本机复制当前已安装的 Node 运行时；公开仓库不分发该二进制。未来制作独立安装包时需附带 Node 及其第三方许可。
 - 完整安装版本由 `package-lock.json` 固定；包内 LICENSE 和上游声明是对应组件许可的依据。
 
+## AppRoute 应用图标
+
+`public/brand` 及 `public/favicon.ico` 为本项目使用 GPT 图像生成功能制作、经用户确认采用的应用标识及其尺寸导出。它们不是从本机第三方程序提取的素材；来源、定稿约束和导出方法见 [图标说明](docs/design/app-icon.md)。
+
 ## 示例 SVG 图标
 
 - `chrome.svg`、`edge.svg`、`vscode.svg`、`telegram.svg`：来自 [SVG Logos](https://github.com/gilbarbara/logos)，通过 `@iconify-json/logos` 生成；图标集元数据标注 CC0-1.0。
