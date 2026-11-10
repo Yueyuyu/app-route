@@ -92,7 +92,7 @@ export function overrideScript(apps: ManagedApplication[]): string {
   return `${scriptHeader}\nfunction main(config) {\n  var key = ${JSON.stringify(markerKey)};\n  var old = config[key];\n  if (old && old.owner === ${JSON.stringify(ownerId)} && Array.isArray(old.rules)) {\n    if (!Array.isArray(config.rules) || !old.rules.every(function(r,i){return config.rules[i] === r})) return config;\n    config.rules = config.rules.slice(old.rules.length);\n    delete config[key];\n  }\n  var apps = ${JSON.stringify(apps)};\n  var names = ['DIRECT'].concat((config.proxies || []).map(function(p){return p.name}), (config['proxy-groups'] || []).map(function(p){return p.name}));\n  var rules = [];\n  apps.forEach(function(app){\n    var target = app.mode === 'direct' ? 'DIRECT' : app.target;\n    if (names.indexOf(target) < 0) return;\n    (app.processPaths || app.processes).forEach(function(p){rules.push((app.processPaths ? 'PROCESS-PATH,' : 'PROCESS-NAME,') + p + ',' + target)});\n  });\n  if (rules.length) {\n    config.rules = rules.concat(config.rules || []);\n    config[key] = {owner:${JSON.stringify(ownerId)},rules:rules};\n  }\n  return config;\n}\n`
 }
 
-export interface ProxyInfo { name: string; type: string; all?: string[]; now?: string; fixed?: string; udp?: boolean }
+export interface ProxyInfo { name: string; type: string; all?: string[]; now?: string; fixed?: string; udp?: boolean; alive?: boolean; history?: { time: string; delay: number }[] }
 /** 自动测速/故障转移的 now 会自然变化；只核对用户手动选择及自动组的固定选择。 */
 export function configuredProxySelections(proxies: Record<string, ProxyInfo>): string {
   return JSON.stringify(Object.values(proxies).filter(p => p.type === 'Selector' || ['URLTest', 'Fallback'].includes(p.type))

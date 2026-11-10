@@ -10,13 +10,27 @@ export interface ManagedApplication {
   mode: RouteMode
   target?: string
 }
-export interface ApplyRequest { applications: Application[]; target?: string; revision: string }
+export interface ApplyRequest {
+  applications: Application[]; target?: string; revision: string
+  /** 保存默认跟随组时，必须同时迁移全部已设置代理的应用。 */
+  proxyGroup?: string
+}
 export interface AutomaticApplyResult {
   outcome: 'applied' | 'restored' | 'unchanged' | 'recovery-required'
   message: string
   status: IntegrationStatus
 }
 export interface ProxyChoice { name: string; type: string; current: string; udp: boolean }
+export interface ProxyOutlet {
+  target: string
+  type?: string
+  chain: string[]
+  node?: string
+  kind: 'proxy' | 'direct' | 'reject' | 'distributed' | 'missing' | 'unknown'
+  health: 'healthy' | 'unhealthy' | 'unknown'
+  checkedAt?: string
+  delay?: number
+}
 export interface ConnectionEvidence {
   applicationId: string
   process: string
@@ -25,6 +39,8 @@ export interface ConnectionEvidence {
   matched: boolean
   startedAt: string
   currentRuleMatched?: boolean
+  node?: string
+  usesCurrentNode?: boolean
 }
 export interface IntegrationStatus {
   persistenceObserved?: boolean
@@ -36,6 +52,9 @@ export interface IntegrationStatus {
   revision: string
   choices: ProxyChoice[]
   suggestedTarget?: string
+  proxyGroup?: string
+  groupChoices?: ProxyChoice[]
+  outlets?: Record<string, ProxyOutlet>
   managed: ManagedApplication[]
   rulesLoaded: boolean
   evidence: ConnectionEvidence[]

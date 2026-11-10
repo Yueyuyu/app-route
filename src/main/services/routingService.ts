@@ -12,6 +12,7 @@ import { atomicWrite, digest, readOptional, withLock, writeIfUnchanged } from '.
 import { installRecoveryKit, startGuardian } from '../recovery/recoveryKit.ts'
 import { isDedicatedApplicationDirectory, resolveProcessFamily } from '../platform/windows/processFamily.ts'
 import { normalizeProcessPath } from '../../core/processFamily.ts'
+import { isFollowGroup, resolveProxyOutlet } from '../../core/proxyGroups.ts'
 
 export interface RoutingState {
   revision: string
@@ -19,6 +20,7 @@ export interface RoutingState {
   appliedAt?: string
   pendingId?: string
   lastRecovery?: string
+  proxyGroup?: string
 }
 export interface Transaction {
   id: string
@@ -93,7 +95,7 @@ export class RoutingService {
   }
   async status(): Promise<IntegrationStatus> {
     const state = await this.state()
-    const base: IntegrationStatus = { connected: false, revision: state.revision, choices: [], managed: state.managed, rulesLoaded: false, evidence: [], recoveryReady: await fs.access(this.recoveryPath).then(() => true, () => false), recoveryPath: this.recoveryPath, lastRecovery: state.lastRecovery }
+    const base: IntegrationStatus = { connected: false, revision: state.revision, proxyGroup: state.proxyGroup, choices: [], managed: state.managed, rulesLoaded: false, evidence: [], recoveryReady: await fs.access(this.recoveryPath).then(() => true, () => false), recoveryPath: this.recoveryPath, lastRecovery: state.lastRecovery }
     if (state.pendingId) {
       const tx = await this.transaction(state.pendingId)
       base.pending = { id: tx.id, deadline: tx.deadline }
@@ -103,20 +105,27 @@ export class RoutingService {
       const [version, config, proxies, connections, rulesLoaded] = await Promise.all([runtime.version(), runtime.config(), runtime.proxies(), runtime.connections(), this.matches(runtime, state.managed)])
       const snapshot = await this.party.snapshot()
       const persistenceObserved = Boolean(snapshot.config[markerKey])
-      const changedTarget = state.managed.some(app => app.mode === 'proxy' && !isProxyOnly(app.target!, proxies.proxies))
       const declared = new Set([...(snapshot.config.proxies ?? []), ...(snapshot.config['proxy-groups'] ?? [])].map(p => p.name))
-      const choices = Object.values(proxies.proxies).filter(p => declared.has(p.name) && isProxyOnly(p.name, proxies.proxies))
+      const choices = Object.values(proxies.proxies).filter(p => declared.has(p.name) && (isFollowGroup(p) || isProxyOnly(p.name, proxies.proxies)))
         .sort((a, b) => Number(Boolean(b.all)) - Number(Boolean(a.all)))
         .map(p => ({ name: p.name, type: p.type, current: p.now ?? p.name, udp: p.udp === true }))
+      const groupChoices = choices.filter(p => isFollowGroup(proxies.proxies[p.name]))
+      const targets = new Set([...state.managed.filter(app => app.mode === 'proxy').map(app => app.target!), ...groupChoices.map(p => p.name), ...(state.proxyGroup ? [state.proxyGroup] : [])])
+      const outlets = Object.fromEntries([...targets].map(target => [target, resolveProxyOutlet(target, proxies.proxies)]))
+      const changedTarget = state.managed.some(app => app.mode === 'proxy' && (!declared.has(app.target!) || ['missing', 'unknown'].includes(outlets[app.target!].kind)))
       const evidence = connections.connections.flatMap(connection => {
         const app = state.managed.find(app => managedProcessMatches(app, connection.metadata))
         if (!app || Date.parse(connection.start) < Date.parse(app.appliedAt ?? state.appliedAt ?? new Date().toISOString())) return []
         const chains = connection.chains ?? []
         const direct = chains.some(p => p === 'DIRECT')
         const currentRuleMatched = connection.rule.replaceAll('-', '').toLowerCase() === (app.processPaths ? 'processpath' : 'processname') && (app.processPaths ?? app.processes).some(p => p.toLowerCase() === connection.rulePayload.toLowerCase())
-        const matched = currentRuleMatched && (app.mode === 'direct' ? direct : chains.includes(app.target ?? '') && !direct)
-        return [{ applicationId: app.id, process: connection.metadata.process ?? '', destination: connection.metadata.host || connection.metadata.destinationIP || '未知目标', outbound: chains.join(' ← '), matched, currentRuleMatched, startedAt: connection.start }]
-      }).slice(0, 50)
+        const followsGroup = isFollowGroup(proxies.proxies[app.target ?? ''])
+        const matched = currentRuleMatched && (app.mode === 'direct' ? direct : chains.includes(app.target ?? '') && (followsGroup || !direct))
+        const node = chains[0]
+        const currentNode = app.mode === 'direct' ? 'DIRECT' : outlets[app.target!]?.node
+        return [{ applicationId: app.id, process: connection.metadata.process ?? '', destination: connection.metadata.host || connection.metadata.destinationIP || '未知目标', outbound: chains.join(' ← '), matched, currentRuleMatched, node,
+          usesCurrentNode: currentNode && node ? currentNode === node : undefined, startedAt: connection.start }]
+      }).sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt)).slice(0, 50)
       const uncoveredProcesses = connections.connections.flatMap(connection => {
         if (!connection.metadata.processPath) return []
         // 共享目录中的其他程序不是辅助进程，不能因其建立连接而反复自动应用。
@@ -125,10 +134,11 @@ export class RoutingService {
         return [{ applicationId: app.id, process: path.win32.basename(connection.metadata.processPath) }]
       }).filter((item, index, items) => items.findIndex(other => other.applicationId === item.applicationId && other.process === item.process) === index)
       return { ...base, connected: true, version: version.version, mode: config.mode, tun: config.tun?.enable ?? false, processMode: config['find-process-mode'], choices, rulesLoaded: rulesLoaded && config.mode === 'rule', evidence,
-        uncoveredProcesses,
-        suggestedTarget: choices.find(choice => choice.name === proxies.proxies.GLOBAL?.now)?.name ?? choices.find(choice => ['Selector', 'Fallback', 'URLTest'].includes(choice.type))?.name,
+        uncoveredProcesses, groupChoices, outlets,
+        // 只有唯一组时才推荐；多个独立选择不能猜成同一个“当前代理”。已保存组失效时也不静默换组。
+        suggestedTarget: state.proxyGroup ?? (groupChoices.length === 1 ? groupChoices[0].name : undefined),
         persistenceObserved,
-        warning: config.mode !== 'rule' ? '当前内核不是规则模式，应用规则不会按预期执行。' : !rulesLoaded ? '规则与运行内核不一致，请检查覆写启用状态或恢复后重新应用。' : changedTarget ? '代理出口成员发生变化，可能包含直连或不可用节点，请重新选择出口。' : state.managed.length && !persistenceObserved ? '当前规则已加载，持久化尚未验证。首次登记后请正常退出并重新打开 Clash Party，再检查规则是否仍已加载。' : config.tun?.enable ? undefined : '当前使用系统代理；不遵循系统代理的软件可能不会进入 Clash，需以实际连接检查为准。' }
+        warning: config.mode !== 'rule' ? '当前内核不是规则模式，应用规则不会按预期执行。' : changedTarget ? '代理组或成员不存在，跟随尚未确认。订阅重新生成时会跳过失效目标、沿用原有规则；请重新绑定有效组。' : !rulesLoaded ? '规则与运行内核不一致，请检查覆写启用状态或恢复后重新应用。' : state.managed.length && !persistenceObserved ? '当前规则已加载，持久化尚未验证。首次登记后请正常退出并重新打开 Clash Party，再检查规则是否仍已加载。' : config.tun?.enable ? undefined : '当前使用系统代理；不遵循系统代理的软件可能不会进入 Clash，需以实际连接检查为准。' }
     } catch (e) { return { ...base, warning: (e as Error).message } }
   }
   async diagnose(): Promise<DiagnosticCheck[]> {
@@ -163,12 +173,12 @@ export class RoutingService {
       const runtime = await this.runtime()
       const baseline = await runtime.proxies()
       const probes = [{ target: 'DIRECT', url: 'https://www.baidu.com/' }, { target: 'GLOBAL', url: 'https://www.gstatic.com/generate_204' }]
-      if (applications.some(app => app.mode === 'proxy')) probes.push({ target: request.target!, url: 'https://www.gstatic.com/generate_204' })
+      if (request.proxyGroup || applications.some(app => app.mode === 'proxy')) probes.push({ target: request.target!, url: 'https://www.gstatic.com/generate_204' })
       const probe = (p: typeof probes[number]) => this.options.probe ? this.options.probe(runtime, p.target, p.url) : runtime.delay(p.target, p.url).then(() => true, () => false)
       const before = await Promise.all(probes.map(probe))
       if (!before.some(Boolean)) throw new Error('网络基线检查未通过，暂未修改设置。')
       if (applications.some(app => app.mode === 'direct') && !before[0]) throw new Error('当前直连出口不可用，暂未修改设置。')
-      if (applications.some(app => app.mode === 'proxy') && !before.at(-1)) throw new Error('所选代理出口不可用，请更换出口。')
+      if ((request.proxyGroup || applications.some(app => app.mode === 'proxy')) && !before.at(-1)) throw new Error('所选代理出口不可用，请更换出口。')
       const pending = await this.apply({ ...request, applications })
       transactionId = pending.pending?.id
       if (!transactionId) throw new Error('未取得恢复事务，不能确认应用。')
@@ -191,12 +201,18 @@ export class RoutingService {
       return { outcome, message: `${error instanceof Error ? error.message : '操作失败。'}${restored ? '已自动恢复上一次设置。' : outcome === 'unchanged' ? '原设置保留。' : '请检查恢复状态。'}`, status }
     }
   }
+  /** 一个组供所有代理应用共用；更换组走完整事务，节点切换本身完全由 Mihomo 执行。 */
+  async setProxyGroup(request: { target: string; revision: string }): Promise<AutomaticApplyResult> {
+    const state = await this.state()
+    return this.applyAutomatically({ revision: request.revision, target: request.target, proxyGroup: request.target,
+      applications: state.managed.filter(app => app.mode === 'proxy').map(app => ({ ...app, path: app.processPaths?.[0], source: 'manual', category: '已管理应用' })) })
+  }
   async apply(request: ApplyRequest): Promise<IntegrationStatus> {
     await withLock(this.root, async () => {
       const previous = await this.state()
       if (previous.pendingId) throw new Error('请先保留或恢复上一轮试运行设置。')
       if (request.revision !== previous.revision) throw new Error('页面状态已过期，请刷新后重试。')
-      if (!Array.isArray(request.applications) || !request.applications.length) throw new Error('请先选择应用。')
+      if (!Array.isArray(request.applications) || (!request.applications.length && !request.proxyGroup)) throw new Error('请先选择应用。')
       const appliedAt = new Date().toISOString()
       const selected = managedApplications(request.applications, request.target).map(app => ({ ...app, appliedAt }))
       const selectedIds = new Set(request.applications.map(app => app.id))
@@ -211,7 +227,9 @@ export class RoutingService {
       if (cfg.mode !== 'rule' || cfg['find-process-mode'] === 'off') throw new Error('需要 Clash Party 的规则模式及进程识别；AppRoute 不会自动切换全局网络设置。')
       if (snapshot.config.mode !== cfg.mode || snapshot.config['mixed-port'] !== cfg['mixed-port']) throw new Error('磁盘配置与内核模式或代理端口不同，请先在 Clash Party 重新加载配置。')
       const declared = new Set([...(snapshot.config.proxies ?? []), ...(snapshot.config['proxy-groups'] ?? [])].map(p => p.name))
-      for (const app of managed) if (app.mode === 'proxy' && (!declared.has(app.target!) || !isProxyOnly(app.target!, proxies.proxies))) throw new Error('代理出口不存在或包含直连/拒绝成员，请重新选择。')
+      if (request.proxyGroup !== undefined && (typeof request.proxyGroup !== 'string' || request.proxyGroup !== request.target || !declared.has(request.proxyGroup) || !isFollowGroup(proxies.proxies[request.proxyGroup]) ||
+          managed.some(app => app.mode === 'proxy' && app.target !== request.proxyGroup))) throw new Error('请选择有效代理组，并统一更新已有代理应用。')
+      for (const app of managed) if (app.mode === 'proxy' && (!declared.has(app.target!) || !(isFollowGroup(proxies.proxies[app.target!]) || isProxyOnly(app.target!, proxies.proxies)))) throw new Error('代理出口不存在或类型不支持，请重新选择。')
       const candidate = YAML.stringify(addManagedRules(snapshot.config, managed))
       await this.validate(candidate, snapshot.workDir)
       await this.ensureRecovery()
@@ -233,7 +251,7 @@ export class RoutingService {
         if (runtimeRuleSignature((await runtime.rules()).rules) !== configRuleSignature(addManagedRules(snapshot.config, managed).rules ?? [])) throw new Error('原有规则未完整保留，正在恢复。')
         for (const app of selected) app.appliedAt = new Date().toISOString()
         tx.phase = 'pending'; await this.saveTransaction(tx)
-        await this.save({ revision: id, managed, appliedAt: new Date().toISOString(), pendingId: id })
+        await this.save({ revision: id, managed, proxyGroup: request.proxyGroup ?? previous.proxyGroup, appliedAt: new Date().toISOString(), pendingId: id })
       } catch (e) {
         try { await this.rollbackInternal(tx) } catch { throw new Error('应用失败且内核恢复未确认，请立即运行独立恢复工具。') }
         throw e
@@ -290,7 +308,7 @@ export class RoutingService {
         try { const tx = await this.transaction(previous.pendingId); tx.phase = 'rolled-back'; await this.saveTransaction(tx) }
         catch { /* 离线全部恢复不依赖可解析的历史事务，先解除全部专属规则。 */ }
       }
-      await this.save({ revision: randomUUID(), managed: [], lastRecovery: new Date().toISOString() })
+      await this.save({ revision: randomUUID(), managed: [], proxyGroup: previous.proxyGroup, lastRecovery: new Date().toISOString() })
       try {
         const snapshot = await this.party.snapshot()
         const runtime = await this.runtime()

@@ -8,7 +8,8 @@ import vm from 'node:vm'
 import { RoutingService, type ServiceOptions } from '../src/main/services/routingService.ts'
 import { MihomoRuntime, type RuntimeConfig, type RuntimeConnection, type RuntimeRule } from '../src/main/adapters/mihomoRuntime.ts'
 import { atomicWrite, readOptional, writeIfUnchanged } from '../src/main/storage/localState.ts'
-import { markerKey, overrideScript } from '../src/core/managedRouting.ts'
+import { markerKey, overrideScript, type ProxyInfo } from '../src/core/managedRouting.ts'
+import { routingPresentation } from '../src/core/applicationInventory.ts'
 import type { Application } from '../src/shared/application.ts'
 import { identifyProcessFamily } from '../src/core/processFamily.ts'
 
@@ -17,13 +18,15 @@ class MockRuntime extends MihomoRuntime {
   failNextReload = false
   available = true
   activeConnections: RuntimeConnection[] = []
+  reloadCount = 0
+  proxyEntries: Record<string, ProxyInfo> = { DIRECT: { name: 'DIRECT', type: 'Direct' }, Group: { name: 'Group', type: 'Selector', all: ['Node'], now: 'Node' }, Node: { name: 'Node', type: 'Shadowsocks', udp: true } }
   constructor(config: any) { super('test'); this.current = structuredClone(config) }
   override async config(): Promise<RuntimeConfig> { if (!this.available) throw new Error('内核离线'); return this.current }
   override async version() { return { version: 'test' } }
-  override async proxies() { return { proxies: { DIRECT: { name: 'DIRECT', type: 'Direct' }, Group: { name: 'Group', type: 'Selector', all: ['Node'], now: 'Node' }, Node: { name: 'Node', type: 'Shadowsocks', udp: true } } } }
+  override async proxies() { return { proxies: structuredClone(this.proxyEntries) } }
   override async connections() { return { connections: this.activeConnections } }
   override async rules(): Promise<{ rules: RuntimeRule[] }> { return { rules: this.current.rules.map((r: string) => { const parts = r.split(','); const type = parts.shift()!; const proxy = parts.pop()!; return { type, payload: parts.join(','), proxy } }) } }
-  override async reload(payload: string) { if (!this.available || this.failNextReload) { this.failNextReload = false; throw new Error('模拟重载失败') }; this.current = YAML.parse(payload) }
+  override async reload(payload: string) { this.reloadCount++; if (!this.available || this.failNextReload) { this.failNextReload = false; throw new Error('模拟重载失败') }; this.current = YAML.parse(payload) }
 }
 
 const app: Application = { id: 'test', name: '测试程序', processes: ['Example.exe'], category: '其他应用', source: 'manual', mode: 'direct' }
@@ -207,4 +210,88 @@ test('系统共享目录的新连接不会被当成应用辅助进程反复触�
   await f.service.applyAutomatically({ applications: [{ ...pathApp, path: 'C:\\Windows\\System32\\Example.exe' }], revision: 'initial' })
   f.runtime.activeConnections = [{ metadata: { process: 'system-host.exe', processPath: 'C:\\Windows\\System32\\system-host.exe' }, chains: ['DIRECT'], start: new Date().toISOString(), rule: 'Match', rulePayload: '' }]
   assert.deepEqual((await f.service.status()).uncoveredProcesses, [])
+})
+
+async function groupFixture(t: TestContext) {
+  const f = await fixture(t, { resolveFamily: async application => identifyProcessFamily(application, []), probe: async () => true })
+  f.config.proxies.push({ name: 'NodeTwo', type: 'ss' })
+  f.config['proxy-groups'][0].proxies.push('NodeTwo', 'DIRECT')
+  f.runtime.current = structuredClone(f.config)
+  f.runtime.proxyEntries.NodeTwo = { name: 'NodeTwo', type: 'Shadowsocks' }
+  f.runtime.proxyEntries.Group.all = ['Node', 'NodeTwo', 'DIRECT']
+  await atomicWrite(path.join(f.party, 'work/config.yaml'), YAML.stringify(f.config))
+  return f
+}
+
+test('统一绑定组，保留直连应用；成员切换无需重写规则，显示真实连接与当前选择', async t => {
+  const f = await groupFixture(t)
+  const direct = await f.service.applyAutomatically({ applications: [pathApp], revision: 'initial' })
+  const proxyApp = { ...pathApp, id: 'proxy', path: 'C:\\ProxyApp\\Example.exe', mode: 'proxy' as const }
+  const fixed = await f.service.applyAutomatically({ applications: [proxyApp], target: 'Node', revision: direct.status.revision })
+  const result = await f.service.setProxyGroup({ target: 'Group', revision: fixed.status.revision })
+  assert.equal(result.outcome, 'applied')
+  assert.equal(result.status.proxyGroup, 'Group')
+  assert.equal(result.status.groupChoices?.some(p => p.name === 'Group'), true, '包含 DIRECT 的手动组仍可跟随')
+  assert.deepEqual(result.status.managed.find(a => a.id === app.id), direct.status.managed[0])
+  assert.equal(result.status.managed.find(a => a.id === proxyApp.id)?.target, 'Group')
+  const state = await f.service.state(), reloads = f.runtime.reloadCount, rules = structuredClone(f.runtime.current.rules)
+  const start = new Date(Date.parse(state.appliedAt!) + 1000).toISOString()
+  f.runtime.activeConnections = [{ metadata: { processPath: proxyApp.path, process: 'Example.exe' }, start, chains: ['Node', 'Group'], rule: 'ProcessPath', rulePayload: proxyApp.path }]
+  f.runtime.proxyEntries.Group.now = 'NodeTwo'
+  let status = await f.service.status()
+  assert.equal(status.outlets?.Group.node, 'NodeTwo')
+  assert.equal(status.evidence[0].matched, true)
+  assert.equal(status.evidence[0].node, 'Node')
+  assert.equal(status.evidence[0].usesCurrentNode, false)
+  assert.equal(routingPresentation(proxyApp, status).label, '等待新节点连接')
+  f.runtime.activeConnections.unshift({ ...f.runtime.activeConnections[0], chains: ['NodeTwo', 'Group'] })
+  status = await f.service.status()
+  assert.equal(status.evidence[0].usesCurrentNode, true)
+  assert.equal(routingPresentation(proxyApp, status).label, '已验证新连接')
+  assert.equal(f.runtime.reloadCount, reloads)
+  assert.deepEqual(await f.service.state(), state)
+  assert.deepEqual(f.runtime.current.rules, rules)
+  // 重建客户端配置和服务实例仍保存组名，不把运行时 now 写成固定节点。
+  const generated = vm.runInNewContext((await fs.readFile(f.service.party.scriptPath, 'utf8')) + '\nmain(config)', { config: structuredClone(f.config) })
+  assert.ok(generated.rules.includes('PROCESS-PATH,C:\\ProxyApp\\Example.exe,Group'))
+  assert.equal((await new RoutingService(f.service.options).status()).proxyGroup, 'Group')
+  f.runtime.proxyEntries.Group.now = 'DIRECT'
+  status = await f.service.status()
+  assert.equal(routingPresentation(proxyApp, status).label, '代理组当前直连')
+  delete f.runtime.proxyEntries.Group
+  assert.equal((await f.service.status()).outlets?.Group.kind, 'missing')
+})
+
+test('首次绑定可保存默认组；断开后不展示缓存节点，过期操作不能换组', async t => {
+  const f = await groupFixture(t)
+  const result = await f.service.setProxyGroup({ target: 'Group', revision: 'initial' })
+  assert.equal(result.outcome, 'applied')
+  assert.equal(result.status.managed.length, 0)
+  assert.deepEqual(f.runtime.current.rules, f.config.rules)
+  assert.equal((await f.service.setProxyGroup({ target: 'Group', revision: 'initial' })).outcome, 'unchanged')
+  f.runtime.available = false
+  const offline = await f.service.status()
+  assert.equal(offline.connected, false)
+  assert.equal(offline.proxyGroup, 'Group')
+  assert.equal(offline.outlets, undefined)
+})
+
+test('跟随组迁移网络检查失败，恢复旧固定出口和默认组；不修改组内选择', async t => {
+  const f = await groupFixture(t)
+  const fixed = await f.service.applyAutomatically({ applications: [{ ...pathApp, mode: 'proxy' }], target: 'Node', revision: 'initial' })
+  let probes = 0
+  f.service.options.probe = async () => ++probes <= 3
+  const failed = await f.service.setProxyGroup({ target: 'Group', revision: fixed.status.revision })
+  assert.equal(failed.outcome, 'restored')
+  assert.equal(failed.status.proxyGroup, undefined)
+  assert.deepEqual(failed.status.managed, fixed.status.managed)
+  assert.equal(f.runtime.proxyEntries.Group.now, 'Node')
+})
+
+test('统一跟随不能只更新默认组而遗漏旧代理应用，也不能把节点当作组', async t => {
+  const f = await groupFixture(t)
+  const fixed = await f.service.applyAutomatically({ applications: [{ ...pathApp, mode: 'proxy' }], target: 'Node', revision: 'initial' })
+  await assert.rejects(f.service.apply({ applications: [], target: 'Group', proxyGroup: 'Group', revision: fixed.status.revision }), /统一更新/)
+  await assert.rejects(f.service.apply({ applications: [], target: 'Node', proxyGroup: 'Node', revision: fixed.status.revision }), /有效代理组/)
+  assert.deepEqual((await f.service.state()).managed, fixed.status.managed)
 })

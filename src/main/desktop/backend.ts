@@ -29,6 +29,7 @@ async function dispatch(action: DesktopAction, body: any = {}) {
     case 'inventory.write': return inventory.write(body)
     case 'integration.status': return service.status()
     case 'integration.apply-automatic': return service.applyAutomatically(body)
+    case 'integration.proxy-group': return service.setProxyGroup(body)
     case 'integration.apply': return service.apply(body)
     case 'integration.confirm': return service.confirm(body.id)
     case 'integration.rollback': return service.rollback(body.id)

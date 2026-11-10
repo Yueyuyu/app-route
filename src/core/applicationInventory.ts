@@ -25,8 +25,12 @@ export function routingPresentation(app: Application, status?: IntegrationStatus
   if (!status.rulesLoaded) return { label: '规则异常', detail: '运行规则与保存的设置不一致，请检查或恢复。', color: 'error' }
   if (status.pending) return { label: '自动检查中', detail: '独立恢复守护已启动，检查失败会自动恢复。', color: 'processing' }
   if (status.uncoveredProcesses?.some(item => item.applicationId === managed.id)) return { label: '发现新的辅助进程', detail: '正在核对进程归属并补充规则；未识别的流量暂时沿用原有规则。', color: 'warning' }
+  const outlet = managed.mode === 'proxy' ? status.outlets?.[managed.target ?? ''] : undefined
+  if (outlet?.kind === 'direct') return { label: '代理组当前直连', detail: '跟随组当前选择了 DIRECT，并未经过远端代理节点。', color: 'warning' }
+  if (outlet?.kind === 'reject' || outlet?.kind === 'missing' || outlet?.kind === 'unknown' || outlet?.health === 'unhealthy') return { label: '代理组待检查', detail: '当前出口不可用或尚未确认，请检查 Clash Party 的组内选择或网络自检。', color: 'warning' }
   const evidence = status.evidence.filter(item => item.applicationId === managed.id)
   if (evidence.some(item => !item.matched)) return { label: '连接不符合设置', detail: '已观察到不符合当前规则的新连接，请检查或恢复。', color: 'error' }
+  if (evidence.length && evidence.every(item => item.usesCurrentNode === false)) return { label: '等待新节点连接', detail: '当前观察到的连接仍用其他节点；已有连接不会强制断开，新建连接交给组当前选择。', color: 'warning' }
   if (evidence.length) return { label: '已验证新连接', detail: `已验证 ${[...new Set(evidence.map(item => item.process))].join('、')} 的 ${evidence.length} 条新连接；其余进程仍待观测。`, color: 'success' }
   return { label: '规则已加载', detail: '等待应用建立新连接；现有连接不会自动切换。', color: 'warning' }
 }
