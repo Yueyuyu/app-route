@@ -10,7 +10,7 @@ import { discoverPipe, MihomoRuntime } from '../adapters/mihomoRuntime.ts'
 import { configRuleSignature, runtimeRuleSignature } from '../adapters/runtimeRules.ts'
 import { atomicWrite, digest, readOptional, withLock, writeIfUnchanged } from '../storage/localState.ts'
 import { installRecoveryKit, startGuardian } from '../recovery/recoveryKit.ts'
-import { resolveProcessFamily } from '../platform/windows/processFamily.ts'
+import { isDedicatedApplicationDirectory, resolveProcessFamily } from '../platform/windows/processFamily.ts'
 import { normalizeProcessPath } from '../../core/processFamily.ts'
 
 export interface RoutingState {
@@ -119,7 +119,8 @@ export class RoutingService {
       }).slice(0, 50)
       const uncoveredProcesses = connections.connections.flatMap(connection => {
         if (!connection.metadata.processPath) return []
-        const app = state.managed.find(app => app.processPaths?.length && normalizeProcessPath(connection.metadata.processPath!).startsWith(path.win32.dirname(normalizeProcessPath(app.processPaths[0])) + '\\'))
+        // 共享目录中的其他程序不是辅助进程，不能因其建立连接而反复自动应用。
+        const app = state.managed.find(app => app.processPaths?.length && isDedicatedApplicationDirectory(app.processPaths[0]) && normalizeProcessPath(connection.metadata.processPath!).startsWith(path.win32.dirname(normalizeProcessPath(app.processPaths[0])) + '\\'))
         if (!app || managedProcessMatches(app, connection.metadata)) return []
         return [{ applicationId: app.id, process: path.win32.basename(connection.metadata.processPath) }]
       }).filter((item, index, items) => items.findIndex(other => other.applicationId === item.applicationId && other.process === item.process) === index)

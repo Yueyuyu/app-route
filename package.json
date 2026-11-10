@@ -23,7 +23,9 @@
     "icons:app": "powershell.exe -NoProfile -NonInteractive -File scripts/render-app-icon.ps1 && powershell.exe -NoProfile -NonInteractive -File scripts/export-app-icon.ps1",
     "recovery:build": "node scripts/build-recovery.mjs",
     "predev": "npm run recovery:build",
-    "prepreview": "npm run recovery:build"
+    "prepreview": "npm run recovery:build",
+    "desktop:build": "npm run build && node scripts/build-desktop.mjs",
+    "desktop:install": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/install-desktop.ps1"
   },
   "dependencies": {
     "@ant-design/icons": "6.3.4",
@@ -34,6 +36,7 @@
     "yaml": "2.9.1"
   },
   "devDependencies": {
+    "@electron/packager": "20.3.0",
     "@iconify-json/icon-park": "1.2.4",
     "@iconify-json/logos": "1.2.19",
     "@iconify-json/simple-icons": "1.2.101",
@@ -42,6 +45,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
+    "electron": "45.2.3",
     "rolldown": "1.2.18",
     "typescript": "7.0.2",
     "vite": "8.3.7"

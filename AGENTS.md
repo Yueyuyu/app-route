@@ -4,7 +4,7 @@
 
 阅读 `README.md` 了解当前可运行能力，阅读 `docs/PROJECT.md`、`docs/ARCHITECTURE.md` 和 `docs/COMPATIBILITY.md` 了解产品及适配边界。功能状态以 `docs/ROADMAP.md` 为准；完成对应功能时同步更新。
 
-当前为 0.2 集成测试版：已实现 Clash Party / Mihomo 运行控制、专属覆写、试运行与独立离线恢复；真实客户端重启和订阅切换验收仍待完成。没有 Electron 安装包。
+当前为 0.2 集成测试版：已实现 Clash Party / Mihomo 运行控制、专属覆写、试运行与独立离线恢复；真实客户端重启和订阅切换验收仍待完成。已有本机 Electron 桌面打包/安装流程，尚未签名或发布稳定安装版。
 
 涉及品牌图标、艺术字或复用视觉效果时，先读 `docs/design/README.md`、`docs/design/app-icon.md` 和 `docs/design/wordmark.md`。AppRoute 沿用已确认原图；跨项目的通用风格按字标规范中的 UI Design Lab 来源提交、ID 与版本读取，不把字标图片当作可安装字体。
 
@@ -22,7 +22,7 @@
 - `src/main/platform/windows` 负责 Windows 能力；脚本只执行固定功能，不接受界面拼接的命令。
 - `src/main/adapters` 分开管理内核运行控制、配置所有者、通用端口的流量接管能力。
 - `tooling/vite` 仅是开发预览桥接。不得把该 HTTP 服务器当成已交付的 Electron 后端。
-- `src/preload` 的桌面桥接尚未实现；实现时只暴露经过校验的有限 IPC 接口。
+- `src/preload` 只暴露经过校验的有限 IPC 接口；桌面资源由固定本地协议加载，不启用开发 HTTP 服务。
 
 ## 分流语义
 

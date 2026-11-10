@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { applicationKey, applicationView, isSystemTool, isRunningApplication, mergeScannedApplications } from '../src/core/applicationViews.ts'
+import { desktopAssetPath, isTrustedDesktopSender, validateDesktopRequest } from '../src/main/desktop/boundary.ts'
 import { InventoryPreferencesStore } from '../src/main/services/inventoryPreferences.ts'
 import type { Application } from '../src/shared/application.ts'
 
@@ -32,6 +33,17 @@ test('重扫增加新应用并保持默认规则，保留手动和便携资料�
   assert.equal(result[0].name, '我的音乐')
   assert.equal(result[0].category, '音乐娱乐')
   assert.ok(result.every(app => app.mode === 'rule'))
+})
+test('桌面 IPC 限制来源、子框架、操作名和请求大小，资源不能越出 UI 目录', () => {
+  assert.equal(isTrustedDesktopSender('approute://app/index.html', true), true)
+  for (const url of ['https://app/index.html', 'approute://evil/index.html', 'approute://app/other.html', 'approute://user@app/index.html']) assert.equal(isTrustedDesktopSender(url, true), false)
+  assert.equal(isTrustedDesktopSender('approute://app/index.html', false), false)
+  assert.doesNotThrow(() => validateDesktopRequest('integration.status'))
+  assert.throws(() => validateDesktopRequest('shell.execute'))
+  assert.throws(() => validateDesktopRequest('inventory.write', 'x'.repeat(5 * 1024 * 1024)))
+  const root = path.resolve('fixture-ui')
+  assert.equal(desktopAssetPath(root, 'approute://app/assets/main.js'), path.join(root, 'assets/main.js'))
+  for (const url of ['file:///private/config.yaml', 'approute://evil/index.html', 'approute://app/%2e%2e%5csecret', 'approute://app/a%2f..%2f..%2fsecret']) assert.throws(() => desktopAssetPath(root, url))
 })
 test('桌面收藏持久化，读写资料不会写入联网状态，也不会覆盖损坏文件', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'approute-desktop-test-'))

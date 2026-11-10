@@ -201,3 +201,10 @@ test('辅助进程遗漏会提示；只验证应用后的精确路径、规则�
   f.runtime.activeConnections.push(connection(pathApp.path, { rule: 'DomainSuffix', rulePayload: 'example' }))
   assert.equal((await f.service.status()).evidence.at(-1)?.matched, false, '出口碰巧直连也不能冒充应用规则命中')
 })
+
+test('系统共享目录的新连接不会被当成应用辅助进程反复触发应用', async t => {
+  const f = await fixture(t, { resolveFamily: async application => identifyProcessFamily(application, []), probe: async () => true })
+  await f.service.applyAutomatically({ applications: [{ ...pathApp, path: 'C:\\Windows\\System32\\Example.exe' }], revision: 'initial' })
+  f.runtime.activeConnections = [{ metadata: { process: 'system-host.exe', processPath: 'C:\\Windows\\System32\\system-host.exe' }, chains: ['DIRECT'], start: new Date().toISOString(), rule: 'Match', rulePayload: '' }]
+  assert.deepEqual((await f.service.status()).uncoveredProcesses, [])
+})

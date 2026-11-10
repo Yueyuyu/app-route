@@ -1,4 +1,4 @@
-import { Alert, Button, Drawer, Form, Input, Select, Space } from 'antd'
+import { Alert, App as AntApp, Button, Drawer, Form, Input, Select, Space } from 'antd'
 import { useEffect } from 'react'
 import { categories, routeDescriptions, validProcessName, type Application, type RouteMode } from '../types'
 import { ApplicationIcon } from './ApplicationIcon'
@@ -8,6 +8,7 @@ interface Props { open: boolean; application?: Application; applications: Applic
 
 export function ApplicationEditor({ open, application, applications, onClose, onSave }: Props) {
   const [form] = Form.useForm<Values>()
+  const { message } = AntApp.useApp()
   useEffect(() => {
     if (open) { form.resetFields(); form.setFieldsValue(application ?? { category: '其他应用', mode: 'rule', processes: [] }) }
   }, [open, application, form])
@@ -16,6 +17,9 @@ export function ApplicationEditor({ open, application, applications, onClose, on
   return <Drawer title={application ? '应用详情' : '添加应用'} open={open} onClose={onClose} size={460}
     footer={<div className="drawer-footer"><Button onClick={onClose}>取消</Button><Button type="primary" onClick={() => form.submit()}>保存应用资料</Button></div>}>
     {application && <div className="drawer-app-heading"><ApplicationIcon name={application.name} icon={application.icon} application={application} /><div><h2>{application.name}</h2><span>{sourceLabel}</span></div></div>}
+    {!application && window.appRoute && <Button className="choose-executable" onClick={() => {
+      void window.appRoute!.request<{ path: string; name: string; processes: string[] } | null>('application.choose').then(result => { if (result) form.setFieldsValue(result) }).catch(() => { void message.error('未能读取程序文件，请重试或填写路径') })
+    }}>从电脑选择程序文件…</Button>}
     <Form form={form} layout="vertical" requiredMark={false} onFinish={(values) => {
       onSave({ ...application, ...values, name: values.name.trim(), processes: [...new Set(values.processes.map((item) => item.trim()))], id: application?.id ?? crypto.randomUUID(), source: application?.source ?? 'manual', mode: application?.mode ?? 'rule' })
       onClose()

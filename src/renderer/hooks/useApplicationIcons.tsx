@@ -4,6 +4,7 @@ import type { ApplicationIconState } from '../../shared/applicationIcon'
 
 let session: string | undefined
 async function iconRequest(action: string, body?: unknown): Promise<ApplicationIconState> {
+  if (window.appRoute) return window.appRoute.request(`icons.${action}` as import('../../shared/desktop').DesktopAction, body)
   if (body !== undefined && !session) {
     const response = await fetch('/api/icons/session', { headers: { 'X-AppRoute-UI': '1' } })
     if (!response.ok) throw new Error('无法建立图标管理会话，请刷新页面。')

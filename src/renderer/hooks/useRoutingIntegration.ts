@@ -4,6 +4,7 @@ import type { Application, RouteMode } from '../../shared/application.ts'
 
 let token: string | undefined
 export async function integrationRequest<T>(action: string, body?: unknown): Promise<T> {
+  if (window.appRoute) return window.appRoute.request<T>(`integration.${action}` as import('../../shared/desktop').DesktopAction, body)
   if (body !== undefined && !token) {
     const result = await fetch('/api/integration/session', { headers: { 'X-AppRoute-UI': '1' } }).then(res => res.json())
     token = result.session
@@ -54,7 +55,7 @@ export function useRoutingIntegration() {
     } finally { busy.current = false; setBusyIds([]); await refresh() }
   }
   useEffect(() => {
-    if (!status?.connected || status.pending || busy.current) return
+    if (window.appRoute || !status?.connected || status.pending || busy.current) return
     const missing = status.uncoveredProcesses ?? []
     const attemptKey = (id: string) => JSON.stringify([id, missing.filter(item => item.applicationId === id).map(item => item.process).sort()])
     const managed = status.managed.find(app => app.processPaths?.length && missing.some(item => item.applicationId === app.id) && !familyAttempts.current.has(attemptKey(app.id)))
