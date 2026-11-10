@@ -2,13 +2,16 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import YAML from 'yaml'
-import type { ApplyRequest, DiagnosticCheck, IntegrationStatus, ManagedApplication } from '../../shared/integration.ts'
-import { addManagedRules, isProxyOnly, managedApplications, markerKey, overrideScript, removeManagedRules, ruleStrings, scriptHeader } from '../../core/managedRouting.ts'
+import type { ApplyRequest, AutomaticApplyResult, DiagnosticCheck, IntegrationStatus, ManagedApplication } from '../../shared/integration.ts'
+import type { Application } from '../../shared/application.ts'
+import { addManagedRules, assertNoProcessOverlap, configuredProxySelections, isProxyOnly, managedApplications, managedProcessMatches, markerKey, overrideScript, removeManagedRules, ruleStrings, scriptHeader } from '../../core/managedRouting.ts'
 import { ClashPartyConfiguration, findInstalledCore, validateWithCore } from '../adapters/clashPartyConfiguration.ts'
 import { discoverPipe, MihomoRuntime } from '../adapters/mihomoRuntime.ts'
 import { configRuleSignature, runtimeRuleSignature } from '../adapters/runtimeRules.ts'
 import { atomicWrite, digest, readOptional, withLock, writeIfUnchanged } from '../storage/localState.ts'
 import { installRecoveryKit, startGuardian } from '../recovery/recoveryKit.ts'
+import { resolveProcessFamily } from '../platform/windows/processFamily.ts'
+import { normalizeProcessPath } from '../../core/processFamily.ts'
 
 export interface RoutingState {
   revision: string
@@ -35,6 +38,8 @@ export interface ServiceOptions {
   guardian?: (id: string) => Promise<void>
   installKit?: () => Promise<void>
   trialMs?: number
+  resolveFamily?: (app: Application, previousPaths?: string[]) => Promise<Application>
+  probe?: (runtime: MihomoRuntime, target: string, url: string) => Promise<boolean>
 }
 
 export class RoutingService {
@@ -81,9 +86,9 @@ export class RoutingService {
     const { rules } = await runtime.rules()
     const expected = ruleStrings(managed)
     return expected.every((text, i) => {
-      const [, payload, proxy] = text.split(',')
+      const [type, payload, proxy] = text.split(',')
       const actual = rules[i]
-      return actual?.type.replaceAll('-', '').toLowerCase() === 'processname' && actual.payload === payload && actual.proxy === proxy && !actual.extra?.disabled
+      return actual?.type.replaceAll('-', '').toLowerCase() === type.replaceAll('-', '').toLowerCase() && actual.payload.toLowerCase() === payload.toLowerCase() && actual.proxy === proxy && !actual.extra?.disabled
     })
   }
   async status(): Promise<IntegrationStatus> {
@@ -104,14 +109,23 @@ export class RoutingService {
         .sort((a, b) => Number(Boolean(b.all)) - Number(Boolean(a.all)))
         .map(p => ({ name: p.name, type: p.type, current: p.now ?? p.name, udp: p.udp === true }))
       const evidence = connections.connections.flatMap(connection => {
-        const app = state.managed.find(app => app.processes.some(p => p.toLowerCase() === (connection.metadata.process ?? '').toLowerCase()))
-        if (!app || Date.parse(connection.start) < Date.parse(state.appliedAt ?? new Date().toISOString())) return []
+        const app = state.managed.find(app => managedProcessMatches(app, connection.metadata))
+        if (!app || Date.parse(connection.start) < Date.parse(app.appliedAt ?? state.appliedAt ?? new Date().toISOString())) return []
         const chains = connection.chains ?? []
         const direct = chains.some(p => p === 'DIRECT')
-        const matched = app.mode === 'direct' ? direct : chains.includes(app.target ?? '') && !direct
-        return [{ applicationId: app.id, process: connection.metadata.process ?? '', destination: connection.metadata.host || connection.metadata.destinationIP || '未知目标', outbound: chains.join(' ← '), matched, startedAt: connection.start }]
+        const currentRuleMatched = connection.rule.replaceAll('-', '').toLowerCase() === (app.processPaths ? 'processpath' : 'processname') && (app.processPaths ?? app.processes).some(p => p.toLowerCase() === connection.rulePayload.toLowerCase())
+        const matched = currentRuleMatched && (app.mode === 'direct' ? direct : chains.includes(app.target ?? '') && !direct)
+        return [{ applicationId: app.id, process: connection.metadata.process ?? '', destination: connection.metadata.host || connection.metadata.destinationIP || '未知目标', outbound: chains.join(' ← '), matched, currentRuleMatched, startedAt: connection.start }]
       }).slice(0, 50)
+      const uncoveredProcesses = connections.connections.flatMap(connection => {
+        if (!connection.metadata.processPath) return []
+        const app = state.managed.find(app => app.processPaths?.length && normalizeProcessPath(connection.metadata.processPath!).startsWith(path.win32.dirname(normalizeProcessPath(app.processPaths[0])) + '\\'))
+        if (!app || managedProcessMatches(app, connection.metadata)) return []
+        return [{ applicationId: app.id, process: path.win32.basename(connection.metadata.processPath) }]
+      }).filter((item, index, items) => items.findIndex(other => other.applicationId === item.applicationId && other.process === item.process) === index)
       return { ...base, connected: true, version: version.version, mode: config.mode, tun: config.tun?.enable ?? false, processMode: config['find-process-mode'], choices, rulesLoaded: rulesLoaded && config.mode === 'rule', evidence,
+        uncoveredProcesses,
+        suggestedTarget: choices.find(choice => choice.name === proxies.proxies.GLOBAL?.now)?.name ?? choices.find(choice => ['Selector', 'Fallback', 'URLTest'].includes(choice.type))?.name,
         persistenceObserved,
         warning: config.mode !== 'rule' ? '当前内核不是规则模式，应用规则不会按预期执行。' : !rulesLoaded ? '规则与运行内核不一致，请检查覆写启用状态或恢复后重新应用。' : changedTarget ? '代理出口成员发生变化，可能包含直连或不可用节点，请重新选择出口。' : state.managed.length && !persistenceObserved ? '当前规则已加载，持久化尚未验证。首次登记后请正常退出并重新打开 Clash Party，再检查规则是否仍已加载。' : config.tun?.enable ? undefined : '当前使用系统代理；不遵循系统代理的软件可能不会进入 Clash，需以实际连接检查为准。' }
     } catch (e) { return { ...base, warning: (e as Error).message } }
@@ -133,17 +147,60 @@ export class RoutingService {
     checks.push({ name: '独立离线恢复入口', ok: await fs.access(this.recoveryPath).then(() => true, () => false), detail: this.recoveryPath })
     return checks
   }
+  async applyAutomatically(request: ApplyRequest): Promise<AutomaticApplyResult> {
+    const previous = await this.state()
+    let transactionId: string | undefined
+    try {
+      // 先校验请求，再从操作系统重建进程身份；页面不能自行扩大辅助进程范围。
+      managedApplications(request.applications, request.target)
+      if (request.revision !== previous.revision || previous.pendingId) throw new Error('状态已变化或仍有恢复检查，请稍后重试。')
+      const applications = await Promise.all(request.applications.map(async app => {
+        const clean = { ...app, processPaths: undefined, processWarnings: undefined }
+        if (app.mode === 'rule') return clean
+        return (this.options.resolveFamily ?? resolveProcessFamily)(clean, previous.managed.find(old => old.id === app.id)?.processPaths)
+      }))
+      const runtime = await this.runtime()
+      const baseline = await runtime.proxies()
+      const probes = [{ target: 'DIRECT', url: 'https://www.baidu.com/' }, { target: 'GLOBAL', url: 'https://www.gstatic.com/generate_204' }]
+      if (applications.some(app => app.mode === 'proxy')) probes.push({ target: request.target!, url: 'https://www.gstatic.com/generate_204' })
+      const probe = (p: typeof probes[number]) => this.options.probe ? this.options.probe(runtime, p.target, p.url) : runtime.delay(p.target, p.url).then(() => true, () => false)
+      const before = await Promise.all(probes.map(probe))
+      if (!before.some(Boolean)) throw new Error('网络基线检查未通过，暂未修改设置。')
+      if (applications.some(app => app.mode === 'direct') && !before[0]) throw new Error('当前直连出口不可用，暂未修改设置。')
+      if (applications.some(app => app.mode === 'proxy') && !before.at(-1)) throw new Error('所选代理出口不可用，请更换出口。')
+      const pending = await this.apply({ ...request, applications })
+      transactionId = pending.pending?.id
+      if (!transactionId) throw new Error('未取得恢复事务，不能确认应用。')
+      const after = await Promise.all(probes.map(probe))
+      if (before.some((ok, i) => ok && !after[i])) throw new Error('应用后网络检查未通过。')
+      if (configuredProxySelections(baseline.proxies) !== configuredProxySelections((await runtime.proxies()).proxies)) throw new Error('原有代理出口选择发生变化。')
+      const observed = await this.status()
+      if (observed.evidence.some(item => applications.some(app => app.id === item.applicationId) && !item.matched)) throw new Error('发现不符合设置的新连接。')
+      const status = await this.confirm(transactionId)
+      return { outcome: 'applied', message: '规则已加载并通过网络检查；实际分流以新连接证据为准。', status }
+    } catch (error) {
+      if (transactionId) {
+        try { await this.rollback(transactionId) } catch { return { outcome: 'recovery-required', message: '自动恢复尚未确认，请使用“恢复网络”或桌面离线恢复入口。', status: await this.status() } }
+      }
+      const state = await this.state()
+      const status = await this.status()
+      const unchanged = JSON.stringify(state.managed) === JSON.stringify(previous.managed) && !state.pendingId
+      const restored = unchanged && status.connected && status.rulesLoaded && state.lastRecovery !== previous.lastRecovery
+      const outcome = restored ? 'restored' : unchanged && state.lastRecovery === previous.lastRecovery ? 'unchanged' : 'recovery-required'
+      return { outcome, message: `${error instanceof Error ? error.message : '操作失败。'}${restored ? '已自动恢复上一次设置。' : outcome === 'unchanged' ? '原设置保留。' : '请检查恢复状态。'}`, status }
+    }
+  }
   async apply(request: ApplyRequest): Promise<IntegrationStatus> {
     await withLock(this.root, async () => {
       const previous = await this.state()
       if (previous.pendingId) throw new Error('请先保留或恢复上一轮试运行设置。')
       if (request.revision !== previous.revision) throw new Error('页面状态已过期，请刷新后重试。')
       if (!Array.isArray(request.applications) || !request.applications.length) throw new Error('请先选择应用。')
-      const selected = managedApplications(request.applications, request.target)
+      const appliedAt = new Date().toISOString()
+      const selected = managedApplications(request.applications, request.target).map(app => ({ ...app, appliedAt }))
       const selectedIds = new Set(request.applications.map(app => app.id))
       const managed = [...previous.managed.filter(app => !selectedIds.has(app.id)), ...selected]
-      const allProcesses = managed.flatMap(app => app.processes.map(p => p.toLowerCase()))
-      if (new Set(allProcesses).size !== allProcesses.length) throw new Error('这些进程已在其他已生效应用中，请先恢复对应应用。')
+      assertNoProcessOverlap(managed)
       const runtime = await this.runtime()
       const [cfg, proxies, snapshot] = await Promise.all([runtime.config(), runtime.proxies(), this.party.snapshot()])
       const rulesBefore = runtimeRuleSignature((await runtime.rules()).rules)
@@ -172,6 +229,8 @@ export class RoutingService {
         await this.party.register(snapshot)
         await runtime.reload(candidate)
         if (!await this.matches(runtime, managed)) throw new Error('内核未加载预期规则。')
+        if (runtimeRuleSignature((await runtime.rules()).rules) !== configRuleSignature(addManagedRules(snapshot.config, managed).rules ?? [])) throw new Error('原有规则未完整保留，正在恢复。')
+        for (const app of selected) app.appliedAt = new Date().toISOString()
         tx.phase = 'pending'; await this.saveTransaction(tx)
         await this.save({ revision: id, managed, appliedAt: new Date().toISOString(), pendingId: id })
       } catch (e) {

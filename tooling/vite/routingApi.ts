@@ -38,7 +38,8 @@ export function createRoutingApi(service: RoutingService): Connect.NextHandleFun
       else if (request.method === 'POST') {
         if (request.headers['content-type'] !== 'application/json') throw new Error('请求格式无效。')
         const body = await readBody(request)
-        if (route === '/api/integration/apply') result = await service.apply(body)
+        if (route === '/api/integration/apply-automatic') result = await service.applyAutomatically(body)
+        else if (route === '/api/integration/apply') result = await service.apply(body)
         else if (route === '/api/integration/confirm') result = await service.confirm(body.id)
         else if (route === '/api/integration/rollback') result = await service.rollback(body.id)
         else if (route === '/api/integration/recover') result = await service.recoverAll()

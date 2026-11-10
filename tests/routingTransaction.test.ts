@@ -6,20 +6,22 @@ import test, { type TestContext } from 'node:test'
 import YAML from 'yaml'
 import vm from 'node:vm'
 import { RoutingService, type ServiceOptions } from '../src/main/services/routingService.ts'
-import { MihomoRuntime, type RuntimeConfig, type RuntimeRule } from '../src/main/adapters/mihomoRuntime.ts'
+import { MihomoRuntime, type RuntimeConfig, type RuntimeConnection, type RuntimeRule } from '../src/main/adapters/mihomoRuntime.ts'
 import { atomicWrite, readOptional, writeIfUnchanged } from '../src/main/storage/localState.ts'
 import { markerKey, overrideScript } from '../src/core/managedRouting.ts'
 import type { Application } from '../src/shared/application.ts'
+import { identifyProcessFamily } from '../src/core/processFamily.ts'
 
 class MockRuntime extends MihomoRuntime {
   current: any
   failNextReload = false
   available = true
+  activeConnections: RuntimeConnection[] = []
   constructor(config: any) { super('test'); this.current = structuredClone(config) }
   override async config(): Promise<RuntimeConfig> { if (!this.available) throw new Error('内核离线'); return this.current }
   override async version() { return { version: 'test' } }
   override async proxies() { return { proxies: { DIRECT: { name: 'DIRECT', type: 'Direct' }, Group: { name: 'Group', type: 'Selector', all: ['Node'], now: 'Node' }, Node: { name: 'Node', type: 'Shadowsocks', udp: true } } } }
-  override async connections() { return { connections: [] } }
+  override async connections() { return { connections: this.activeConnections } }
   override async rules(): Promise<{ rules: RuntimeRule[] }> { return { rules: this.current.rules.map((r: string) => { const parts = r.split(','); const type = parts.shift()!; const proxy = parts.pop()!; return { type, payload: parts.join(','), proxy } }) } }
   override async reload(payload: string) { if (!this.available || this.failNextReload) { this.failNextReload = false; throw new Error('模拟重载失败') }; this.current = YAML.parse(payload) }
 }
@@ -127,4 +129,75 @@ test('历史事务记录损坏也不能阻止离线全部恢复', async t => {
   assert.equal((await f.service.recoverAll()).restored, true)
   assert.deepEqual(f.runtime.current, f.config)
   assert.equal((await f.service.state()).pendingId, undefined)
+})
+
+const pathApp = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }
+const resolveFamily: NonNullable<ServiceOptions['resolveFamily']> = async application => identifyProcessFamily(application, [
+  { pid: 1, parentPid: 0, path: pathApp.path }, { pid: 2, parentPid: 1, path: 'C:\\Apps\\Example\\web\\helper.exe' },
+])
+test('一键应用自动解析辅助进程、检查并保留；再次选择规则只移除本应用', async t => {
+  const f = await fixture(t, { resolveFamily, probe: async () => true })
+  const result = await f.service.applyAutomatically({ applications: [pathApp], revision: 'initial' })
+  assert.equal(result.outcome, 'applied')
+  assert.equal(result.status.pending, undefined)
+  assert.equal(result.status.evidence.length, 0)
+  assert.deepEqual(f.runtime.current.rules.slice(0, 2), ['PROCESS-PATH,C:\\Apps\\Example\\Example.exe,DIRECT', 'PROCESS-PATH,C:\\Apps\\Example\\web\\helper.exe,DIRECT'])
+  assert.deepEqual(f.runtime.current.rules.slice(2), f.config.rules)
+  const refreshed = new RoutingService(f.service.options)
+  assert.equal((await refreshed.status()).managed[0].processPaths?.length, 2)
+  const restored = await refreshed.applyAutomatically({ applications: [{ ...pathApp, mode: 'rule' }], revision: result.status.revision })
+  assert.equal(restored.outcome, 'applied')
+  assert.deepEqual(f.runtime.current.rules, f.config.rules)
+})
+test('自动网络检查回归时恢复全部原规则，失败状态不能假报成功', async t => {
+  let count = 0
+  const f = await fixture(t, { resolveFamily, probe: async () => ++count <= 2 })
+  const result = await f.service.applyAutomatically({ applications: [pathApp], revision: 'initial' })
+  assert.equal(result.outcome, 'restored')
+  assert.deepEqual(f.runtime.current, f.config)
+  assert.equal(result.status.managed.length, 0)
+  assert.equal(result.status.pending, undefined)
+})
+test('自动检查之前不接受示例、伪造路径扩张、失效出口和并发旧修订', async t => {
+  const f = await fixture(t, { resolveFamily, probe: async () => true })
+  assert.equal((await f.service.applyAutomatically({ applications: [{ ...pathApp, source: 'example' }], revision: 'initial' })).outcome, 'unchanged')
+  assert.equal((await f.service.applyAutomatically({ applications: [{ ...pathApp, mode: 'proxy' }], target: 'Missing', revision: 'initial' })).outcome, 'unchanged')
+  const result = await f.service.applyAutomatically({ applications: [{ ...pathApp, processPaths: ['C:\\Other\\Example.exe'] }], revision: 'initial' })
+  assert.equal(result.outcome, 'applied')
+  assert.ok(!result.status.managed[0].processPaths?.includes('C:\\Other\\Example.exe'))
+  const stale = await f.service.applyAutomatically({ applications: [{ ...pathApp, mode: 'proxy' }], target: 'Group', revision: 'initial' })
+  assert.equal(stale.outcome, 'unchanged')
+  assert.equal(stale.status.managed[0].mode, 'direct')
+})
+test('路径覆写在模拟客户端重新生成后仍有效，目标消失时回到原规则', async t => {
+  const f = await fixture(t, { resolveFamily, probe: async () => true })
+  await f.service.applyAutomatically({ applications: [{ ...pathApp, mode: 'proxy' }], target: 'Group', revision: 'initial' })
+  const script = await fs.readFile(f.service.party.scriptPath, 'utf8')
+  const generated = vm.runInNewContext(script + '\nmain(config)', { config: structuredClone(f.config) })
+  assert.equal(generated.rules[1], 'PROCESS-PATH,C:\\Apps\\Example\\web\\helper.exe,Group')
+  const missing = vm.runInNewContext(script + '\nmain(config)', { config: { ...f.config, 'proxy-groups': [] } })
+  assert.deepEqual(JSON.parse(JSON.stringify(missing.rules)), f.config.rules)
+})
+
+test('辅助进程遗漏会提示；只验证应用后的精确路径、规则和出口', async t => {
+  const f = await fixture(t, { resolveFamily, probe: async () => true })
+  const applied = await f.service.applyAutomatically({ applications: [pathApp], revision: 'initial' })
+  const recent = new Date(Date.parse(applied.status.managed[0].appliedAt!) + 1000).toISOString()
+  const connection = (processPath: string, patch: Partial<RuntimeConnection> = {}): RuntimeConnection => ({
+    metadata: { processPath, process: path.win32.basename(processPath), host: 'music.example' },
+    chains: ['DIRECT'], start: recent, rule: 'ProcessPath', rulePayload: processPath, ...patch,
+  })
+  f.runtime.activeConnections = [
+    connection(pathApp.path, { start: '2000-01-01T00:00:00.000Z', chains: ['Node'], rule: 'DomainSuffix' }),
+    connection('C:\\Apps\\Example\\web\\helper.exe'),
+    connection('C:\\Other\\Example.exe'),
+    connection('C:\\Apps\\Example\\late.exe', { rule: 'DomainSuffix', rulePayload: 'example' }),
+  ]
+  const status = await f.service.status()
+  assert.equal(status.evidence.length, 1)
+  assert.equal(status.evidence[0].process, 'helper.exe')
+  assert.equal(status.evidence[0].matched, true)
+  assert.deepEqual(status.uncoveredProcesses, [{ applicationId: pathApp.id, process: 'late.exe' }])
+  f.runtime.activeConnections.push(connection(pathApp.path, { rule: 'DomainSuffix', rulePayload: 'example' }))
+  assert.equal((await f.service.status()).evidence.at(-1)?.matched, false, '出口碰巧直连也不能冒充应用规则命中')
 })

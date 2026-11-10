@@ -11,6 +11,8 @@ export interface Application {
   source: ApplicationSource
   icon?: string
   path?: string
+  processPaths?: string[]
+  processWarnings?: string[]
   publisher?: string
   iconMethod?: import('./applicationIcon.ts').LocalIconMethod
 }

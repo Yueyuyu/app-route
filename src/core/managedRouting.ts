@@ -1,6 +1,8 @@
 import type { Application } from '../shared/application.ts'
 import type { ManagedApplication } from '../shared/integration.ts'
 import { validProcessName } from './applicationRules.ts'
+import { normalizeProcessPath, validProcessPath } from './processFamily.ts'
+import path from 'node:path'
 
 export const ownerId = 'approute-managed-v1'
 export const markerKey = 'x-approute-managed-v1'
@@ -14,7 +16,7 @@ export function managedApplications(input: Application[], target?: string): Mana
   return input.map(app => {
     if (!app || typeof app.id !== 'string' || !app.id || app.id.length > 200 || ids.has(app.id) || typeof app.name !== 'string' || !app.name.trim() ||
         !['scan', 'manual'].includes(app.source) || !['rule', 'direct', 'proxy'].includes(app.mode) ||
-        !Array.isArray(app.processes) || !app.processes.length || app.processes.length > 20) {
+        !Array.isArray(app.processes) || !app.processes.length || app.processes.length > 40) {
       throw new Error('请先扫描或手动添加真实应用；示例应用不能直接应用到网络。')
     }
     ids.add(app.id)
@@ -22,17 +24,44 @@ export function managedApplications(input: Application[], target?: string): Mana
       if (typeof name !== 'string' || !validProcessName(name)) throw new Error('进程名无效。')
       const normalized = name.trim().toLowerCase()
       if (protectedProcesses.has(normalized)) throw new Error('为保留修复通道，AppRoute 不改写自身、ChatGPT/Codex、代理内核和恢复工具的分流。')
-      if (seen.has(normalized)) throw new Error('同一进程不能同时属于多个应用。')
-      seen.add(normalized)
+      if (!app.processPaths) {
+        if (seen.has(normalized)) throw new Error('同一进程不能同时属于多个应用。')
+        seen.add(normalized)
+      }
       return name.trim()
     })
+    if (app.processPaths !== undefined) {
+      if (!Array.isArray(app.processPaths) || !app.processPaths.length || app.processPaths.length > 40) throw new Error('进程路径无效。')
+      for (const value of app.processPaths) {
+        if (!validProcessPath(value) || !processes.some(p => p.toLowerCase() === path.win32.basename(value).toLowerCase()) || protectedProcesses.has(path.win32.basename(value).toLowerCase())) throw new Error('进程路径无效或属于受保护程序。')
+        const key = normalizeProcessPath(value)
+        if (seen.has(key)) throw new Error('同一进程不能同时属于多个应用。')
+        seen.add(key)
+      }
+    }
     if (app.mode === 'proxy' && (typeof target !== 'string' || !target || /[,\r\n\x00]/.test(target) || target.length > 200)) throw new Error('请选择有效的代理出口。')
-    return { id: app.id, name: app.name.slice(0, 80), processes, mode: app.mode, ...(app.mode === 'proxy' ? { target } : {}) }
+    return { id: app.id, name: app.name.slice(0, 80), processes, mode: app.mode,
+      ...(app.processPaths ? { processPaths: app.processPaths, processWarnings: app.processWarnings } : {}), ...(app.mode === 'proxy' ? { target } : {}) }
   }).filter(app => app.mode !== 'rule')
 }
 
 export function ruleStrings(apps: ManagedApplication[]): string[] {
-  return apps.flatMap(app => app.processes.map(process => `PROCESS-NAME,${process},${app.mode === 'direct' ? 'DIRECT' : app.target}`))
+  return apps.flatMap(app => (app.processPaths ?? app.processes).map(process => `${app.processPaths ? 'PROCESS-PATH' : 'PROCESS-NAME'},${process},${app.mode === 'direct' ? 'DIRECT' : app.target}`))
+}
+
+export function managedProcessMatches(app: ManagedApplication, metadata: { process?: string; processPath?: string }): boolean {
+  return app.processPaths ? Boolean(metadata.processPath && app.processPaths.some(p => normalizeProcessPath(p) === normalizeProcessPath(metadata.processPath!)))
+    : app.processes.some(p => p.toLowerCase() === metadata.process?.toLowerCase())
+}
+
+export function assertNoProcessOverlap(apps: ManagedApplication[]) {
+  for (let i = 0; i < apps.length; i++) for (let j = i + 1; j < apps.length; j++) {
+    const left = apps[i], right = apps[j]
+    const overlap = left.processPaths && right.processPaths
+      ? left.processPaths.some(p => right.processPaths!.some(q => normalizeProcessPath(p) === normalizeProcessPath(q)))
+      : left.processes.some(p => right.processes.some(q => p.toLowerCase() === q.toLowerCase()))
+    if (overlap) throw new Error('这些进程已在其他已生效应用中，请先恢复对应应用。')
+  }
 }
 
 /** 只移除带本工具标记、且与标记完整一致的前置规则；冲突时不猜测所有权。 */
@@ -60,10 +89,15 @@ export function addManagedRules(config: Record<string, any>, apps: ManagedApplic
 
 /** 生成独立覆写；目标在订阅更新后消失时跳过该条，不能让整个代理配置失效。 */
 export function overrideScript(apps: ManagedApplication[]): string {
-  return `${scriptHeader}\nfunction main(config) {\n  var key = ${JSON.stringify(markerKey)};\n  var old = config[key];\n  if (old && old.owner === ${JSON.stringify(ownerId)} && Array.isArray(old.rules)) {\n    if (!Array.isArray(config.rules) || !old.rules.every(function(r,i){return config.rules[i] === r})) return config;\n    config.rules = config.rules.slice(old.rules.length);\n    delete config[key];\n  }\n  var apps = ${JSON.stringify(apps)};\n  var names = ['DIRECT'].concat((config.proxies || []).map(function(p){return p.name}), (config['proxy-groups'] || []).map(function(p){return p.name}));\n  var rules = [];\n  apps.forEach(function(app){\n    var target = app.mode === 'direct' ? 'DIRECT' : app.target;\n    if (names.indexOf(target) < 0) return;\n    app.processes.forEach(function(p){rules.push('PROCESS-NAME,' + p + ',' + target)});\n  });\n  if (rules.length) {\n    config.rules = rules.concat(config.rules || []);\n    config[key] = {owner:${JSON.stringify(ownerId)},rules:rules};\n  }\n  return config;\n}\n`
+  return `${scriptHeader}\nfunction main(config) {\n  var key = ${JSON.stringify(markerKey)};\n  var old = config[key];\n  if (old && old.owner === ${JSON.stringify(ownerId)} && Array.isArray(old.rules)) {\n    if (!Array.isArray(config.rules) || !old.rules.every(function(r,i){return config.rules[i] === r})) return config;\n    config.rules = config.rules.slice(old.rules.length);\n    delete config[key];\n  }\n  var apps = ${JSON.stringify(apps)};\n  var names = ['DIRECT'].concat((config.proxies || []).map(function(p){return p.name}), (config['proxy-groups'] || []).map(function(p){return p.name}));\n  var rules = [];\n  apps.forEach(function(app){\n    var target = app.mode === 'direct' ? 'DIRECT' : app.target;\n    if (names.indexOf(target) < 0) return;\n    (app.processPaths || app.processes).forEach(function(p){rules.push((app.processPaths ? 'PROCESS-PATH,' : 'PROCESS-NAME,') + p + ',' + target)});\n  });\n  if (rules.length) {\n    config.rules = rules.concat(config.rules || []);\n    config[key] = {owner:${JSON.stringify(ownerId)},rules:rules};\n  }\n  return config;\n}\n`
 }
 
-export interface ProxyInfo { name: string; type: string; all?: string[]; now?: string; udp?: boolean }
+export interface ProxyInfo { name: string; type: string; all?: string[]; now?: string; fixed?: string; udp?: boolean }
+/** 自动测速/故障转移的 now 会自然变化；只核对用户手动选择及自动组的固定选择。 */
+export function configuredProxySelections(proxies: Record<string, ProxyInfo>): string {
+  return JSON.stringify(Object.values(proxies).filter(p => p.type === 'Selector' || ['URLTest', 'Fallback'].includes(p.type))
+    .map(p => [p.name, p.type === 'Selector' ? p.now ?? '' : p.fixed ?? '']).sort((a, b) => a[0].localeCompare(b[0])))
+}
 // 只接受所有可能成员均为代理的出口，防止选中含 DIRECT 的组后仍宣称强制代理。
 export function isProxyOnly(name: string, proxies: Record<string, ProxyInfo>, visiting = new Set<string>()): boolean {
   const entry = proxies[name]

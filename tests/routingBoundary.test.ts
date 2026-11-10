@@ -8,6 +8,8 @@ import { RoutingService } from '../src/main/services/routingService.ts'
 test('真实写入接口必须同源且持有当前会话；拒绝伪造令牌和超大请求', async t => {
   let writes = 0
   const service = new RoutingService()
+  let automaticWrites = 0
+  service.applyAutomatically = async () => { automaticWrites++; return { outcome: 'applied', message: 'test', status: {} as any } }
   service.recoverAll = async () => { writes++; return { restored: true, message: 'test' } }
   const middleware = createRoutingApi(service)
   const server = createServer((req, res) => middleware(req, res, () => res.end()))
@@ -30,11 +32,17 @@ test('真实写入接口必须同源且持有当前会话；拒绝伪造令牌�
     { 'x-approute-session': session },
     { origin, 'x-approute-session': session, host: 'other.example:4318' },
   ]
-  for (const extra of rejected) assert.equal((await call('recover', 'POST', extra)).code, 403)
+  for (const extra of rejected) {
+    assert.equal((await call('recover', 'POST', extra)).code, 403)
+    assert.equal((await call('apply-automatic', 'POST', extra)).code, 403)
+  }
   assert.equal(writes, 0)
+  assert.equal(automaticWrites, 0)
   const valid = { origin, 'x-approute-session': session }
   assert.equal((await call('recover', 'POST', valid, JSON.stringify({ value: 'a'.repeat(130 * 1024) }))).code, 400)
   assert.equal(writes, 0)
   assert.equal((await call('recover', 'POST', valid)).code, 200)
   assert.equal(writes, 1)
+  assert.equal((await call('apply-automatic', 'POST', valid)).code, 200)
+  assert.equal(automaticWrites, 1)
 })

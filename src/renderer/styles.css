@@ -185,3 +185,8 @@ h1 { font-size: 32px; line-height: 1.35; letter-spacing: -.7px; margin: 0; font-
   .help-entry { gap: 15px; } .help-icon { width: 35px; height: 35px; font-size: 18px; } .help-entry h2 { font-size: 16px; } .route-flow { gap: 7px; } .route-flow > span { gap: 7px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
+
+.application-routing-status { display: flex; align-items: flex-start; flex-direction: column; gap: 4px; margin: 8px 0 0 46px; max-width: 550px; }
+.application-routing-status small, .process-family-info { color: #768397; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.application-routing-status .ant-tag { margin: 0; }
+@media (max-width: 767px) { .application-routing-status { margin-left: 0; } }
