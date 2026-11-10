@@ -1,11 +1,12 @@
 import { Button, Dropdown, Empty, Table, Tag, Tooltip } from 'antd'
-import { DeleteOutlined, EditOutlined, InfoCircleOutlined, MoreOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, InfoCircleOutlined, MoreOutlined, StarOutlined, StarFilled } from '@ant-design/icons'
 import type { Key } from 'react'
 import type { Application, RouteMode } from '../types'
 import { ApplicationIcon } from './ApplicationIcon'
 import { RouteSelector } from './RouteSelector'
 import type { IntegrationStatus } from '../../shared/integration'
 import { managedFor, routingPresentation } from '../../core/applicationInventory'
+import { applicationKey } from '../../core/applicationViews'
 
 interface Props {
   applications: Application[]
@@ -19,10 +20,14 @@ interface Props {
   busyIds: string[]
   failures: Record<string, string>
   loading: boolean
+  favorites: string[]
+  toggleFavorite: (app: Application) => void
+  emptyDescription?: string
 }
 
-export function ApplicationTable({ applications, selected, setSelected, changeMode, edit, remove, clearFilters, status, busyIds, failures, loading }: Props) {
+export function ApplicationTable({ applications, selected, setSelected, changeMode, edit, remove, clearFilters, status, busyIds, failures, loading, favorites, toggleFavorite, emptyDescription }: Props) {
   const disabled = busyIds.length > 0 || Boolean(status?.pending) || !status?.connected
+  const selector = (app: Application) => <RouteSelector disabled={disabled} label={`${app.name} 的连接方式`} value={app.mode} onChange={(mode) => changeMode([app.id], mode)} />
   function feedback(app: Application) {
     const state = routingPresentation(app, status)
     return <div className="application-routing-status" aria-live="polite">
@@ -36,19 +41,20 @@ export function ApplicationTable({ applications, selected, setSelected, changeMo
     rowKey="id"
     dataSource={applications}
     loading={loading && !applications.length}
-    rowSelection={{ selectedRowKeys: selected, onChange: setSelected, columnWidth: 48,
+    rowSelection={{ selectedRowKeys: selected, onChange: setSelected, columnWidth: 42, preserveSelectedRowKeys: true,
       getCheckboxProps: (app) => ({ 'aria-label': `选择 ${app.name}` }) }}
     pagination={applications.length > 12 ? { pageSize: 12, showSizeChanger: false, hideOnSinglePage: true } : false}
-    locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有找到匹配的应用">
-      <Button onClick={clearFilters}>清除筛选</Button>
+    locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyDescription ?? '没有找到匹配的应用'}>
+      <Button onClick={clearFilters}>查看全部应用</Button>
     </Empty> }}
     columns={[
+      { title: '收藏', key: 'favorite', width: 48, render: (_, app) => <Button type="text" className={favorites.includes(applicationKey(app)) ? 'favorite-button is-favorite' : 'favorite-button'} aria-label={`${favorites.includes(applicationKey(app)) ? '取消收藏' : '收藏'} ${app.name}`} aria-pressed={favorites.includes(applicationKey(app))} icon={favorites.includes(applicationKey(app)) ? <StarFilled /> : <StarOutlined />} onClick={() => toggleFavorite(app)} /> },
       { title: '应用名称', key: 'name', render: (_, app) => <div><button className="application-name" onClick={() => edit(app)} aria-label={`查看 ${app.name} 详情`}>
         <ApplicationIcon name={app.name} icon={app.icon} application={app} />
         <span className="application-label"><strong>{app.name}</strong><span className="process-label">{app.processes[0]}{app.processes.length > 1 && ` +${app.processes.length - 1}`}</span></span>
-      </button><div className="mobile-route"><RouteSelector disabled={disabled} label={`${app.name} 的连接方式`} value={app.mode} onChange={(mode) => changeMode([app.id], mode)} /></div>{feedback(app)}</div> },
+      </button><div className="mobile-route">{selector(app)}</div>{feedback(app)}</div> },
       { title: '分类', dataIndex: 'category', key: 'category', width: '18%', responsive: ['lg'], render: (value) => <span className="category-label">{value}</span> },
-      { title: <span>连接方式 · 点击即应用 <Tooltip title="AppRoute 自动写入 Clash Party 并检查；失败恢复。选择代理使用上方显示的出口。"><InfoCircleOutlined className="muted-icon" /></Tooltip></span>, key: 'mode', width: 340, responsive: ['md'], render: (_, app) => <RouteSelector disabled={disabled} label={`${app.name} 的连接方式`} value={app.mode} onChange={(mode) => changeMode([app.id], mode)} /> },
+      { title: <span>连接方式 · 点击即应用 <Tooltip title="AppRoute 自动写入 Clash Party 并检查；失败恢复。选择代理使用上方显示的出口。"><InfoCircleOutlined className="muted-icon" /></Tooltip></span>, key: 'mode', width: 340, responsive: ['md'], render: (_, app) => selector(app) },
       { title: '', key: 'actions', width: 52, render: (_, app) => <Dropdown trigger={['click']} menu={{
         items: [{ key: 'edit', icon: <EditOutlined />, label: '应用详情' }, { key: 'retry', label: '重新识别并应用', disabled: disabled || app.mode === 'rule' }, { type: 'divider' }, { key: 'delete', icon: <DeleteOutlined />, label: '从列表移除', danger: true, disabled: app.mode !== 'rule' || disabled }],
         onClick: ({ key }) => key === 'edit' ? edit(app) : key === 'retry' ? changeMode([app.id], app.mode) : remove(app),

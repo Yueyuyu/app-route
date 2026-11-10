@@ -4,9 +4,19 @@
 
 为每个应用选择联网方式：按 Clash Party 原有规则、直接联网或使用指定代理出口。
 
-**当前版本：0.2.0-preview.1，Windows 集成测试版。** Ant Design 页面已接入 Clash Party / Mihomo，支持真实规则应用、连接生效检查、120 秒试运行回退和独立离线恢复。当前仍以 Vite 本机服务运行，没有 Electron 安装包，不属于稳定发行版。
+**当前版本：0.2.0-preview.1，Windows 集成测试版。** Ant Design 页面已接入 Clash Party / Mihomo，支持真实规则应用、连接生效检查、120 秒试运行回退和独立离线恢复。已提供可本机打包安装的 Electron 桌面版，仍不属于稳定发行版。开发预览保留为辅助入口。
 
-## 使用
+## 桌面使用
+
+本机开发打包：`npm ci` → `npm run desktop:build` → `npm run desktop:install`（Windows / Node.js 24）。安装到 `%LOCALAPPDATA%\Programs\AppRoute`，创建桌面及开始菜单的 AppRoute 快捷方式；双击即打开独立窗口，无需浏览器、开发服务器或额外安装 Node。完整便携目录为 `release/AppRoute-win32-x64`，其中的运行时及资源必须一起保留。
+
+关闭窗口收至托盘。托盘提供打开、检查新应用、恢复网络和退出；退出保留已有分流，独立恢复仍可用。桌面菜单可按 Alt 打开，Ctrl+Q 正常退出。开机自启未启用。打包、更新与数据说明见 [桌面版使用](docs/DESKTOP.md)。
+
+应用列表默认打开“我的应用”（收藏 + 已设置专属分流），另有“正在运行”和“全部应用”。星标只影响收藏和排序，不改变网络；系统工具与维护程序默认折叠，已收藏或已设置分流的条目保持展开。
+
+新装应用会在启动、返回窗口时自动检查（至少间隔 60 秒），窗口可见时每 5 分钟补查；运行进程每 15 秒更新。立即检查可点击“重新扫描”。有主窗口的便携应用可在运行后被发现，也可在“添加应用”中选取 exe。新发现的软件默认沿用 Clash Party 原有规则，需要收藏才加入“我的应用”；不把扫描当成网络授权。
+
+## 开发预览使用
 
 需要 Node.js 24 LTS、Windows，以及正在运行的 Clash Party 标准模式与 Mihomo 稳定内核。已实测 Clash Party 2.0.4 / Mihomo v1.19.32；其他版本尚未验证。
 
@@ -63,8 +73,8 @@ npm run preview  # 构建后的本机预览，端口仍为 4318
 
 ## 数据与许可
 
-应用资料缓存在浏览器 localStorage（approute.inventory.v1）；旧 approute.draft.v1 仅迁移真实应用资料，不重放联网选项。联网方式以本机服务的已管理状态为准。导出的设置记录标记 verified: false，不代表规则或连接已经验证。扫描和设置记录可能包含个人程序路径，不要直接公开。
+桌面应用资料及收藏保存在 `%LOCALAPPDATA%\AppRoute\inventory.json`；开发预览资料缓存在浏览器 localStorage（approute.inventory.v1）；旧 approute.draft.v1 仅迁移真实应用资料，不重放联网选项。联网方式以本机服务的已管理状态为准。导出的设置记录标记 verified: false，不代表规则或连接已经验证。扫描和设置记录可能包含个人程序路径，不要直接公开。
 
 应用状态、事务备份和离线工具保存在 %LOCALAPPDATA%\AppRoute，Clash Party 只增加独立的 AppRoute 覆写及登记项。事务快照可能含订阅凭据，禁止提交或上传；当前尚未实现备份保留限额。代码没有遥测或云上传功能。
 
-自有代码采用 [MIT License](LICENSE)，第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。仓库不分发代理内核、Node 二进制或驱动；离线运行时在本机从当前 Node 复制。
+自有代码采用 [MIT License](LICENSE)，第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。源码仓库不存放代理内核、Node 二进制或驱动；桌面包包含 Electron 及打包机的 Node 24，并附许可。离线恢复从桌面后台使用的 Node 复制独立运行时。

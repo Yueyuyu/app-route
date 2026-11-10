@@ -190,3 +190,34 @@ h1 { font-size: 32px; line-height: 1.35; letter-spacing: -.7px; margin: 0; font-
 .application-routing-status small, .process-family-info { color: #768397; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .application-routing-status .ant-tag { margin: 0; }
 @media (max-width: 767px) { .application-routing-status { margin-left: 0; } }
+
+.view-filters { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: -4px 0 16px; color: #788294; font-size: 13px; }
+.view-filters > div { display: flex; gap: 10px; }
+.view-filters .ant-select { width: 138px; }
+.favorite-button { color: #a3adbb; }
+.favorite-button.is-favorite { color: #db9b23; }
+.system-tools { margin-top: 16px; border-color: #e6eaf0; background: #fafbfe; }
+.inventory-update { margin-top: 14px; }
+.choose-executable { width: 100%; margin-bottom: 22px; }
+@media (max-width: 1080px) { .view-filters { flex-wrap: wrap; } .view-filters > div { width: 100%; } }
+
+/* 独立桌面窗口优先展示应用，保留完整状态于提示和详情。 */
+.desktop-shell .sidebar { width: 224px; flex-basis: 224px; padding-top: 22px; }
+.desktop-shell .workspace { margin-left: 224px; }
+.desktop-shell .brand-wordmark { width: 126px; }
+.desktop-shell .brand-icon { width: 36px; height: 36px; flex-basis: 36px; }
+.desktop-shell .brand-tagline { font-size: 11px; }
+.desktop-shell .topbar { height: 48px; padding-inline: 26px; }
+.desktop-shell .main-content { padding: 22px 24px; }
+.desktop-shell h1 { font-size: 27px; }
+.desktop-shell .page-heading { margin-bottom: 16px; }
+.desktop-shell .page-heading p { margin-top: 4px; font-size: 13px; }
+.desktop-shell .routing-panel { padding: 12px 14px; margin-bottom: 12px; }
+.desktop-shell .list-toolbar { margin-top: 12px; margin-bottom: 14px; }
+.desktop-shell .preview-notice { padding: 8px 12px; }
+.desktop-shell .application-routing-status > small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 330px; }
+.desktop-shell .process-family-info { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 330px; }
+.desktop-shell .application-label strong { font-size: 14px; }
+.desktop-shell .workspace-footer { padding-block: 12px; }
+
+.application-table .ant-table-cell:nth-child(2) { white-space: nowrap; padding-inline: 6px; text-align: center; }

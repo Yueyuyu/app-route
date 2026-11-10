@@ -2,7 +2,7 @@
 
 ## 运行形态
 
-单仓库 TypeScript + React + Ant Design。当前为仅监听本机的 Vite 页面与 Node 服务；目标桌面版使用 Electron 与受限 preload IPC。没有云后端，不把现有开发服务器作为正式桌面后端发布。
+单仓库 TypeScript + React + Ant Design。桌面版由 Electron 窗口、受限 preload IPC 与独立 Node 后台组成；加载打包的本地资源，不开启 HTTP 端口。Vite 本机服务仅供开发预览。没有云后端。
 
 | 目录 | 职责 |
 | --- | --- |
@@ -26,7 +26,10 @@
 | src/main/recovery | 自带运行时的离线工具、独立倒计时守护进程 |
 | tooling/vite | 本机 HTTP 桥接，Host/Origin/会话验证，请求大小限制 |
 | scripts/build-recovery.mjs | 将恢复入口及 YAML 依赖打包为独立 CJS |
-| src/preload | 后续桌面 IPC 边界说明，目前未实现 |
+| src/main/desktop | 独立窗口、单实例、托盘、固定资源协议、来源校验与 Node 后台生命周期 |
+| src/preload | 仅暴露白名单业务请求及刷新事件，不暴露原始 Electron/文件/shell 能力 |
+| src/core/applicationViews.ts | 我的应用、精确路径运行匹配、收藏身份、系统工具折叠与扫描合并 |
+| src/main/services/inventoryPreferences.ts | 独立本机资料存储，禁止缓存模式重放 |
 | tests | 输入、接口边界、所有权、事务失败恢复与配置漂移测试 |
 
 ## 应用事务
@@ -34,6 +37,9 @@
 点击模式 → 后端识别真实进程 → 网络基线检查 → 读取磁盘及内核 → 对比规则/模式/端口 → 编译候选 → 已安装内核 -t 校验 → 安装并验证离线工具 → 私有备份 → 再查并发变更 → 持久化 prepared 事务 → 启动独立守护并等待 ready → 原子写入专属覆写 → 登记 → API 热重载 → 核对全部规则 → pending → 再次检查网络及原有手动出口选择 → 自动确认；失败回退或由守护到期恢复。
 
 `apply-automatic` 组合已有 apply/confirm/rollback 事务。前端传入的辅助路径不受信任，必须由系统查询重建；旧手动试运行接口保留给兼容和恢复测试。自动测速/故障转移组的即时节点允许正常变化，手动 Selector 和 fixed 选择必须保持。页面每 5 秒查询状态；发现新辅助进程时同样通过自动事务补充，失败保留提示并支持手动重试。
+
+
+新辅助进程的目录检测只用于明确的应用独立目录，系统共享目录不会触发隐式的反复应用。
 
 事务默认 120 秒。页面、服务、独立恢复共享写锁；陈旧守护只能处理自己仍处于 pending/prepared 的事务。失败先恢复专属脚本，再用**当前订阅**与上一轮应用策略生成配置，不直接覆盖旧完整快照。
 
@@ -55,8 +61,14 @@ Clash Party 2.0.4 缓存覆写登记；首次登记后需要重新打开客户�
 - recovery：复制当前 Node.exe、自包含 recovery.cjs、Restore-Network.cmd。
 - icons/index.json、icons/cache、icons/custom：独立图标索引、自动提取和用户替换。采用内容哈希文件名、原子写入及目录内独立锁；不与网络事务共用锁。
 
-`applicationIcons` Vite 插件让扫描入口和图标接口共享一个服务实例；现有扫描接口返回缓存 URL，旧草稿的 PNG data URL 在登记后迁移为 URL。图标图片响应仅允许本机同源访问；写入需要同源 Origin 和图标会话令牌。未来 Electron 迁移时复用服务，通过受限 IPC 与图片协议替换 HTTP 边界。
+`applicationIcons` Vite 插件让扫描入口和图标接口共享一个服务实例；现有扫描接口返回缓存 URL，旧草稿的 PNG data URL 在登记后迁移为 URL。图标图片响应仅允许本机同源访问；写入需要同源 Origin 和图标会话令牌。桌面版复用同一服务，通过受限 IPC 与 approute://app 图片协议替换 HTTP 边界。
 
 生效证据按每个应用最近应用时间过滤新连接，并同时核对进程路径、命中规则及出口 chains；修改一个应用不会抹掉另一个应用的时间基准。界面列出已观测的进程，未观察到的组件不宣称已验证。自检 HTTPS 探测只代表目标站点的瞬时结果，成功后不构成无限期网络保障。
 
-正式版还需 Electron 权限边界、事务持久化崩溃点覆盖、安装包/休眠/重启测试、备份限额与脱敏诊断导出。参见 [功能规划](ROADMAP.md) 和 [Mihomo API](https://wiki.metacubex.one/api/)。
+桌面版已落实 renderer 沙箱、contextIsolation、禁止远程导航、权限拒绝与 IPC 主框架来源校验。正式版仍需事务崩溃点覆盖、更多安装/休眠/重启测试、备份限额与脱敏诊断导出。参见 [功能规划](ROADMAP.md) 和 [Mihomo API](https://wiki.metacubex.one/api/)。
+
+## 桌面列表与生命周期
+
+桌面主进程通过随包 Node 的 fork IPC 调用后台，扫描、图标和分流服务都不在 UI 线程中运行。恢复工具复制后台的真正 Node.exe；不会把 Electron.exe 当作恢复运行时。关闭窗口隐藏到托盘；后台每 10 秒检查已经管理的应用是否出现新辅助进程。正常退出停止观察，已经开始的事务继续完成或由独立守护回退；退出不清除已确认规则。
+
+资料与收藏使用 inventory.json；运行进程仅在内存中按可执行文件完整路径关联，辅助路径使用已识别的精确集合。不记录窗口标题或使用时长。启动/焦点返回触发扫描，60 秒节流，窗口可见时每 5 分钟补查；手动扫描绕过缓存，并发扫描共用同一任务。普通已安装条目以最新扫描为准，手动及运行中发现的便携条目保留；扫描不写入分流状态，收藏以路径为键，重新识别 ID 不丢失收藏。
