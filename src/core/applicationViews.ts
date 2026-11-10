@@ -1,0 +1,28 @@
+import type { Application } from '../shared/application.ts'
+import type { RunningApplicationProcess } from '../shared/desktop.ts'
+
+export type ApplicationView = 'mine' | 'running' | 'all'
+export const applicationKey = (app: Application) => (app.path || app.id).replaceAll('/', '\\').toLowerCase()
+export function isRunningApplication(app: Application, running: RunningApplicationProcess[]): boolean {
+  const paths = new Set([app.path, ...(app.processPaths ?? [])].filter(Boolean).map(p => p!.replaceAll('/', '\\').toLowerCase()))
+  return running.some(process => paths.has(process.path.replaceAll('/', '\\').toLowerCase()))
+}
+/** 仅影响折叠展示；未知软件保持展开，不用发布者或名字推断联网策略。 */
+export function isSystemTool(app: Application): boolean {
+  const executable = app.processes[0]?.toLowerCase() ?? ''
+  return /^[a-z]:\\windows\\(?:system32|syswow64)\\/i.test(applicationKey(app)) ||
+    /^(?:control|regedit|mmc|msconfig|taskmgr|eventvwr|services|perfmon|resmon|appverif|cmd|powershell|pwsh)\.exe$/.test(executable) ||
+    /(?:uninstall|unins\d*|installer|installmanager|updater|bugreport|crashreport|diagnostic)/i.test(executable)
+}
+export function applicationView(apps: Application[], view: ApplicationView, favorites: string[], running: RunningApplicationProcess[]) {
+  return apps.filter(app => view === 'all' || (view === 'mine' ? favorites.includes(applicationKey(app)) || app.mode !== 'rule' : isRunningApplication(app, running)))
+    .sort((a, b) => Number(favorites.includes(applicationKey(b))) - Number(favorites.includes(applicationKey(a))) || a.name.localeCompare(b.name, 'zh-CN'))
+}
+/** 扫描只更新资料，不重放联网方式；保留便携/手动条目及用户编辑过的分类。 */
+export function mergeScannedApplications(current: Application[], scanned: Application[]): Application[] {
+  const next = scanned.map(app => {
+    const previous = current.find(old => applicationKey(old) === applicationKey(app))
+    return { ...app, ...(previous?.source === 'manual' ? { name: previous.name, source: previous.source } : {}), category: previous?.category || app.category, mode: 'rule' as const }
+  })
+  return [...next, ...current.filter(old => (old.source === 'manual' || old.discovery === 'running') && !next.some(app => applicationKey(app) === applicationKey(old))).map(app => ({ ...app, mode: 'rule' as const }))]
+}

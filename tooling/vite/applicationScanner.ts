@@ -1,12 +1,13 @@
 import type { Connect, Plugin } from 'vite'
-import type { ApplicationScanResult } from '../../src/shared/application.ts'
+import { runningApplications } from '../../src/main/platform/windows/runningApplications.ts'
 import { scanApplications } from '../../src/main/platform/windows/scanApplications.ts'
 
 export const previewPort = 4318
 
 export function createScanMiddleware(scan = scanApplications, platform = process.platform): Connect.NextHandleFunction {
   return async (request, response, next) => {
-    if (request.url?.split('?')[0] !== '/api/applications') return next()
+    const route = request.url?.split('?')[0]
+    if (!['/api/applications', '/api/applications/running'].includes(route ?? '')) return next()
     response.setHeader('Content-Type', 'application/json; charset=utf-8')
     response.setHeader('Cache-Control', 'no-store')
     const host = request.headers.host ?? ''
@@ -23,7 +24,7 @@ export function createScanMiddleware(scan = scanApplications, platform = process
       return
     }
     try {
-      const result: ApplicationScanResult = await scan()
+      const result = route === '/api/applications/running' ? await runningApplications() : await scan()
       response.end(JSON.stringify(result))
     } catch {
       response.statusCode = 500

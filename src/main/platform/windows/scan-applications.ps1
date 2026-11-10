@@ -5,7 +5,7 @@ Add-Type -AssemblyName System.Drawing
 $applications = @{}
 $scanWarnings = @()
 
-function Add-Application([string]$displayName, [string]$executable, [string]$publisher, [string]$iconResource = '', [string]$iconMethod = 'executable') {
+function Add-Application([string]$displayName, [string]$executable, [string]$publisher, [string]$iconResource = '', [string]$iconMethod = 'executable', [string]$discovery = 'installed') {
   if (-not $displayName -or -not $executable -or $executable -notmatch '\.exe$') { return }
   if ($executable.StartsWith('\\') -or -not (Test-Path -LiteralPath $executable -PathType Leaf)) { return }
   $processName = [System.IO.Path]::GetFileName($executable)
@@ -26,7 +26,7 @@ function Add-Application([string]$displayName, [string]$executable, [string]$pub
   }
   $applications[$key] = [PSCustomObject]@{
     id = $key; name = $displayName; processes = @($processName); path = $executable
-    publisher = $publisher; icon = $iconData; iconMethod = $iconMethod; source = 'scan'; mode = 'rule'; category = ''
+    publisher = $publisher; discovery = $discovery; icon = $iconData; iconMethod = $iconMethod; source = 'scan'; mode = 'rule'; category = ''
   }
 }
 
@@ -58,7 +58,7 @@ foreach ($process in Get-Process) {
   if ($process.MainWindowHandle -eq 0 -or -not $process.Path) { continue }
   $displayName = $process.MainModule.FileVersionInfo.FileDescription
   if (-not $displayName) { $displayName = $process.ProcessName }
-  Add-Application $displayName $process.Path $process.MainModule.FileVersionInfo.CompanyName
+  Add-Application $displayName $process.Path $process.MainModule.FileVersionInfo.CompanyName '' 'executable' 'running'
 }
 [System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) | Out-Null
 
