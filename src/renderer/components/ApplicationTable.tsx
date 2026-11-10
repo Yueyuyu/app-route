@@ -7,6 +7,7 @@ import { RouteSelector } from './RouteSelector'
 import type { IntegrationStatus } from '../../shared/integration'
 import { managedFor, routingPresentation } from '../../core/applicationInventory'
 import { applicationKey } from '../../core/applicationViews'
+import { proxyOutletLabel } from '../../core/proxyGroups'
 
 interface Props {
   applications: Application[]
@@ -23,18 +24,23 @@ interface Props {
   favorites: string[]
   toggleFavorite: (app: Application) => void
   emptyDescription?: string
+  groupBusy?: boolean
 }
 
-export function ApplicationTable({ applications, selected, setSelected, changeMode, edit, remove, clearFilters, status, busyIds, failures, loading, favorites, toggleFavorite, emptyDescription }: Props) {
-  const disabled = busyIds.length > 0 || Boolean(status?.pending) || !status?.connected
-  const selector = (app: Application) => <RouteSelector disabled={disabled} label={`${app.name} 的连接方式`} value={app.mode} onChange={(mode) => changeMode([app.id], mode)} />
+export function ApplicationTable({ applications, selected, setSelected, changeMode, edit, remove, clearFilters, status, busyIds, failures, loading, favorites, toggleFavorite, emptyDescription, groupBusy }: Props) {
+  const disabled = groupBusy || busyIds.length > 0 || Boolean(status?.pending) || !status?.connected
+  const selector = (app: Application) => <RouteSelector disabled={disabled} legacyProxy={app.mode === 'proxy' && managedFor(app, status?.managed)?.target !== status?.proxyGroup} label={`${app.name} 的连接方式`} value={app.mode} onChange={(mode) => changeMode([app.id], mode)} />
   function feedback(app: Application) {
     const state = routingPresentation(app, status)
     const managed = managedFor(app, status?.managed)
+    const outlet = managed?.mode === 'proxy' ? status?.outlets?.[managed.target ?? ''] : undefined
+    const observed = status?.evidence.filter(item => item.applicationId === managed?.id)
+    const observedNodes = [...new Set(observed?.map(item => item.node ?? item.outbound))]
     return <div className="application-routing-status" aria-live="polite">
       <Tooltip title={failures[app.id] ?? state.detail}><Tag color={busyIds.includes(app.id) ? 'processing' : failures[app.id] ? 'error' : state.color}>{busyIds.includes(app.id) ? '正在应用与检查…' : failures[app.id] ? '应用失败' : state.label}</Tag></Tooltip>
       <small>{busyIds.includes(app.id) ? '正在识别进程、写入规则并检查网络；失败会自动恢复。' : failures[app.id] ?? state.detail}</small>
       {managed && <small className="application-policy">已保存出口：{managed.mode === 'proxy' ? managed.target ?? '未指定，请检查' : 'DIRECT · 本地直连'}</small>}
+      {managed?.mode === 'proxy' && <><small>{managed.target === status?.proxyGroup ? '组当前选择' : '旧出口当前选择'}：{proxyOutletLabel(outlet)}</small><small>实际连接节点：{observedNodes.length ? observedNodes.join('、') : '尚未观测到'}{observed?.some(item => item.usesCurrentNode === false) ? '（部分连接与当前选择不同，等待重连）' : ''}</small></>}
       {managedFor(app, status?.managed) && <span className="process-family-info" title={[app.processes.join('、'), ...(app.processWarnings ?? [])].join('\n')}>已识别 {app.processes.length} 个进程：{app.processes.slice(0, 3).join('、')}{app.processes.length > 3 ? ' 等（详情查看全部）' : ''}</span>}
     </div>
   }

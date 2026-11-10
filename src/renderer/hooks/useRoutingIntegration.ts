@@ -22,6 +22,7 @@ export async function integrationRequest<T>(action: string, body?: unknown): Pro
 export function useRoutingIntegration() {
   const [status, setStatus] = useState<IntegrationStatus>()
   const [error, setError] = useState('')
+  const [groupBusy, setGroupBusy] = useState(false)
   const [busyIds, setBusyIds] = useState<string[]>([])
   const [failures, setFailures] = useState<Record<string, string>>({})
   const busy = useRef(false)
@@ -54,6 +55,17 @@ export function useRoutingIntegration() {
       throw e
     } finally { busy.current = false; setBusyIds([]); await refresh() }
   }
+  async function setProxyGroup(target: string) {
+    if (busy.current) throw new Error('请等待当前应用操作结束。')
+    busy.current = true; setGroupBusy(true)
+    try {
+      const current = await refresh()
+      if (!current?.connected || current.pending) throw new Error('尚未连接或上一轮操作未确认，请检查恢复状态。')
+      const result = await integrationRequest<AutomaticApplyResult>('proxy-group', { target, revision: current.revision })
+      requestSequence.current++; setStatus(result.status)
+      if (result.outcome !== 'applied') throw new Error(result.message)
+    } finally { await refresh(); busy.current = false; setGroupBusy(false) }
+  }
   useEffect(() => {
     if (window.appRoute || !status?.connected || status.pending || busy.current) return
     const missing = status.uncoveredProcesses ?? []
@@ -64,5 +76,5 @@ export function useRoutingIntegration() {
     // 只为已经选择了专属模式的应用补充身份；仍经同一后端校验、网络检查和恢复事务。
     void apply([{ ...managed, path: managed.processPaths![0], source: 'scan', category: '已管理应用' }], managed.mode, managed.target).catch(() => {})
   }, [status])
-  return { status, error, refresh, apply, busyIds, failures }
+  return { status, error, refresh, apply, setProxyGroup, groupBusy, busyIds, failures }
 }

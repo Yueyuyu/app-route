@@ -4,6 +4,7 @@ import { routeDescriptions, routeLabels, type Application, type RouteMode } from
 import { ApplicationIcon } from './ApplicationIcon'
 import type { IntegrationStatus } from '../../shared/integration'
 import { managedFor } from '../../core/applicationInventory'
+import { proxyOutletLabel } from '../../core/proxyGroups'
 
 export function DraftPage({ applications, status, onExport }: { applications: Application[]; status?: IntegrationStatus; onExport: () => void }) {
   const rules = applications.filter((app) => app.mode !== 'rule')
@@ -15,9 +16,10 @@ export function DraftPage({ applications, status, onExport }: { applications: Ap
       { title: '应用', dataIndex: 'name', width: 210, render: (_, app) => <div className="draft-app"><ApplicationIcon name={app.name} icon={app.icon} application={app} /><strong>{app.name}</strong></div> },
       { title: '连接方式', dataIndex: 'mode', width: 115, render: (mode: RouteMode) => <Tag color={mode === 'direct' ? 'green' : 'blue'}>{routeLabels[mode]}</Tag> },
       { title: '已保存出口', key: 'target', width: 210, render: (_, app) => app.mode === 'direct' ? 'DIRECT · 本地直连' : managedFor(app, status?.managed)?.target ?? '未确认，请检查' },
+      { title: '组当前选择', key: 'current', width: 230, render: (_, app) => app.mode === 'direct' ? 'DIRECT' : proxyOutletLabel(status?.outlets?.[managedFor(app, status?.managed)?.target ?? '']) },
       { title: '适用进程', dataIndex: 'processes', responsive: ['md'], ellipsis: true, render: (processes: string[]) => <span className="process-label" title={processes.join('、')}>{processes.join('、')}</span> },
     ]} />
-    <p className="draft-note">出口来自 Clash Party。此处显示每个应用已经保存的设置；修改应用管理顶部的下拉框不会自动修改这些记录。实际是否符合设置，请查看新连接验证。</p>
+    <p className="draft-note">出口来自 Clash Party。此处显示每个应用已经保存的设置；在顶部绑定代理组会统一更新已有代理应用；之后在 Clash Party 换节点无需再次应用。实际是否符合设置，请查看新连接验证。</p>
   </section>
 }
 
@@ -25,12 +27,12 @@ export function HelpPage() {
   const entries = [
     { mode: 'rule' as const, icon: <ApartmentOutlined />, example: '例如原规则让百度直连、Google 使用“自动选择”组，同一个浏览器访问它们就会使用不同出口。并非所有国外网站都必然走同一节点，具体取决于你的规则。', flow: ['应用的新连接', 'Clash Party 原有规则', '规则决定直连或代理'] },
     { mode: 'direct' as const, icon: <HomeOutlined />, example: '例如 QQ 音乐选择直接联网，被识别的新连接走本地网络。系统代理仍可开启；AppRoute 不会关闭其他 VPN，也不承诺绕过电脑上的所有网络软件。', flow: ['应用的新连接', 'Clash 内核的 DIRECT', '本地网络 → 目标网站'] },
-    { mode: 'proxy' as const, icon: <GlobalOutlined />, example: '例如选定“新加坡节点 A”，该应用被识别的新连接就优先使用它；选定“自动选择”组，则跟随这个组的策略。只有保存的是同一个代理组，才会跟随你在 Clash Party 对那个组的切换。', flow: ['应用的新连接', 'AppRoute 为应用保存的节点或组', '远端代理 → 目标网站'] },
+    { mode: 'proxy' as const, icon: <GlobalOutlined />, example: '例如绑定“节点选择”组后，你在 Clash Party 把这组从新加坡换到日本，应用的新连接会随之切换。手动组不会自动避开坏节点；若选择其下的自动选择／故障转移组，则由 Clash 的策略处理。', flow: ['应用的新连接', 'AppRoute 绑定的代理组', '组当前选择 → 目标网站'] },
   ]
   return <section className="secondary-page help-page"><div className="page-heading"><div><h1>连接方式说明</h1><p>当前已接入 Clash Party，下面说明三种连接方式的含义。</p></div></div>
-    <Alert showIcon type="info" title="Clash 的规则模式，与这里的三个应用选项，是两个层次" description="Clash Party 保持规则模式。AppRoute 的“按 Clash 规则”沿用原有判断；“直接联网”和“指定代理”则给这个应用增加优先规则。它们不会把整台电脑切成全局代理。" />
+    <Alert showIcon type="info" title="Clash 的规则模式，与这里的三个应用选项，是两个层次" description="Clash Party 保持规则模式。AppRoute 的“按 Clash 规则”沿用原有判断；“直接联网”和“跟随代理组”则给这个应用增加优先规则。它们不会把整台电脑切成全局代理。" />
     {entries.map((entry) => <article className={`help-entry help-${entry.mode}`} key={entry.mode}><div className="help-icon">{entry.icon}</div><div><h2>{routeLabels[entry.mode]}</h2><p>{routeDescriptions[entry.mode]}</p><p className="help-example">{entry.example}</p><div className="route-flow">{entry.flow.map((step, index) => <span key={step}>{index > 0 && <ArrowRightOutlined />}<span>{step}</span></span>)}</div></div></article>)}
-    <Alert showIcon type="info" title="选了代理，不等于所有流量都已经验证" description="先选择出口，再点击应用行的“指定代理”。顶部只决定之后的应用操作，已有设置以各行保存的出口为准。未进入 Clash 或未识别的进程不保证符合设置，旧连接不会自动切换；“规则已加载”只表示规则存在，“已验证新连接”才表示观察到了符合设置的连接。" />
-    <p className="draft-note">仅提供不含 DIRECT / REJECT 成员的代理出口。应用自检失败会撤销本次修改并显示结果；处理中断由独立守护兜底。正式发布前仍需完成客户端重启、订阅切换等验收。</p>
+    <Alert showIcon type="info" title="选了代理，不等于所有流量都已经验证" description="先绑定代理组，再点击应用行的“跟随代理组”。绑定一次供所有代理应用共用；日常在 Clash Party 换节点即可。组当前选择与应用的实际连接节点分开显示。未进入 Clash 或未识别的进程不保证符合设置，旧连接不会自动切换；“规则已加载”只表示规则存在，“已验证新连接”才表示观察到了符合设置的连接。" />
+    <p className="draft-note">代理组可以含 DIRECT / REJECT，选择到它们时会明确提示直连或拒绝连接。组被订阅移除后不擅自换组，提示重新绑定；订阅重建会跳过该组规则、恢复原有路由。应用自检失败会撤销本次修改并显示结果；处理中断由独立守护兜底。正式发布前仍需完成客户端重启、订阅切换等验收。</p>
   </section>
 }

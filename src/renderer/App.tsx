@@ -20,9 +20,8 @@ export default function App() {
   const inventory = useApplicationInventory()
   const routing = useRoutingIntegration()
   const applications = useMemo(() => inventoryWithRouting(inventory.applications, routing.status), [inventory.applications, routing.status])
-  const [preferredTarget, setPreferredTarget] = useState<string>()
-  const target = routing.status?.choices.some(choice => choice.name === preferredTarget) ? preferredTarget : routing.status?.suggestedTarget
-  const applying = routing.busyIds.length > 0
+  const target = routing.status?.proxyGroup
+  const applying = routing.busyIds.length > 0 || routing.groupBusy
   const { message, modal } = AntApp.useApp()
   const [page, setPage] = useState<Page>('apps')
   const [search, setSearch] = useState('')
@@ -46,7 +45,8 @@ export default function App() {
 
   async function changeMode(ids: string[], mode: RouteMode) {
     const chosen = applications.filter(app => ids.includes(app.id))
-    if (mode === 'proxy' && !target) { void message.info('请先在上方选择 Clash Party 的节点或代理组，再点击“指定代理”。'); return }
+    if (routing.groupBusy) return
+    if (mode === 'proxy' && !routing.status?.groupChoices?.some(group => group.name === target)) { void message.info('请先在上方绑定 Clash Party 代理组，所有代理应用会共用它。'); return }
     try { const result = await routing.apply(chosen, mode, target); setSelected([]); void message.success(result.message) }
     catch (e) { void message.error(e instanceof Error ? e.message : '应用失败，请检查状态', 8) }
   }
@@ -79,7 +79,7 @@ export default function App() {
       <main className="main-content">
         {page === 'apps' ? <section aria-label="应用管理">
           <div className="page-heading"><div><h1>应用管理</h1><p>收藏常用应用，按需选择联网方式。未设置的应用沿用原有规则。</p></div><div className="heading-actions"><Button icon={<PlusOutlined />} onClick={() => { setEditing(undefined); setEditorOpen(true) }}>添加应用</Button><Button type="primary" icon={<ScanOutlined />} loading={inventory.loading} disabled={applying} onClick={() => void inventory.scan(true)}>重新扫描</Button></div></div>
-          <RoutingPanel status={routing.status} error={routing.error} refresh={routing.refresh} busy={applying} target={target} setTarget={setPreferredTarget} />
+          <RoutingPanel status={routing.status} error={routing.error} refresh={routing.refresh} busy={applying} setProxyGroup={routing.setProxyGroup} />
           <Alert className="preview-notice" type="info" showIcon title="本机真实应用 · 点击连接方式即自动应用，失败自动恢复。" description="规则加载与新连接验证分别显示。桌面后台自动检测进入 Clash 的新辅助进程；已有连接不会自动切换。" />
           {inventory.error && <Alert type="warning" showIcon title={inventory.error} action={<Button onClick={() => void inventory.scan(true)}>重试扫描</Button>} />}
           {inventory.newCount > 0 && <Alert className="inventory-update" type="success" showIcon title={`发现 ${inventory.newCount} 个新应用，已加入全部应用，联网方式沿用原有规则。`} action={<Button size="small" onClick={showAll}>查看全部</Button>} />}
@@ -94,8 +94,8 @@ export default function App() {
           </div></div>
           {view === 'running' && inventory.runningError && <Alert type="warning" title={inventory.runningError} action={<Button onClick={() => void inventory.refreshRunning()}>重试</Button>} />}
           {selected.length > 0 && <div className="bulk-toolbar"><span>已选择 <strong>{selected.length}</strong> 个应用</span><Button size="small" icon={<StarOutlined />} onClick={() => { inventory.addFavorites(applications.filter(app => selected.includes(app.id))); setSelected([]); void message.success('已加入我的应用，联网方式保持不变') }}>加入收藏</Button><Dropdown trigger={['click']} menu={{ items: (Object.keys(routeLabels) as RouteMode[]).map((mode) => ({ key: mode, label: routeLabels[mode] })), onClick: ({ key }) => { changeMode(selected.map(String), key as RouteMode) } }}><Button size="small" disabled={applying || !routing.status?.connected || Boolean(routing.status?.pending)}>批量应用连接方式</Button></Dropdown><Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setSelected([])}>取消选择</Button></div>}
-          {(primary.length > 0 || folded.length === 0) && <ApplicationTable status={routing.status} busyIds={routing.busyIds} failures={routing.failures} loading={inventory.loading || !inventory.ready} applications={primary} favorites={inventory.favorites} toggleFavorite={inventory.toggleFavorite} selected={selected} setSelected={setSelected} changeMode={changeMode} edit={app => { setEditing(app); setEditorOpen(true) }} remove={removeApplication} clearFilters={showAll} emptyDescription={view === 'mine' ? '收藏常用软件，或设置专属分流后，它们会出现在这里' : '没有找到匹配的应用'} />}
-          {folded.length > 0 && <Collapse className="system-tools" items={[{ key: 'tools', label: `系统工具与维护程序 · ${folded.length} 个`, children: <ApplicationTable status={routing.status} busyIds={routing.busyIds} failures={routing.failures} loading={false} applications={folded} favorites={inventory.favorites} toggleFavorite={inventory.toggleFavorite} selected={selected} setSelected={setSelected} changeMode={changeMode} edit={app => { setEditing(app); setEditorOpen(true) }} remove={removeApplication} clearFilters={showAll} /> }]} />}
+          {(primary.length > 0 || folded.length === 0) && <ApplicationTable groupBusy={routing.groupBusy} status={routing.status} busyIds={routing.busyIds} failures={routing.failures} loading={inventory.loading || !inventory.ready} applications={primary} favorites={inventory.favorites} toggleFavorite={inventory.toggleFavorite} selected={selected} setSelected={setSelected} changeMode={changeMode} edit={app => { setEditing(app); setEditorOpen(true) }} remove={removeApplication} clearFilters={showAll} emptyDescription={view === 'mine' ? '收藏常用软件，或设置专属分流后，它们会出现在这里' : '没有找到匹配的应用'} />}
+          {folded.length > 0 && <Collapse className="system-tools" items={[{ key: 'tools', label: `系统工具与维护程序 · ${folded.length} 个`, children: <ApplicationTable groupBusy={routing.groupBusy} status={routing.status} busyIds={routing.busyIds} failures={routing.failures} loading={false} applications={folded} favorites={inventory.favorites} toggleFavorite={inventory.toggleFavorite} selected={selected} setSelected={setSelected} changeMode={changeMode} edit={app => { setEditing(app); setEditorOpen(true) }} remove={removeApplication} clearFilters={showAll} /> }]} />}
           <div className="table-footer"><span>当前视图 {visible.length} 个 · 本机共 {applications.length} 个{inventory.loading ? ' · 正在检查新应用…' : inventory.scannedAt ? ` · 最近检查 ${new Date(inventory.scannedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : ''}</span><Button type="link" size="small" icon={<InfoCircleOutlined />} onClick={() => setPage('help')}>联网方式说明</Button></div>
 
         </section> : page === 'drafts' ? <DraftPage applications={applications} status={routing.status} onExport={exportDraft} /> : page === 'icons' ? <IconManagement /> : <HelpPage />}

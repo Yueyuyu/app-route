@@ -224,3 +224,6 @@ h1 { font-size: 32px; line-height: 1.35; letter-spacing: -.7px; margin: 0; font-
 
 .routing-policy-hint { color: #68768b; font-size: 12px; line-height: 1.7; margin: 10px 0; }
 .application-routing-status .application-policy { color: #415573; }
+
+.proxy-group-current { margin: 12px 0 6px; color: #344967; }
+.proxy-group-current small { display: block; color: #68768b; margin-top: 4px; font-size: 12px; }
