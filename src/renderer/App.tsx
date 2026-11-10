@@ -46,7 +46,7 @@ export default function App() {
 
   async function changeMode(ids: string[], mode: RouteMode) {
     const chosen = applications.filter(app => ids.includes(app.id))
-    if (mode === 'proxy' && !target) { void message.info('请先在上方选择代理出口，以后点击走代理会直接使用该出口。'); return }
+    if (mode === 'proxy' && !target) { void message.info('请先在上方选择 Clash Party 的节点或代理组，再点击“指定代理”。'); return }
     try { const result = await routing.apply(chosen, mode, target); setSelected([]); void message.success(result.message) }
     catch (e) { void message.error(e instanceof Error ? e.message : '应用失败，请检查状态', 8) }
   }
@@ -89,7 +89,7 @@ export default function App() {
             { key: 'all', label: <span>全部应用 <b>{views.all.length}</b></span> },
           ]} /><div className="list-search"><Input prefix={<SearchOutlined />} aria-label="搜索应用名称或进程" placeholder="搜索应用名称或进程" value={search} onChange={event => { setSearch(event.target.value); setSelected([]) }} allowClear /></div></div>
           <div className="view-filters"><span>{view === 'mine' ? '已收藏或已设置专属分流的应用' : view === 'running' ? '按程序路径关联运行进程，辅助进程归到所属应用' : '新安装的应用会自动检查加入；收藏后显示在我的应用'}</span><div>
-            <Select aria-label="联网方式筛选" value={filter} onChange={value => { setFilter(value); setSelected([]) }} options={[{ value: 'all', label: '全部联网方式' }, { value: 'rule', label: '按 Clash 规则' }, { value: 'direct', label: '直接联网' }, { value: 'proxy', label: '强制走代理' }]} />
+            <Select aria-label="联网方式筛选" value={filter} onChange={value => { setFilter(value); setSelected([]) }} options={[{ value: 'all', label: '全部联网方式' }, ...(['rule', 'direct', 'proxy'] as RouteMode[]).map(value => ({ value, label: routeLabels[value] }))]} />
             <Select aria-label="应用分类筛选" value={category} onChange={value => { setCategory(value); setSelected([]) }} options={[{ value: 'all', label: '所有分类' }, ...[...new Set(applications.map(app => app.category))].map(value => ({ value, label: value }))]} />
           </div></div>
           {view === 'running' && inventory.runningError && <Alert type="warning" title={inventory.runningError} action={<Button onClick={() => void inventory.refreshRunning()}>重试</Button>} />}
@@ -98,7 +98,7 @@ export default function App() {
           {folded.length > 0 && <Collapse className="system-tools" items={[{ key: 'tools', label: `系统工具与维护程序 · ${folded.length} 个`, children: <ApplicationTable status={routing.status} busyIds={routing.busyIds} failures={routing.failures} loading={false} applications={folded} favorites={inventory.favorites} toggleFavorite={inventory.toggleFavorite} selected={selected} setSelected={setSelected} changeMode={changeMode} edit={app => { setEditing(app); setEditorOpen(true) }} remove={removeApplication} clearFilters={showAll} /> }]} />}
           <div className="table-footer"><span>当前视图 {visible.length} 个 · 本机共 {applications.length} 个{inventory.loading ? ' · 正在检查新应用…' : inventory.scannedAt ? ` · 最近检查 ${new Date(inventory.scannedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : ''}</span><Button type="link" size="small" icon={<InfoCircleOutlined />} onClick={() => setPage('help')}>联网方式说明</Button></div>
 
-        </section> : page === 'drafts' ? <DraftPage applications={applications} onExport={exportDraft} /> : page === 'icons' ? <IconManagement /> : <HelpPage />}
+        </section> : page === 'drafts' ? <DraftPage applications={applications} status={routing.status} onExport={exportDraft} /> : page === 'icons' ? <IconManagement /> : <HelpPage />}
       </main>
       <footer className="workspace-footer"><div className="save-status"><i className={inventory.saveError ? 'error' : ''} /><strong>{inventory.saveError ? '列表缓存未能保存' : '点击即应用'}</strong><span>{inventory.saveError ? '本地存储不可用，下次将重新扫描' : routing.status?.recoveryReady ? '独立恢复入口已准备 · 每次应用自动检查' : '首次应用前自动准备独立恢复工具'}</span></div><Button icon={<ExportOutlined />} onClick={exportDraft}>导出设置记录</Button></footer>
     </div>

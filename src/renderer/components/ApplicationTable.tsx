@@ -30,9 +30,11 @@ export function ApplicationTable({ applications, selected, setSelected, changeMo
   const selector = (app: Application) => <RouteSelector disabled={disabled} label={`${app.name} 的连接方式`} value={app.mode} onChange={(mode) => changeMode([app.id], mode)} />
   function feedback(app: Application) {
     const state = routingPresentation(app, status)
+    const managed = managedFor(app, status?.managed)
     return <div className="application-routing-status" aria-live="polite">
       <Tooltip title={failures[app.id] ?? state.detail}><Tag color={busyIds.includes(app.id) ? 'processing' : failures[app.id] ? 'error' : state.color}>{busyIds.includes(app.id) ? '正在应用与检查…' : failures[app.id] ? '应用失败' : state.label}</Tag></Tooltip>
       <small>{busyIds.includes(app.id) ? '正在识别进程、写入规则并检查网络；失败会自动恢复。' : failures[app.id] ?? state.detail}</small>
+      {managed && <small className="application-policy">已保存出口：{managed.mode === 'proxy' ? managed.target ?? '未指定，请检查' : 'DIRECT · 本地直连'}</small>}
       {managedFor(app, status?.managed) && <span className="process-family-info" title={[app.processes.join('、'), ...(app.processWarnings ?? [])].join('\n')}>已识别 {app.processes.length} 个进程：{app.processes.slice(0, 3).join('、')}{app.processes.length > 3 ? ' 等（详情查看全部）' : ''}</span>}
     </div>
   }

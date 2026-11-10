@@ -221,3 +221,6 @@ h1 { font-size: 32px; line-height: 1.35; letter-spacing: -.7px; margin: 0; font-
 .desktop-shell .workspace-footer { padding-block: 12px; }
 
 .application-table .ant-table-cell:nth-child(2) { white-space: nowrap; padding-inline: 6px; text-align: center; }
+
+.routing-policy-hint { color: #68768b; font-size: 12px; line-height: 1.7; margin: 10px 0; }
+.application-routing-status .application-policy { color: #415573; }

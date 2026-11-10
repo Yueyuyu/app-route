@@ -20,8 +20,9 @@ export function RoutingPanel({ status, error, refresh, busy, target, setTarget }
   return <section className="routing-panel" aria-label="实际分流与网络恢复">
     <div className="routing-toolbar"><Space wrap>
       <Tag color={status?.connected ? 'green' : 'default'}>{status?.connected ? `Clash Party 已连接 · ${status.version}` : 'Clash Party 未连接'}</Tag>
-      <span>走代理时使用</span><Select aria-label="代理出口" placeholder="请选择代理出口" disabled={busy || Boolean(working) || Boolean(status?.pending)} value={target} onChange={setTarget} showSearch optionFilterProp="label" style={{ width: 230 }} options={status?.choices.map(choice => ({ value: choice.name, label: `${choice.name}${['Selector', 'Fallback', 'URLTest'].includes(choice.type) ? ` → ${choice.current}` : ''}` }))} />
+      <span>下次指定代理时使用</span><Select aria-label="代理出口" placeholder="请选择代理出口" disabled={busy || Boolean(working) || Boolean(status?.pending)} value={target} onChange={setTarget} showSearch optionFilterProp="label" style={{ width: 230 }} options={status?.choices.map(choice => ({ value: choice.name, label: `${choice.name}${choice.current !== choice.name ? ` → ${choice.current}` : ''}` }))} />
     </Space><Space wrap><Button icon={<ReloadOutlined />} loading={working === 'diagnose'} disabled={busy || Boolean(working)} onClick={() => void run('diagnose')}>网络自检</Button><Button danger icon={<SafetyCertificateOutlined />} disabled={busy || Boolean(working)} onClick={() => modal.confirm({ title: '恢复网络：停用 AppRoute 专属规则', content: '保留原有订阅、代理组、系统代理和 TUN 设置，重新加载当前原有配置。', okText: '恢复网络', cancelText: '取消', onOk: () => run('recover') })}>恢复网络</Button></Space></div>
+    <p className="routing-policy-hint">出口来自 Clash Party。仅更改此下拉框不会修改已有应用；点击“指定代理”后才应用，已保存出口见应用行。<br />选择具体节点就使用该节点；选择代理组则跟随该组的选择或自动策略。</p>
     {status?.pending && <Alert type="info" showIcon title="正在自动检查，独立恢复守护已启动" description="检查通过后自动保留；失败或处理意外中断时恢复上一版设置，最长 120 秒。" />}
     {(error || status?.warning) && <Alert type="info" showIcon title={error || status?.warning} />}
     <Collapse ghost items={[{ key: 'inspection', label: `生效检查与离线恢复 · 已管理 ${status?.managed.length ?? 0} 个应用`, children: <>
