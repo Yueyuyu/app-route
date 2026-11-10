@@ -11,11 +11,18 @@ button, input { font: inherit; }
 button:focus-visible, a:focus-visible { outline: 3px solid #adc5ff; outline-offset: 3px; }
 .app-shell { min-height: 100vh; display: flex; }
 .sidebar { width: 274px; flex: 0 0 274px; background: #f4f6fa; border-right: 1px solid #eef0f4; min-height: 100vh; display: flex; flex-direction: column; padding: 27px 14px 20px; position: fixed; inset: 0 auto 0 0; }
-.brand { display: flex; align-items: center; gap: 12px; padding: 0 9px; margin-bottom: 40px; white-space: nowrap; }
-.brand-icon { width: 37px; height: 37px; flex: 0 0 37px; display: block; object-fit: contain; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 9px; white-space: nowrap; }
+.sidebar > .brand { margin-bottom: 36px; }
+.brand-icon { width: 44px; height: 44px; flex: 0 0 44px; display: block; object-fit: contain; }
+.brand-copy { min-width: 0; }
+/* 原图白底通过正片叠底融入浅色侧栏，保留定稿像素与笔画。 */
+.brand-wordmark { display: block; width: 156px; height: auto; aspect-ratio: 1756 / 466; overflow: hidden; mix-blend-mode: multiply; }
+.brand-tagline { display: block; font-size: 12px; font-weight: 400; color: #788191; margin: 4px 0 0 3px; }
 .topbar-app-icon { width: 34px; height: 34px; display: block; object-fit: contain; }
-.brand strong { display: block; font-size: 23px; font-weight: 650; letter-spacing: -.4px; }
-.brand > div > span { display: block; font-size: 13px; color: #788191; margin-top: 4px; }
+.navigation-drawer .brand { padding: 0; gap: 8px; }
+.navigation-drawer .brand-icon { width: 36px; height: 36px; flex-basis: 36px; }
+.navigation-drawer .brand-wordmark { width: 146px; }
+.navigation-drawer .brand-tagline { font-size: 11px; }
 .sidebar .ant-menu { background: transparent; border-inline-end: none !important; }
 .sidebar .ant-menu-item { margin: 4px 0 9px; width: 100%; padding-left: 16px !important; }
 .sidebar .ant-menu-item-icon { font-size: 18px !important; }
@@ -160,7 +167,8 @@ h1 { font-size: 32px; line-height: 1.35; letter-spacing: -.7px; margin: 0; font-
 .mobile-route, .mobile-menu-button { display: none !important; }
 @media (min-width: 1600px) { .main-content { padding: 44px 46px 35px; } .topbar, .workspace-footer { padding-inline: 46px; } .application-table .ant-table-cell { padding-block: 17px; } }
 @media (max-width: 1250px) { .sidebar { width: 210px; flex-basis: 210px; } .workspace { margin-left: 210px; } .main-content { padding: 28px 24px; } .topbar, .workspace-footer { padding-inline: 24px; } .list-toolbar { flex-wrap: wrap-reverse; gap: 0; } .list-search { width: 100%; justify-content: flex-end; margin: 12px 0 0; } .list-search .ant-input-affix-wrapper { width: 240px; } .brand { gap: 9px; padding-inline: 4px; } }
-@media (max-width: 991px) and (min-width: 768px) { .sidebar { width: 185px; flex-basis: 185px; padding-inline: 10px; } .workspace { margin-left: 185px; } .brand-icon { width: 30px; height: 30px; flex-basis: 30px; font-size: 21px; } .brand strong { font-size: 18px; } .brand > div > span { font-size: 9px; } .page-heading { align-items: flex-start; flex-direction: column; } .application-table .ant-table-cell { padding-inline: 9px; } .application-name { gap: 7px; } .application-label strong { font-size: 12px; } .application-icon, .application-icon img { width: 26px; height: 26px; flex-basis: 26px; } .route-selector.ant-segmented { width: 286px; min-width: 286px; font-size: 11px; } }
+@media (max-width: 1250px) { .sidebar .brand-wordmark { width: 122px; } .sidebar .brand-icon { width: 36px; height: 36px; flex-basis: 36px; } .sidebar .brand-tagline { font-size: 10px; } }
+@media (max-width: 991px) and (min-width: 768px) { .sidebar { width: 185px; flex-basis: 185px; padding-inline: 10px; } .workspace { margin-left: 185px; } .sidebar .brand-icon { width: 30px; height: 30px; flex-basis: 30px; } .sidebar .brand-wordmark { width: 116px; } .sidebar .brand-tagline { font-size: 9px; } .page-heading { align-items: flex-start; flex-direction: column; } .application-table .ant-table-cell { padding-inline: 9px; } .application-name { gap: 7px; } .application-label strong { font-size: 12px; } .application-icon, .application-icon img { width: 26px; height: 26px; flex-basis: 26px; } .route-selector.ant-segmented { width: 286px; min-width: 286px; font-size: 11px; } }
 @media (max-width: 767px) {
   .sidebar { display: none; } .workspace { margin-left: 0; } .topbar { height: 60px; padding: 0 16px; } .topbar-left { gap: 6px; } .topbar-right { gap: 8px; } .topbar-right .ant-tag { margin: 0; } .topbar .ant-breadcrumb { font-size: 12px; }
   .mobile-menu-button { display: inline-flex !important; } .main-content { padding: 25px 18px; } h1 { font-size: 25px; }

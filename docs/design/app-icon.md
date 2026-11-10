@@ -13,6 +13,7 @@
 | `public/brand/app-route-128.png` | 应用界面、README 标识 |
 | `public/brand/app-route-180.png` | Apple touch icon |
 | `public/brand/app-route-512.png` | 通用展示、后续桌面打包 |
+| `public/brand/app-route-wordmark.png` | 2026-11-10 用户确认的稍细连笔艺术字原图，1983 × 793 像素；页面通过视窗去除留白 |
 | `public/favicon.ico` | 浏览器及 Windows 图标，含 16、24、32、48、64、128、256 像素七帧 |
 
 Windows 上执行 `npm run icons:app`，由 `scripts/export-app-icon.ps1` 使用系统 System.Drawing 重新导出尺寸及 ICO，不需要额外依赖。该命令只缩放和封装，不重绘、裁切、改色或修改原图。透明区域随原图保留。

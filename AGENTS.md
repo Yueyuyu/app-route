@@ -6,6 +6,8 @@
 
 当前为 0.2 集成测试版：已实现 Clash Party / Mihomo 运行控制、专属覆写、试运行与独立离线恢复；真实客户端重启和订阅切换验收仍待完成。没有 Electron 安装包。
 
+涉及品牌图标、艺术字或复用视觉效果时，先读 `docs/design/README.md`、`docs/design/app-icon.md` 和 `docs/design/wordmark.md`。AppRoute 沿用已确认原图；跨项目的通用风格按字标规范中的 UI Design Lab 来源提交、ID 与版本读取，不把字标图片当作可安装字体。
+
 ## 语言与维护
 
 - 交流、代码注释、文档及提交描述默认使用简体中文。

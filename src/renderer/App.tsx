@@ -8,6 +8,7 @@ import { DraftPage, HelpPage } from './components/SecondaryPages'
 import { useApplicationDraft } from './hooks/useApplicationDraft'
 import { RoutingPanel } from './components/RoutingPanel'
 import { IconManagement } from './components/IconManagement'
+import { Brand } from './components/Brand'
 import { ApplicationIconsProvider } from './hooks/useApplicationIcons'
 import { routeLabels, type Application, type Page, type RouteMode } from './types'
 
@@ -65,7 +66,7 @@ export default function App() {
   ]} />
 
   return <ApplicationIconsProvider applications={draft.applications} onResolved={draft.syncIcons}><div className="app-shell">
-    <aside className="sidebar"><div className="brand"><img className="brand-icon" src="/brand/app-route-128.png" width={37} height={37} alt="" /><div><strong>AppRoute</strong><span>应用分流 · 各走其路</span></div></div>
+    <aside className="sidebar"><Brand />
       {navigation}
       <div className="sidebar-bottom"><div className="integration-status"><i /><div><strong>Clash Party</strong><span>连接与恢复状态见页面上方</span></div></div><small>集成测试版 0.2.0-preview.1</small></div>
     </aside>
@@ -90,6 +91,6 @@ export default function App() {
     </div>
     <ApplicationEditor open={editorOpen} application={editing} applications={draft.applications} onClose={() => setEditorOpen(false)} onSave={(app) => { draft.saveApplication(app); void message.success('应用设置已保存为草稿') }} />
     <ScanApplications open={scanOpen} onClose={() => setScanOpen(false)} onAdd={(apps) => { draft.addScannedApplications(apps); void message.success(`已将 ${apps.length} 个本机应用添加到草稿`) }} />
-    <Drawer title="AppRoute 应用分流" placement="left" open={menuOpen} onClose={() => setMenuOpen(false)} size={260}>{navigation}</Drawer>
+    <Drawer title={<Brand />} className="navigation-drawer" placement="left" open={menuOpen} onClose={() => setMenuOpen(false)} size={280}>{navigation}</Drawer>
   </div></ApplicationIconsProvider>
 }
