@@ -11,7 +11,7 @@ const applications = ids.map((id, index) => {
   return { id, name: item.name, processes: [item.processes[0]], path: `C:\\DemoApps\\${id}\\${item.processes[0]}`, category: item.category, mode: index === 0 ? 'rule' : index % 2 ? 'direct' : 'proxy', source: 'scan', icon: `/icons/apps/${id}.svg` }
 })
 const managed = applications.filter(app => app.mode !== 'rule').map(app => ({ ...app, processPaths: [app.path], target: app.mode === 'direct' ? 'DIRECT' : 'Demo group', appliedAt: '2026-11-11T04:00:00Z' }))
-const status = { connected: true, version: 'v1.19.32', mode: 'rule', tun: false, revision: 'documentation-only',
+const status = { connected: true, version: 'v1.19.32', mode: 'rule', tun: false, revision: 'documentation-only', configurationFingerprint: 'demo-config-a',
   choices: [], groupChoices: [{ name: 'Demo group', type: 'Selector', current: 'Demo node A', udp: true }],
   proxyGroup: 'Demo group', proxyStrategy: { mode: 'existing', group: 'Demo group' }, strategyLoaded: true,
   strategyNodes: ['A', 'B', 'C'].map((letter, i) => ({ name: 'Demo node ' + letter, type: 'Shadowsocks', health: 'healthy', delay: 48 + i * 30 })),
@@ -24,8 +24,16 @@ let inventory = { version: 1, applications, favorites: [applications[0].path.toL
 process.on('message', ({ id, action, body }) => {
   fs.appendFileSync(path.join(root, 'requests.jsonl'), JSON.stringify({ action }) + '\n')
   let value
-  if (action === 'integration.status') value = status
+  if (action === 'integration.status') {
+    value = structuredClone(status)
+    const scenarioPath = path.join(root, 'scenario.json')
+    const scenario = fs.existsSync(scenarioPath) ? JSON.parse(fs.readFileSync(scenarioPath, 'utf8')) : {}
+    if (scenario.offline) { value.connected = false; value.rulesLoaded = false }
+    if (scenario.configuration) value.configurationFingerprint = scenario.configuration
+    if (scenario.node) { value.outlets['Demo group'].node = scenario.node; value.outlets['Demo group'].chain = ['Demo group', scenario.node] }
+  }
   else if (action === 'applications.scan') value = { applications, scannedAt: '2026-11-11T04:00:00Z' }
+  else if (action === 'integration.reconcile') value = undefined
   else if (action === 'applications.running') value = applications.slice(0, 4).map((app, i) => ({ path: app.path, pid: 100 + i, parentPid: 1 }))
   else if (action === 'inventory.read') value = inventory
   else if (action === 'inventory.write') { inventory = body; value = body }
