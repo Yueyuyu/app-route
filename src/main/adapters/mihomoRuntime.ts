@@ -39,7 +39,13 @@ export class MihomoRuntime {
   version() { return this.request<{ version: string }>('GET', '/version') }
   proxies() { return this.request<{ proxies: Record<string, ProxyInfo> }>('GET', '/proxies') }
   rules() { return this.request<{ rules: RuntimeRule[] }>('GET', '/rules') }
-  connections() { return this.request<{ connections: RuntimeConnection[] }>('GET', '/connections') }
+  async connections(): Promise<{ connections: RuntimeConnection[] }> {
+    const response = await this.request<{ connections: RuntimeConnection[] | null }>('GET', '/connections')
+    // Mihomo 刚启动且尚无连接时返回 null；这是空记录，不是控制接口断连。
+    if (response.connections === null) return { connections: [] }
+    if (!Array.isArray(response.connections)) throw new Error('内核连接记录格式错误。')
+    return { connections: response.connections }
+  }
   reload(payload: string) { return this.request<void>('PUT', '/configs?force=true', { payload }) }
   delay(name: string, url: string) { return this.request<{ delay: number }>('GET', `/proxies/${encodeURIComponent(name)}/delay?timeout=5000&url=${encodeURIComponent(url)}`) }
   checkGroup(name: string) { return this.request<Record<string, number>>('GET', `/group/${encodeURIComponent(name)}/delay?timeout=5000&url=${encodeURIComponent('https://www.gstatic.com/generate_204')}`) }
