@@ -1,5 +1,6 @@
-import { t, formatTime } from '../i18n'
-import { Alert, App, Button, Collapse, Descriptions, Drawer, Empty, Tag } from 'antd'
+import { ConnectionInspector } from './ConnectionInspector'
+import { t } from '../i18n'
+import { Alert, App, Button, Drawer } from 'antd'
 import { ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import type { DiagnosticCheck, IntegrationStatus } from '../../shared/integration'
@@ -11,11 +12,12 @@ import { strategyLabels, type ProxyStrategy } from '../../shared/proxyStrategy'
 
 interface Props {
   status?: IntegrationStatus; error: string; refresh: () => Promise<unknown>; busy: boolean
-  setProxyStrategy: (value: ProxyStrategy, revision: string) => Promise<void>
+  setProxyStrategy: (value: ProxyStrategy, revision: string, missingTargetAction?: 'block' | 'original') => Promise<void>
   inspectionOpen: boolean; setInspectionOpen: (open: boolean) => void
 }
 export function RoutingPanel({ status, error, refresh, busy, setProxyStrategy, inspectionOpen, setInspectionOpen }: Props) {
   const { modal, message } = App.useApp()
+  const [tab, setTab] = useState('overview')
   const [working, setWorking] = useState('')
   const [checks, setChecks] = useState<DiagnosticCheck[]>([])
   const outlet = status?.proxyGroup ? status.outlets?.[status.proxyGroup] : undefined
@@ -25,7 +27,7 @@ export function RoutingPanel({ status, error, refresh, busy, setProxyStrategy, i
   async function run(action: string) {
     setWorking(action)
     try {
-      if (action === 'diagnose') { setChecks(await integrationRequest<DiagnosticCheck[]>(action, {})); setInspectionOpen(true) }
+      if (action === 'diagnose') { setChecks(await integrationRequest<DiagnosticCheck[]>(action, {})); setTab('recovery'); setInspectionOpen(true) }
       else { const result = await integrationRequest<{ restored: boolean; message: string }>(action, {}); void (result.restored ? message.success(t(result.message)) : message.warning(t(result.message))) }
     } catch (e) { void message.error(t(e instanceof Error ? e.message : "操作失败")) }
     finally { await refresh(); setWorking('') }
@@ -41,31 +43,18 @@ export function RoutingPanel({ status, error, refresh, busy, setProxyStrategy, i
       </div>
       {error || !status?.connected ? <Alert className="compact-alert" type="warning" showIcon title={error ? t("连接中断，请检查 Clash Party") : status ? t("尚未连接 Clash Party") : t("正在连接 Clash Party…")} action={<Button size="small" onClick={() => void refresh()}>{t("重试")}</Button>} /> : null}
       {status?.strategyWarning && <Alert className="compact-alert" type="warning" showIcon title={t(status.strategyWarning)} />}
-      {Boolean(status?.untrackedRuleCount) && <Alert className="compact-alert" type="warning" showIcon title={t("{0} 条历史规则仍在运行，管理记录缺失", [status!.untrackedRuleCount])} action={<Button size="small" onClick={() => setInspectionOpen(true)}>{t("查看详情")}</Button>} />}
+      {Boolean(status?.untrackedRuleCount || status?.dataIssue) && <Alert className="compact-alert" type="warning" showIcon title={status?.dataIssue ? t("管理记录需要核对") : t("{0} 条历史规则仍在运行，管理记录缺失", [status!.untrackedRuleCount])} action={<Button size="small" onClick={() => setInspectionOpen(true)}>{t("查看详情")}</Button>} />}
       {status?.connected && status.mode !== 'rule' && <Alert className="compact-alert" type="warning" showIcon title={t("Clash Party 当前不是规则模式，应用分流可能不按预期执行。")} />}
       {legacy && <Alert className="compact-alert" type="warning" showIcon title={t("部分应用仍使用旧出口，请在代理策略中统一绑定。")} />}
       {nodeWarning && <Alert className="compact-alert" type="warning" showIcon title={outletLabel(outlet)} action={<Button size="small" onClick={() => setInspectionOpen(true)}>{t("查看原因")}</Button>} />}
       {status?.connected && status.managed.length > 0 && !status.rulesLoaded && !status.pending && <Alert className="compact-alert" type="error" showIcon title={t("已保存规则与当前运行状态不一致")} action={<Button size="small" onClick={() => setInspectionOpen(true)}>{t("检查")}</Button>} />}
-      {status?.pending && <div className="transaction-progress" role="status">{t("正在自动检查 · 失败将恢复上一版设置")}</div>}
+      {status?.connected && !status.proxyGroup && !status.managed.length && !status.untrackedRuleCount && !status.dataIssue && <div className="first-use-guide"><strong>{t('开始使用')}</strong><span>{t('① 确认 Clash Party 已连接')}</span><span>{t('② 需要代理时，先选择代理策略')}</span><span>{t('③ 在全部应用中选择联网方式')}</span></div>}
+      {status?.pending?.recoveryRequired && <Alert type="error" showIcon title={t('恢复尚未确认，请运行网络自检或离线恢复。')} />}
+      {status?.pending && !status.pending.recoveryRequired && <div className="transaction-progress" role="status">{t("正在自动检查 · 失败将恢复上一版设置")}</div>}
     </section>
     <Drawer title={t("连接详情与恢复")} open={inspectionOpen} onClose={() => setInspectionOpen(false)} size={580}
       footer={<div className="drawer-footer"><Button onClick={() => setInspectionOpen(false)}>{t("关闭")}</Button><Button icon={<ReloadOutlined />} loading={working === 'diagnose'} disabled={busy || Boolean(working)} onClick={() => void run('diagnose')}>{t("网络自检")}</Button><Button danger disabled={busy || Boolean(working)} onClick={recover}>{t("恢复网络")}</Button></div>}>
-      <div className="detail-section"><h3>Clash Party <Tag color={status?.connected ? 'success' : 'default'}>{status?.connected ? t("已连接") : t("未连接")}</Tag></h3>
-        <p className="secondary-copy">{t("连接状态来自内核控制接口；不代表所有节点都可用。")}</p>
-        <Descriptions column={1} size="small" items={[
-          { key: 'version', label: t("内核版本"), children: status?.version ?? t("未读取") },
-          { key: 'strategy', label: t("代理策略"), children: t(strategyLabels[status?.proxyStrategy?.mode ?? 'existing']) },
-          { key: 'node', label: t("组当前选择"), children: currentNode },
-          { key: 'probe', label: t("最近探测"), children: outlet?.checkedAt ? formatTime(outlet.checkedAt) + ' · ' + (outlet.delay ? outlet.delay + ' ms' : t("失败")) + (outlet.health === 'unknown' ? t("（记录已过期）") : '') : t("尚无近期记录，可运行网络自检") },
-        ]} />
-        {error && <Alert type="error" showIcon title={t(error)} />}
-      </div>
-      <div className="detail-section"><h3>{t("规则与验证")}</h3><Descriptions column={1} size="small" items={[
-        { key: 'rules', label: t("运行规则"), children: !status?.connected ? t("待连接后确认") : status.untrackedRuleCount ? t("{0} 条历史规则仍在运行，管理记录缺失", [status.untrackedRuleCount]) : status.managed.length ? status.rulesLoaded ? t("规则已加载 · {0} 个应用", [status.managed.length]) : t("规则未确认加载") : t("无专属规则") },
-        { key: 'persistence', label: t("重启后保留"), children: status?.untrackedRuleCount ? t("记录缺失，无法确认") : !status?.managed.length ? t("无专属设置，无需验证") : status.persistenceObserved ? t("已观察到客户端重新生成规则") : t("尚未验证") },
-      ]} />{status?.warning && <Alert type="info" showIcon title={t(status.warning)} />}</div>
-      <div className="detail-section"><h3>{t("离线恢复")}</h3><p>{status?.recoveryReady ? t("双击桌面的 AppRoute - Restore Network，无需联网即可恢复。") : t("首次应用前会自动准备独立恢复工具。准备失败时不会修改规则。")}</p>{status?.recoveryPath && <code className="recovery-path">{status.recoveryPath}</code>}{status?.lastRecovery && <p className="secondary-copy">{t("上次恢复：")}{t(status.lastRecovery)}</p>}</div>
-      <Collapse items={[{ key: 'checks', label: t("网络自检结果") + (checks.length ? ' · ' + checks.filter(check => check.ok).length + '/' + checks.length + ' ' + t("通过") : ''), children: checks.length ? checks.map(check => <div className="diagnostic-item" key={check.name}><Tag color={check.ok ? 'success' : 'warning'}>{check.ok ? t("通过") : t("待处理")}</Tag><strong>{t(check.name)}</strong><p>{t(check.detail)}</p></div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("点击底部“网络自检”开始检查")} /> }]} />
+      <ConnectionInspector status={status} error={error} checks={checks} tab={tab} setTab={setTab} refresh={refresh} busy={busy || Boolean(working)} />
     </Drawer>
   </>
 }

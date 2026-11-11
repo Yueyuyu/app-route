@@ -6,11 +6,12 @@ import type { IntegrationStatus } from '../../shared/integration'
 import { strategyDefaults, strategyLabels, type ProxyStrategy } from '../../shared/proxyStrategy'
 import { HelpTip } from './HelpTip'
 
-interface Props { status?: IntegrationStatus; busy: boolean; apply: (strategy: ProxyStrategy, revision: string) => Promise<void> }
+interface Props { status?: IntegrationStatus; busy: boolean; apply: (strategy: ProxyStrategy, revision: string, missingTargetAction?: 'block' | 'original') => Promise<void> }
 export function ProxyStrategyDrawer({ status, busy, apply }: Props) {
   const { message } = App.useApp()
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<ProxyStrategy['mode']>('existing')
+  const [missingTargetAction, setMissingTargetAction] = useState<'block' | 'original'>('block')
   const [group, setGroup] = useState<string>()
   const [nodes, setNodes] = useState<string[]>([])
   const [search, setSearch] = useState('')
@@ -24,8 +25,9 @@ export function ProxyStrategyDrawer({ status, busy, apply }: Props) {
   const available = status?.strategyNodes ?? []
   const candidates = available.filter(node => node.name.toLowerCase().includes(search.toLowerCase()))
   const missing = nodes.filter(name => !available.some(node => node.name === name))
-  const disabled = saving || busy || !status?.connected || Boolean(status.pending) || Boolean(status.untrackedRuleCount)
+  const disabled = saving || busy || !status?.connected || Boolean(status.pending) || Boolean(status.untrackedRuleCount || status.dataIssue)
   function edit() {
+    setMissingTargetAction(status?.proxyGroup ? status.missingTargetAction ?? 'original' : 'block')
     const strategy = status?.proxyStrategy
     setMode(strategy?.mode ?? 'existing'); setGroup(strategy?.mode === 'existing' ? strategy.group : !strategy ? status?.proxyGroup : undefined)
     setNodes(strategy && strategy.mode !== 'existing' ? [...strategy.nodes] : [])
@@ -39,7 +41,7 @@ export function ProxyStrategyDrawer({ status, busy, apply }: Props) {
     if (revision !== status?.revision) { setError("设置已在其他操作中变化，请关闭后重新打开，核对最新策略。"); return }
     setSaving(true); setError('')
     try {
-      await apply(mode === 'existing' ? { mode, group: group! } : { mode, nodes, ...options }, revision!)
+      await apply(mode === 'existing' ? { mode, group: group! } : { mode, nodes, ...options }, revision!, missingTargetAction)
       setOpen(false); void message.success(t("代理策略已应用，后续新连接按此策略选择节点。"))
     } catch (error) { setError(error instanceof Error ? error.message : "策略应用失败，请检查恢复状态。") }
     finally { setSaving(false) }
@@ -80,6 +82,7 @@ export function ProxyStrategyDrawer({ status, busy, apply }: Props) {
           <p>{t("使用 HTTPS 204 测试地址。检查间隔不代表故障一定在此时间内恢复。")}</p>
         </div> }]} />
       </>}
+      <div className="strategy-group-field"><label>{t('代理组消失时')}</label><Radio.Group value={missingTargetAction} disabled={saving} onChange={event => setMissingTargetAction(event.target.value)} className="strategy-options"><Radio value="block"><strong>{t('停止匹配的新连接')}</strong><small>{t('配置重生成后使用 REJECT，重新选择有效代理组后恢复。')}</small></Radio><Radio value="original"><strong>{t('沿用原有规则')}</strong><small>{t('可能直连或使用其他出口，具体由 Clash Party 原规则决定。')}</small></Radio></Radio.Group><p>{t('仅处理整个代理组消失。单个节点失败仍由组内手动、故障备用或延迟策略处理。')}</p></div>
       {(error || missing.length > 0) && <Alert className="strategy-error" type="error" showIcon title={t(error) || t("部分候选节点已消失，请移除后重新选择。")} />}
     </Drawer>
   </>

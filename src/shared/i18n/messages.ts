@@ -3085,5 +3085,305 @@ export const messages: Record<string, readonly [string, string, string]> = {
     "Unrecognized technical error. Original diagnostic: {0}",
     "未分類の技術エラー。元の診断：{0}",
     "Erreur technique non reconnue. Diagnostic original : {0}"
+  ],
+  "已设置": [
+    "Configured",
+    "設定済み",
+    "Configurées"
+  ],
+  "仅显示已设置专属分流的应用": [
+    "Apps with dedicated routing only",
+    "専用ルールを設定したアプリのみ",
+    "Applications avec routage dédié uniquement"
+  ],
+  "选择直接联网或跟随代理组的应用显示在“已设置”中。收藏仅用于单独筛选，不改变联网方式。": [
+    "Configured lists apps using Direct or Follow proxy group. Favorites are a separate filter and do not change routing.",
+    "「設定済み」には直接接続またはプロキシグループに従うアプリを表示します。お気に入りは独立した絞り込みで、接続方式は変更しません。",
+    "La vue Configurées contient les applications en accès direct ou suivant un groupe proxy. Les favoris servent uniquement de filtre."
+  ],
+  "从全部应用选择联网方式，设置成功后会出现在这里": [
+    "Choose a routing mode in All apps to add an app here.",
+    "すべてのアプリで接続方式を設定すると、ここに表示されます。",
+    "Choisissez un mode dans Toutes les applications pour ajouter une application ici."
+  ],
+  "已加入收藏": [
+    "Added to favorites",
+    "お気に入りに追加しました",
+    "Ajouté aux favoris"
+  ],
+  "列表分类": [
+    "List membership",
+    "一覧の分類",
+    "Classement"
+  ],
+  "“已设置”包含哪些应用？": [
+    "Which apps are in Configured?",
+    "「設定済み」には何が表示されますか？",
+    "Que contient la vue Configurées ?"
+  ],
+  "新发现": [
+    "New",
+    "新しく検出",
+    "Nouvelle"
+  ],
+  "等待应用联网": [
+    "Waiting for app traffic",
+    "アプリの通信待ち",
+    "En attente de trafic"
+  ],
+  "代理组已失效": [
+    "Proxy group unavailable",
+    "プロキシグループが無効",
+    "Groupe proxy indisponible"
+  ],
+  "组消失后拒绝匹配的新连接，请重新选择代理组。": [
+    "Matching new connections are rejected when the group disappears. Select a valid group.",
+    "グループが消えた場合、一致する新規接続を拒否します。グループを選び直してください。",
+    "Les nouvelles connexions correspondantes sont refusées si le groupe disparaît. Sélectionnez un groupe valide."
+  ],
+  "组消失后沿用原有规则，请重新选择代理组。": [
+    "Original rules apply when the group disappears. Select a valid group.",
+    "グループが消えた場合、元のルールに従います。選び直してください。",
+    "Les règles initiales s’appliquent si le groupe disparaît. Sélectionnez un groupe valide."
+  ],
+  "节点探测失败": [
+    "Node check failed",
+    "ノードの確認に失敗",
+    "Échec du test du nœud"
+  ],
+  "代理组仍存在；手动组需要换节点，自动组由 Mihomo 继续探测。": [
+    "The group still exists. Select another node in a manual group; Mihomo continues checking automatic groups.",
+    "グループは存在します。手動グループはノードを変更してください。自動グループは Mihomo が検査を継続します。",
+    "Le groupe existe. Changez de nœud pour un groupe manuel ; Mihomo poursuit les tests des groupes automatiques."
+  ],
+  "代理组消失时": [
+    "When the proxy group disappears",
+    "グループが消えた場合",
+    "Si le groupe proxy disparaît"
+  ],
+  "停止匹配的新连接": [
+    "Block matching new connections",
+    "一致する新規接続を拒否",
+    "Bloquer les nouvelles connexions correspondantes"
+  ],
+  "配置重生成后使用 REJECT，重新选择有效代理组后恢复。": [
+    "Uses REJECT after configuration regeneration. Select a valid group to restore routing.",
+    "設定の再生成後に REJECT を使用します。有効なグループを選ぶと復旧します。",
+    "Utilise REJECT après régénération de la configuration. Sélectionnez un groupe valide pour rétablir le routage."
+  ],
+  "可能直连或使用其他出口，具体由 Clash Party 原规则决定。": [
+    "May connect directly or use another outlet, according to the original Clash Party rules.",
+    "直接接続または別の出口を使用する場合があります。Clash Party の元のルールに従います。",
+    "Peut utiliser un accès direct ou une autre sortie, selon les règles initiales de Clash Party."
+  ],
+  "仅处理整个代理组消失。单个节点失败仍由组内手动、故障备用或延迟策略处理。": [
+    "Applies only when the whole group disappears. Node failures follow the group’s manual, fallback or latency strategy.",
+    "グループ全体の消失のみが対象です。ノードの障害はグループの手動・フェイルオーバー・遅延優先設定で処理します。",
+    "Concerne uniquement la disparition du groupe entier. Les pannes de nœuds suivent la stratégie manuelle, de secours ou de latence du groupe."
+  ],
+  "开始使用": [
+    "Get started",
+    "使い始める",
+    "Premiers pas"
+  ],
+  "① 确认 Clash Party 已连接": [
+    "1. Check the Clash Party connection",
+    "① Clash Party の接続を確認",
+    "1. Vérifier la connexion à Clash Party"
+  ],
+  "② 需要代理时，先选择代理策略": [
+    "2. Choose a strategy if you need a proxy",
+    "② プロキシが必要なら戦略を選択",
+    "2. Choisir une stratégie si un proxy est nécessaire"
+  ],
+  "③ 在全部应用中选择联网方式": [
+    "3. Choose routing in All apps",
+    "③ すべてのアプリで接続方式を選択",
+    "3. Choisir le routage dans Toutes les applications"
+  ],
+  "连接概况": [
+    "Overview",
+    "接続概要",
+    "Vue d’ensemble"
+  ],
+  "控制接口正常": [
+    "Control API connected",
+    "制御 API 接続済み",
+    "API de contrôle connectée"
+  ],
+  "当前节点": [
+    "Current node",
+    "現在のノード",
+    "Nœud actuel"
+  ],
+  "连接参数": [
+    "Connection parameters",
+    "接続パラメーター",
+    "Paramètres de connexion"
+  ],
+  "应用规则": [
+    "App rules",
+    "アプリのルール",
+    "Règles des applications"
+  ],
+  "个应用已设置": [
+    "apps configured",
+    "個のアプリを設定済み",
+    "applications configurées"
+  ],
+  "规则加载与实际连接分别验证。等待应用联网时，可打开该应用并建立新连接。": [
+    "Rule loading and live connections are verified separately. Open the app and start a new connection to verify traffic.",
+    "ルールの読み込みと実際の接続は別々に検証します。アプリを開いて新しい通信を開始してください。",
+    "Le chargement des règles et les connexions sont vérifiés séparément. Ouvrez l’application et démarrez une nouvelle connexion."
+  ],
+  "验证说明": [
+    "Verification details",
+    "検証の説明",
+    "Détails de vérification"
+  ],
+  "管理记录需要核对": [
+    "Management records need checking",
+    "管理記録の確認が必要",
+    "Vérification des enregistrements requise"
+  ],
+  "核对并恢复记录": [
+    "Check and restore records",
+    "確認して記録を復元",
+    "Vérifier et restaurer les enregistrements"
+  ],
+  "先核对当前规则，再恢复记录；不会重新应用旧缓存。": [
+    "Verify current rules before restoring records. Cached routing is never replayed.",
+    "現在のルールを確認してから記録を復元します。古いキャッシュは再適用しません。",
+    "Vérifiez les règles actuelles avant de restaurer les enregistrements. Le cache ne sera pas réappliqué."
+  ],
+  "恢复对应管理记录": [
+    "Restore matching records",
+    "対応する管理記録を復元",
+    "Restaurer les enregistrements correspondants"
+  ],
+  "核对无误，恢复记录": [
+    "Confirm and restore records",
+    "確認して記録を復元",
+    "Confirmer et restaurer"
+  ],
+  "仅补回下面的管理记录，不重载或改写当前分流。损坏原文保留在本机备份。": [
+    "Only restores the records below, without reloading or changing routing. Damaged originals remain in local backups.",
+    "下記の記録のみ復元し、現在のルールは再読み込み・変更しません。破損した原文はローカルに保存します。",
+    "Restaure uniquement les enregistrements ci-dessous sans modifier le routage. Les originaux endommagés restent sauvegardés localement."
+  ],
+  "管理记录已恢复": [
+    "Management records restored",
+    "管理記録を復元しました",
+    "Enregistrements restaurés"
+  ],
+  "恢复与诊断": [
+    "Recovery & diagnostics",
+    "復旧と診断",
+    "Récupération et diagnostic"
+  ],
+  "已准备": [
+    "Ready",
+    "準備完了",
+    "Prêt"
+  ],
+  "尚未准备": [
+    "Not prepared",
+    "未準備",
+    "Non préparé"
+  ],
+  "恢复尚未确认，请运行网络自检或离线恢复。": [
+    "Recovery is not confirmed. Run network checks or offline recovery.",
+    "復旧を確認できていません。ネットワーク診断またはオフライン復旧を実行してください。",
+    "La récupération n’est pas confirmée. Lancez le diagnostic réseau ou la récupération hors ligne."
+  ],
+  "最近操作耗时": [
+    "Recent operation timings",
+    "最近の処理時間",
+    "Durée des opérations récentes"
+  ],
+  "阶段": [
+    "Phase",
+    "段階",
+    "Étape"
+  ],
+  "耗时": [
+    "Duration",
+    "所要時間",
+    "Durée"
+  ],
+  "恢复位置与数据保留": [
+    "Recovery location & retention",
+    "復旧先とデータ保持",
+    "Emplacement et conservation"
+  ],
+  "最近 20 份状态备份和 20 个已结束事务保留在本机；待恢复或无法识别的事务不会自动删除。": [
+    "Keeps the latest 20 state backups and 20 completed transactions locally. Pending recovery and unknown transactions are not deleted automatically.",
+    "最新の状態バックアップ20件と完了した処理20件をローカルに保持します。復旧待ちや不明な処理は自動削除しません。",
+    "Conserve localement 20 sauvegardes et 20 transactions terminées. Les transactions en attente ou non reconnues ne sont pas supprimées automatiquement."
+  ],
+  "导出脱敏诊断": [
+    "Export redacted diagnostics",
+    "匿名化した診断を出力",
+    "Exporter un diagnostic anonymisé"
+  ],
+  "诊断文件已保存": [
+    "Diagnostic file saved",
+    "診断ファイルを保存しました",
+    "Diagnostic enregistré"
+  ],
+  "仅包含状态、数量和阶段耗时，不包含应用名、节点名、路径、访问目标或配置。": [
+    "Contains only status, counts and phase timings. Excludes app names, node names, paths, destinations and configuration.",
+    "状態、件数、処理時間のみを含みます。アプリ名、ノード名、パス、アクセス先、設定は含みません。",
+    "Contient uniquement les états, les nombres et les durées. Exclut les noms, chemins, destinations et configurations."
+  ],
+  "应用扫描": [
+    "App scan",
+    "アプリ検出",
+    "Analyse des applications"
+  ],
+  "进程识别": [
+    "Process discovery",
+    "プロセス識別",
+    "Identification des processus"
+  ],
+  "网络基线": [
+    "Network baseline",
+    "ネットワーク基準確認",
+    "État réseau initial"
+  ],
+  "配置校验": [
+    "Configuration validation",
+    "設定の検証",
+    "Validation de la configuration"
+  ],
+  "恢复工具": [
+    "Recovery tools",
+    "復旧ツール",
+    "Outils de récupération"
+  ],
+  "规则写入": [
+    "Writing rules",
+    "ルールの書き込み",
+    "Écriture des règles"
+  ],
+  "内核重载": [
+    "Core reload",
+    "コア再読み込み",
+    "Rechargement du moteur"
+  ],
+  "网络复查": [
+    "Network recheck",
+    "ネットワーク再確認",
+    "Nouvelle vérification réseau"
+  ],
+  "本地管理记录需要核对。": [
+    "Local management records need checking.",
+    "ローカル管理記録の確認が必要です。",
+    "Les enregistrements locaux doivent être vérifiés."
+  ],
+  "代理组已失效，请重新选择代理组；失效时的处理方式可在代理策略中查看。": [
+    "The proxy group is unavailable. Select another group; see Proxy strategy for the failure behavior.",
+    "プロキシグループが無効です。選び直してください。障害時の動作はプロキシ戦略で確認できます。",
+    "Le groupe proxy est indisponible. Sélectionnez un autre groupe ; le comportement en cas de panne est indiqué dans la stratégie proxy."
   ]
 }

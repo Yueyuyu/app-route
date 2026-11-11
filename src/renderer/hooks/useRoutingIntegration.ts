@@ -78,7 +78,7 @@ export function useRoutingIntegration() {
   async function setProxyGroup(target: string) {
     return setProxyStrategy({ mode: 'existing', group: target })
   }
-  async function setProxyStrategy(strategy: ProxyStrategy, expectedRevision?: string) {
+  async function setProxyStrategy(strategy: ProxyStrategy, expectedRevision?: string, missingTargetAction?: 'block' | 'original') {
     if (strategyBusy.current || Object.keys(queue.current!.snapshot()).length) throw new Error('请等待当前应用操作结束。')
     strategyBusy.current = true
     setGroupBusy(true)
@@ -86,7 +86,7 @@ export function useRoutingIntegration() {
       const current = await refresh()
       if (!current?.connected || current.pending) throw new Error('尚未连接或上一轮操作未确认，请检查恢复状态。')
       if (expectedRevision !== undefined && expectedRevision !== current.revision) throw new Error('设置已经变化，请关闭后重新打开代理策略。')
-      const result = await integrationRequest<AutomaticApplyResult>('proxy-strategy', { strategy, revision: current.revision })
+      const result = await integrationRequest<AutomaticApplyResult>('proxy-strategy', { strategy, revision: current.revision, missingTargetAction })
       requestSequence.current++; currentStatus.current = result.status; setStatus(result.status)
       if (result.outcome !== 'applied') throw new Error(result.message)
     } finally { await refresh(); strategyBusy.current = false; setGroupBusy(false) }

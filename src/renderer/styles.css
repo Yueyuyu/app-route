@@ -318,3 +318,14 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
   .language-switcher { width: 142px; }
   .topbar-left .ant-breadcrumb { display: none; }
 }
+
+/* 连接详情：概况优先，诊断按需展开。 */
+.connection-hero { padding: 20px 0 16px; }
+.connection-hero h2 { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.connection-hero p { color: #718099; font-size: 12px; }
+.connection-node { display: grid; gap: 8px; padding: 20px; margin: 0 0 24px; border: 1px solid #e3eafa; background: #f7f9ff; border-radius: 12px; overflow-wrap: anywhere; }
+.connection-node strong { font-size: 20px; }
+.connection-node > span:last-child { color: #718099; }
+.managed-rule-line { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #edf0f7; }
+.first-use-guide { display: flex; gap: 8px 18px; flex-wrap: wrap; padding: 14px 0 0; color: #62718b; font-size: 12px; }
+.application-label strong .ant-tag { margin-inline-start: 8px; font-size: 11px; font-weight: 400; }

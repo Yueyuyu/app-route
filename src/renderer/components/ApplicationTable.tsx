@@ -1,5 +1,5 @@
 import { t } from '../i18n'
-import { Button, Dropdown, Empty, Table, Tooltip } from 'antd'
+import { Button, Dropdown, Empty, Table, Tooltip, Tag } from 'antd'
 import { DeleteOutlined, InfoCircleOutlined, MoreOutlined, StarOutlined, StarFilled } from '@ant-design/icons'
 import type { Key } from 'react'
 import type { Application, RouteMode } from '../types'
@@ -32,7 +32,7 @@ interface Props {
 }
 
 export function ApplicationTable({ applications, selected, setSelected, changeMode, details, remove, clearFilters, status, busyIds, pendingRoutes, failures, loading, favorites, toggleFavorite, emptyDescription, groupBusy }: Props) {
-  const disabled = groupBusy || !status?.connected || Boolean(status.untrackedRuleCount) || (Boolean(status?.pending) && !busyIds.length)
+  const disabled = groupBusy || !status?.connected || Boolean(status.untrackedRuleCount || status.dataIssue) || (Boolean(status?.pending) && !busyIds.length)
   const selector = (app: Application) => status?.untrackedRuleCount ? <span className="secondary-copy">{t("待核对历史规则")}<HelpTip title={t("当前分流待核对")}>{t("Clash Party 仍有历史 AppRoute 规则，本机管理记录已为空。请先核对记录或在恢复网络中停用历史规则，再设置联网方式。")}</HelpTip></span> : <RouteSelector disabled={disabled} legacyProxy={app.mode === 'proxy' && managedFor(app, status?.managed)?.target !== status?.proxyGroup} pending={Boolean(pendingRoutes[app.id])} label={t("{0} 的连接方式", [app.name])} value={pendingRoutes[app.id]?.mode ?? app.mode} onChange={(mode) => changeMode([app.id], mode)} />
   const feedback = (app: Application) => <ApplicationStatus application={app} status={status} pending={pendingRoutes[app.id]} failure={failures[app.id]} onDetails={() => details(app)} />
   return <Table<Application>
@@ -49,7 +49,7 @@ export function ApplicationTable({ applications, selected, setSelected, changeMo
     columns={[
       { title: t("应用"), key: 'name', render: (_, app) => <div><button className="application-name" onClick={() => details(app)} aria-label={t("查看 {0} 详情", [app.name])}>
         <ApplicationIcon name={app.name} icon={app.icon} application={app} />
-        <span className="application-label"><strong>{app.name}</strong><span className="process-label">{app.processes[0]}{app.processes.length > 1 && ` +${app.processes.length - 1}`}</span></span>
+        <span className="application-label"><strong>{app.name}{app.discoveredAt && Date.now() - Date.parse(app.discoveredAt) < 7 * 86400000 && <Tag color="blue">{t("新发现")}</Tag>}</strong><span className="process-label">{app.processes[0]}{app.processes.length > 1 && ` +${app.processes.length - 1}`}</span></span>
       </button><div className="compact-row-status">{feedback(app)}</div><div className="mobile-route">{selector(app)}</div></div> },
       { title: t("状态"), key: 'status', width: 174, responsive: ['xl'], render: (_, app) => feedback(app) },
       { title: <span>{t("联网方式")}<HelpTip title={t("点击即应用")}><p>{t("选择后自动应用，可连续操作。等待中的选项尚未生效，失败会恢复上一版。")}</p><p>{t("按 Clash 规则：沿用原有规则。直接联网：不经远端节点。跟随代理组：由顶部策略选择出口。")}</p></HelpTip></span>, key: 'mode', width: 322, responsive: ['md'], render: (_, app) => selector(app) },

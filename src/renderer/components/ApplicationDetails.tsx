@@ -26,7 +26,7 @@ export function ApplicationDetails({ application, status, favorite, pending, fai
             { key: 'target', label: t("已绑定代理组"), children: managed.target ?? t("未指定") },
             { key: 'node', label: t("组当前选择"), children: outletLabel(status?.outlets?.[managed.target ?? '']) },
           ] : []),
-          { key: 'membership', label: t("我的应用收录"), children: [favorite && t("已收藏"), application.mode !== 'rule' && t("已设置专属分流")].filter(Boolean).join(' · ') || t("尚未收录；收藏后即可加入") },
+          { key: 'membership', label: t("列表分类"), children: [favorite && t("已收藏"), application.mode !== 'rule' && t("已设置专属分流")].filter(Boolean).join(' · ') || t("沿用原有规则") },
         ]} />
       </div>
       <div className="detail-section"><h3>{t("实际连接")}<small>{evidence.length}</small></h3>

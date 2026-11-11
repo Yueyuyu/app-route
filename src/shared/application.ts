@@ -14,6 +14,7 @@ export interface Application {
   processPaths?: string[]
   processWarnings?: string[]
   publisher?: string
+  discoveredAt?: string
   discovery?: 'installed' | 'running'
   iconMethod?: import('./applicationIcon.ts').LocalIconMethod
 }

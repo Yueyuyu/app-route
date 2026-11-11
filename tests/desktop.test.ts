@@ -9,14 +9,15 @@ import { InventoryPreferencesStore } from '../src/main/services/inventoryPrefere
 import type { Application } from '../src/shared/application.ts'
 
 const app = (id: string, file: string, mode: Application['mode'] = 'rule'): Application => ({ id, name: id, path: file, processes: [path.win32.basename(file)], mode, source: 'scan', category: '其他应用' })
-test('我的应用由收藏及实际分流组成，正在运行只按精确路径匹配', () => {
+test('已设置只包含实际专属分流，收藏独立筛选，正在运行只按精确路径匹配', () => {
   const apps = [app('music', 'C:\\Apps\\Music\\music.exe', 'direct'), app('browser', 'C:\\Apps\\Browser\\browser.exe'), app('other', 'D:\\Tools\\browser.exe')]
   const favorites = [applicationKey(apps[1])]
-  assert.deepEqual(applicationView(apps, 'mine', favorites, []).map(a => a.id), ['browser', 'music'])
+  assert.deepEqual(applicationView(apps, 'configured', favorites, []).map(a => a.id), ['music'])
   const running = [{ path: 'c:\\apps\\browser\\BROWSER.EXE', pid: 10, parentPid: 1 }]
   assert.deepEqual(applicationView(apps, 'running', [], running).map(a => a.id), ['browser'])
   assert.equal(isRunningApplication({ ...apps[0], processPaths: ['C:\\Apps\\Music\\helper.exe'] }, [{ path: 'C:\\Apps\\Music\\helper.exe', pid: 11, parentPid: 10 }]), true)
   assert.equal(apps[1].mode, 'rule')
+  assert.deepEqual(filterApplications(apps, { view: 'all', favorites, running: [], query: '', mode: 'all', category: 'all', favoritesOnly: true }).map(app => app.id), ['browser'])
 })
 test('折叠系统维护工具，不凭未知发布者或共享宿主名隐藏普通应用', () => {
   assert.equal(isSystemTool(app('控制面板', 'C:\\Windows\\System32\\control.exe')), true)
@@ -29,7 +30,7 @@ test('搜索跨越我的应用和运行视图，支持空格大小写及辅助�
   const browser = { ...app('browser', 'C:\\Apps\\Browser\\chrome.exe'), name: 'Google Chrome' }
   const tool = app('control', 'C:\\Windows\\System32\\control.exe')
   const apps = [music, browser, tool]
-  const options = { view: 'mine' as const, favorites: [] as string[], running: [], query: '', mode: 'all', category: 'all', favoritesOnly: false }
+  const options = { view: 'configured' as const, favorites: [] as string[], running: [], query: '', mode: 'all', category: 'all', favoritesOnly: false }
   assert.deepEqual(filterApplications(apps, options).map(a => a.id), ['music'])
   for (const query of ['google chrome', 'GOOGLECHROME', 'Chrome.exe']) assert.deepEqual(filterApplications(apps, { ...options, query }).map(a => a.id), ['browser'])
   for (const query of ['QQ音乐', 'ＱＱ 音乐', 'QMBROWSER.EXE']) assert.deepEqual(filterApplications(apps, { ...options, query }).map(a => a.id), ['music'])
@@ -49,6 +50,10 @@ test('重扫增加新应用并保持默认规则，保留手动和便携资料�
   assert.equal(result[0].name, '我的音乐')
   assert.equal(result[0].category, '音乐娱乐')
   assert.ok(result.every(app => app.mode === 'rule'))
+  assert.equal(result[0].discoveredAt, undefined)
+  assert.ok(result[1].discoveredAt)
+  assert.equal(mergeScannedApplications([], [app('first', 'C:\\Apps\\first.exe')])[0].discoveredAt, undefined)
+  assert.equal(mergeScannedApplications(result, [result[1]])[0].discoveredAt, result[1].discoveredAt)
 })
 test('桌面 IPC 限制来源、子框架、操作名和请求大小，资源不能越出 UI 目录', () => {
   assert.equal(isTrustedDesktopSender('approute://app/index.html', true), true)
@@ -74,6 +79,7 @@ test('桌面收藏持久化，读写资料不会写入联网状态，也不会�
     assert.equal(await fs.stat(path.join(root, 'state.json')).then(() => true, () => false), false)
     await fs.writeFile(path.join(root, 'inventory.json'), '{bad data')
     await assert.rejects(store.read())
+    await assert.rejects(store.write({ version: 1, applications: [], favorites: [] }))
     assert.equal(await fs.readFile(path.join(root, 'inventory.json'), 'utf8'), '{bad data')
   } finally { await fs.rm(root, { recursive: true, force: true }) }
 })

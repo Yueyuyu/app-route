@@ -15,7 +15,7 @@ export function ApplicationEditor({ open, application, applications, onClose, on
   }, [open, application, form])
   const sourceLabel = application?.source === 'example' ? t("示例应用") : application?.source === 'scan' ? t("本机扫描") : t("手动添加")
   return <Drawer title={application ? t("编辑应用资料") : t("添加应用")} open={open} onClose={onClose} size={480}
-    footer={<div className="drawer-footer"><Button onClick={onClose}>{t("取消")}</Button><Button type="primary" onClick={() => form.submit()}>{application ? t("保存资料") : t("添加到我的应用")}</Button></div>}>
+    footer={<div className="drawer-footer"><Button onClick={onClose}>{t("取消")}</Button><Button type="primary" onClick={() => form.submit()}>{application ? t("保存资料") : t("添加应用")}</Button></div>}>
     {application && <div className="drawer-app-heading"><ApplicationIcon name={application.name} icon={application.icon} application={application} /><div><h2>{application.name}</h2><span>{sourceLabel}</span></div></div>}
     {!application && window.appRoute && <Button className="choose-executable" onClick={() => {
       void window.appRoute!.request<{ path: string; name: string; processes: string[] } | null>('application.choose').then(result => { if (result) form.setFieldsValue(result) }).catch(() => { void message.error(t("未能读取程序文件，请重试或填写路径")) })

@@ -27,7 +27,7 @@ let desktop
 try {
  desktop = await electron.launch({ executablePath, args: [fixture], env, timeout: 30000 })
  const page = await desktop.firstWindow(); page.on('pageerror', e => errors.push(e.message))
- await page.locator('.language-switcher').waitFor(); await page.getByText('Google Chrome', { exact: true }).first().waitFor()
+ await page.locator('.language-switcher').waitFor(); await page.locator('.application-table button.application-name').first().waitFor()
  await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1440, 1000))
  async function screenshot(name) { await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: path.join(output, name + '.png'), animations: 'disabled' }) }
  async function layout(label) {
@@ -46,6 +46,15 @@ try {
    await page.locator('.sidebar').getByText(labels[1], { exact: true }).click()
    await page.getByRole('heading', { name: labels[1], exact: true }).waitFor()
    await layout(locale + '-apps'); await screenshot(locale + '-applications')
+   const favoriteButton = page.locator('.view-filters button[aria-pressed]')
+   await favoriteButton.click()
+   await page.waitForFunction(() => document.querySelectorAll('.application-table button.application-name').length === 1)
+   assert.equal(await page.locator('.application-table button.application-name').count(), 1)
+   assert.ok((await page.locator('.application-table button.application-name').innerText()).includes('Google Chrome'))
+   await favoriteButton.click()
+   await page.locator('.list-toolbar [role=tab]').first().click()
+   assert.equal(await page.locator('.application-table button.application-name').count(), 7)
+   results.push({ label: locale + '-configured-and-favorites', passed: true })
    for (const [index, slug] of [[2, 'rules'], [3, 'icons'], [4, 'help']]) {
      await page.locator('.sidebar').getByText(labels[index], { exact: true }).click()
      await page.getByRole('heading', { name: labels[index], exact: true }).waitFor()
@@ -63,6 +72,8 @@ try {
    await page.keyboard.press('Escape'); await page.locator('.ant-drawer-body:visible').waitFor({ state: 'hidden' })
    await page.getByRole('button', { name: labels[5], exact: true }).click()
    await page.locator('.ant-drawer-body:visible').waitFor(); await screenshot(locale + '-connection')
+   const connectionTabs = page.locator('.ant-drawer-body:visible [role=tab]')
+   for (const index of [1, 2]) { await connectionTabs.nth(index).click(); await layout(locale + '-connection-tab-' + index); await screenshot(locale + '-connection-tab-' + index) }
    await page.keyboard.press('Escape'); await page.locator('.ant-drawer-body:visible').waitFor({ state: 'hidden' })
    await page.getByRole('button', { name: labels[6], exact: true }).click()
    const strategy = page.locator('.ant-drawer-body:visible')
