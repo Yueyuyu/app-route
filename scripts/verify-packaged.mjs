@@ -3,6 +3,7 @@ import path from 'node:path'
 import assert from 'node:assert/strict'
 import { _electron as electron } from 'playwright'
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 
 // 使用最终打包的主进程、预加载和后台；独立数据目录，CI 没有日常 Clash Party 配置。
 if (!process.env.CI) throw new Error('干净环境验收只在 CI 执行。')
@@ -10,6 +11,10 @@ const mac = process.platform === 'darwin'
 const folder = path.resolve('release', `AppRoute-${process.platform}-${process.arch}`)
 const executablePath = path.join(folder, mac ? 'AppRoute.app/Contents/MacOS/AppRoute' : 'AppRoute.exe')
 const resources = path.join(folder, mac ? 'AppRoute.app/Contents/Resources/app' : 'resources/app')
+if (mac) {
+  const identifier = execFileSync('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', path.join(folder, 'AppRoute.app/Contents/Info.plist')], { encoding: 'utf8' }).trim()
+  assert.equal(identifier, 'com.approute.desktop')
+}
 const profile = path.resolve('.runtime/packaged-verification')
 const info = JSON.parse(await fs.readFile(path.join(resources, 'ui/build-info.json'), 'utf8'))
 assert.equal(info.dirty, false, '发布产物必须来自干净提交')

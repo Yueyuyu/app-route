@@ -33,6 +33,7 @@ await fs.writeFile(path.join(stage, 'package.json'), JSON.stringify({ name: 'app
 if (!process.argv.includes('--stage-only')) {
   // 只输出到仓库 release 目录；不清理已安装应用或用户数据。
   const paths = await packager({ dir: stage, out: output, name: 'AppRoute', executableName: 'AppRoute', platform: process.platform, arch: process.arch,
+    appBundleId: 'com.approute.desktop', appCategoryType: 'public.app-category.utilities',
     electronVersion: manifest.devDependencies.electron, icon: process.platform === 'darwin' ? await macIcon() : path.join(root, 'public', 'favicon.ico'), asar: false, prune: false, overwrite: true,
     win32metadata: { CompanyName: 'AppRoute contributors', FileDescription: 'AppRoute 应用分流', ProductName: 'AppRoute', OriginalFilename: 'AppRoute.exe' } })
   if (process.platform === 'darwin') {
