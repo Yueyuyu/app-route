@@ -26,7 +26,8 @@
     "predev": "npm run recovery:build",
     "prepreview": "npm run recovery:build",
     "desktop:build": "npm run build && node scripts/build-desktop.mjs",
-    "desktop:install": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/install-desktop.ps1"
+    "desktop:install": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/install-desktop.ps1",
+    "installer:build": "npm run desktop:build && node scripts/build-installer.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "6.3.4",
@@ -47,6 +48,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
     "electron": "45.2.3",
+    "electron-builder": "26.18.0",
     "playwright": "1.65.0",
     "rolldown": "1.2.18",
     "typescript": "7.0.2",
