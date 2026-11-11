@@ -1,6 +1,6 @@
 import { resolveLocale, translate, type LanguagePreference } from '../../shared/i18n/index.ts'
 import { LanguagePreferencesStore } from './languagePreferences.ts'
-import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, protocol, session, shell, nativeImage } from 'electron'
+import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, protocol, session, shell, nativeImage, powerMonitor } from 'electron'
 import { fork, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -117,6 +117,13 @@ else {
         languageWrite = task
         return task
       }
+      if (action === 'integration.diagnostics-export') {
+        const result = await dialog.showSaveDialog(window!, { title: tr('导出脱敏诊断'), defaultPath: 'AppRoute-diagnostics.json', filters: [{ name: 'JSON', extensions: ['json'] }] })
+        if (result.canceled || !result.filePath) return { saved: false }
+        const data = await request(action)
+        await fs.writeFile(result.filePath, JSON.stringify(data, null, 2), { mode: 0o600 })
+        return { saved: true }
+      }
       if (action === 'application.choose') {
         const result = await dialog.showOpenDialog(window!, { title: tr("选择应用主程序"), filters: [{ name: tr("Windows 应用"), extensions: ['exe'] }], properties: ['openFile'] })
         if (result.canceled) return null
@@ -128,6 +135,7 @@ else {
       return request(action, body)
     })
     startBackend(); createWindow()
+    powerMonitor.on('resume', () => { void request('integration.reconcile').catch(() => {}).finally(() => window?.webContents.send('approute:refresh')) })
     tray = new Tray(nativeImage.createFromPath(icon))
     tray.on('double-click', showWindow)
     updateNativeLanguage()

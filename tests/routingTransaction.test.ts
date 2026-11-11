@@ -14,6 +14,9 @@ import type { Application } from '../src/shared/application.ts'
 import { identifyProcessFamily } from '../src/core/processFamily.ts'
 import { strategyOwnership } from '../src/core/proxyStrategy.ts'
 import type { ProxyStrategy } from '../src/shared/proxyStrategy.ts'
+import { inspectManagementRepair, repairManagementRecords } from '../src/main/services/managementRepair.ts'
+import { parseRoutingState, pruneCompletedTransactions } from '../src/main/storage/routingStateStore.ts'
+import { diagnosticExport } from '../src/main/services/diagnosticExport.ts'
 
 class MockRuntime extends MihomoRuntime {
   current: any
@@ -49,6 +52,116 @@ async function fixture(t: TestContext, overrides: ServiceOptions = {}) {
   const service = new RoutingService({ root, partyRoot: party, runtime: async () => runtime, validate: async () => {}, installKit: async () => {}, guardian: async () => { guardianStarted = true }, ...overrides })
   return { service, runtime, config, party, guardianStarted: () => guardianStarted }
 }
+
+test('模拟事务中断后服务重新实例化，超时回退；内核离线保留待恢复编号', async t => {
+  const f = await fixture(t, { trialMs: 1 })
+  await f.service.apply({ applications: [app], revision: 'initial' })
+  await new Promise(resolve => setTimeout(resolve, 5))
+  f.runtime.available = false
+  const restarted = new RoutingService(f.service.options)
+  await assert.rejects(restarted.reconcileInterrupted())
+  const pending = (await restarted.state()).pendingId!
+  assert.ok(pending)
+  assert.equal((await restarted.transaction(pending)).phase, 'recovery-required')
+  f.runtime.available = true
+  await restarted.reconcileInterrupted()
+  assert.equal((await restarted.state()).pendingId, undefined)
+  assert.deepEqual(f.runtime.current, f.config)
+})
+test('确认事务与保存状态之间崩溃，重启只核对并完成确认，不重载正常规则', async t => {
+  const f = await fixture(t)
+  const status = await f.service.apply({ applications: [app], revision: 'initial' })
+  const tx = await f.service.transaction(status.pending!.id)
+  tx.phase = 'confirmed'; await f.service.saveTransaction(tx)
+  const count = f.runtime.reloadCount
+  await new RoutingService(f.service.options).reconcileInterrupted()
+  assert.equal((await f.service.state()).pendingId, undefined)
+  assert.equal(f.runtime.reloadCount, count)
+  await f.service.reconcileInterrupted()
+  assert.equal(f.runtime.reloadCount, count)
+})
+test('恢复重试遇到外部脚本修改仍拒绝覆盖', async t => {
+  const f = await fixture(t, { trialMs: 1 })
+  await f.service.apply({ applications: [app], revision: 'initial' })
+  await atomicWrite(f.service.party.scriptPath, '// external change')
+  await assert.rejects(f.service.reconcileInterrupted(), /外部修改/)
+  assert.ok((await f.service.state()).pendingId)
+  assert.equal(await readOptional(f.service.party.scriptPath), '// external change')
+})
+test('损坏管理记录仍显示连接；核对后只恢复记录，保留损坏原文且不重载规则', async t => {
+  const f = await fixture(t)
+  const pending = await f.service.apply({ applications: [app], revision: 'initial' })
+  await f.service.confirm(pending.pending!.id)
+  await atomicWrite(path.join(f.party, 'work/config.yaml'), YAML.stringify(f.runtime.current))
+  await atomicWrite(f.service.statePath, '{damaged')
+  const status = await f.service.status()
+  assert.equal(status.connected, true); assert.equal(status.dataIssue, true); assert.equal(status.rulesLoaded, false)
+  const preview = await inspectManagementRepair(f.service)
+  const count = f.runtime.reloadCount
+  const repaired = await repairManagementRecords(f.service, preview.fingerprint)
+  assert.equal(repaired.managed[0].id, app.id); assert.equal(repaired.rulesLoaded, true)
+  assert.equal(f.runtime.reloadCount, count)
+  const directory = path.join(f.service.root, 'backups', 'state')
+  assert.ok((await Promise.all((await fs.readdir(directory)).map(file => fs.readFile(path.join(directory, file), 'utf8')))).includes('{damaged'))
+})
+test('修复预览后外部配置变化会使核对凭据失效', async t => {
+  const f = await fixture(t)
+  const pending = await f.service.apply({ applications: [app], revision: 'initial' })
+  await f.service.confirm(pending.pending!.id)
+  await atomicWrite(path.join(f.party, 'work/config.yaml'), YAML.stringify(f.runtime.current))
+  await fs.unlink(f.service.statePath)
+  const preview = await inspectManagementRepair(f.service)
+  await atomicWrite(f.service.party.scriptPath, (await readOptional(f.service.party.scriptPath))! + '\n// changed')
+  await assert.rejects(repairManagementRecords(f.service, preview.fingerprint), /变化/)
+  assert.equal(await readOptional(f.service.statePath), null)
+})
+test('代理组消失按明确策略拒绝连接；旧记录仍保留原规则行为', async t => {
+  const f = await fixture(t, { probe: async () => true, resolveFamily: async app => app })
+  let status = await f.service.setProxyStrategy({ revision: 'initial', strategy: { mode: 'existing', group: 'Group' }, missingTargetAction: 'block' })
+  status = await f.service.applyAutomatically({ revision: status.status.revision, target: 'Group', applications: [{ ...app, mode: 'proxy' }] })
+  assert.equal(status.outcome, 'applied')
+  const script = (await readOptional(f.service.party.scriptPath))!
+  const config = { ...f.config, 'proxy-groups': [], rules: ['MATCH,DIRECT'] }
+  const generated = JSON.parse(JSON.stringify(vm.runInNewContext(script + '\nmain(config)', { config }, { timeout: 500 })))
+  assert.deepEqual(generated.rules, ['PROCESS-NAME,Example.exe,REJECT', 'MATCH,DIRECT'])
+  assert.equal((await f.service.state()).missingTargetAction, 'block')
+})
+test('不能仅更改全局失效选项而遗漏现有代理应用；网络失败恢复原失效策略', async t => {
+  const f = await fixture(t, { probe: async () => true, resolveFamily: async app => app })
+  let result = await f.service.setProxyStrategy({ revision: 'initial', strategy: { mode: 'existing', group: 'Group' }, missingTargetAction: 'original' })
+  result = await f.service.applyAutomatically({ revision: result.status.revision, target: 'Group', applications: [{ ...app, mode: 'proxy' }] })
+  await assert.rejects(f.service.apply({ applications: [], proxyGroup: 'Group', target: 'Group', revision: result.status.revision, missingTargetAction: 'block' }), /全部代理应用/)
+  const old = await f.service.state()
+  f.runtime.failNextReload = true
+  const failed = await f.service.setProxyStrategy({ revision: old.revision, strategy: { mode: 'existing', group: 'Group' }, missingTargetAction: 'block' })
+  assert.equal(failed.outcome, 'restored')
+  assert.equal((await f.service.state()).missingTargetAction, 'original')
+  assert.equal((await f.service.state()).managed[0].missingTargetAction, 'original')
+})
+test('状态升级验证版本，备份保留上限；未完成及未知事务不清理', async t => {
+  const f = await fixture(t)
+  assert.equal(parseRoutingState('{"revision":"old","managed":[]}').version, 1)
+  assert.throws(() => parseRoutingState('{"version":999,"revision":"future","managed":[]}'))
+  for (let i = 0; i < 24; i++) await f.service.save({ revision: String(i), managed: [] })
+  assert.equal((await fs.readdir(path.join(f.service.root, 'backups', 'state'))).length, 20)
+  for (let i = 0; i < 24; i++) {
+    const id = `00000000-0000-0000-0000-${String(i).padStart(12, '0')}`
+    await f.service.saveTransaction({ id, phase: i === 0 ? 'recovery-required' : 'confirmed', deadline: i, previous: { revision: 'old', managed: [] }, beforeScript: null, nextScript: '' })
+  }
+  await atomicWrite(path.join(f.service.root, 'transactions', 'unknown.txt'), 'keep')
+  await pruneCompletedTransactions(f.service.root)
+  assert.equal((await fs.readdir(path.join(f.service.root, 'transactions'))).length, 22)
+  assert.equal((await f.service.transaction('00000000-0000-0000-0000-000000000000')).phase, 'recovery-required')
+})
+test('诊断导出白名单不包含路径、节点、目标、名称和错误原文', async t => {
+  const f = await fixture(t)
+  const status = await f.service.status()
+  status.warning = status.recoveryPath = status.version = 'SECRET'
+  status.evidence = [{ applicationId: 'SECRET', process: 'SECRET', destination: 'SECRET', outbound: 'SECRET', matched: true, startedAt: 'SECRET' }]
+  status.timings = [{ phase: 'SECRET', durationMs: 5, ok: true, at: 'SECRET' }, { phase: '内核重载', durationMs: 12, ok: true, at: 'SECRET' }]
+  assert.ok(!JSON.stringify(diagnosticExport(status)).includes('SECRET'))
+  assert.equal(diagnosticExport(status).timings[0].durationMs, 12)
+})
 
 test('直连试运行、确认和恢复保留原有文件与规则', async t => {
   const f = await fixture(t)

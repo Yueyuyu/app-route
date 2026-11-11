@@ -10,12 +10,14 @@ export interface ManagedApplication {
   appliedAt?: string
   mode: RouteMode
   target?: string
+  missingTargetAction?: 'block' | 'original'
 }
 export interface ApplyRequest {
   applications: Application[]; target?: string; revision: string
   /** 保存默认跟随组时，必须同时迁移全部已设置代理的应用。 */
   proxyGroup?: string
   proxyStrategy?: ProxyStrategy
+  missingTargetAction?: 'block' | 'original'
 }
 export interface AutomaticApplyResult {
   outcome: 'applied' | 'restored' | 'unchanged' | 'recovery-required'
@@ -45,6 +47,9 @@ export interface ConnectionEvidence {
   usesCurrentNode?: boolean
 }
 export interface IntegrationStatus {
+  dataIssue?: boolean
+  missingTargetAction?: 'block' | 'original'
+  timings?: { phase: string; durationMs: number; ok: boolean; at: string }[]
   /** 内核仍加载自有规则，但本机管理记录为空；只能提示核对，不能当成默认路由。 */
   untrackedRuleCount?: number
   persistenceObserved?: boolean
@@ -67,7 +72,7 @@ export interface IntegrationStatus {
   rulesLoaded: boolean
   evidence: ConnectionEvidence[]
   uncoveredProcesses?: { applicationId: string; process: string }[]
-  pending?: { id: string; deadline: number }
+  pending?: { id: string; deadline: number; recoveryRequired?: boolean }
   recoveryReady: boolean
   recoveryPath: string
   warning?: string

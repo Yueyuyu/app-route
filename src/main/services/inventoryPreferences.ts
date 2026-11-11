@@ -17,7 +17,11 @@ export class InventoryPreferencesStore {
   }
   async write(value: unknown) {
     const clean = cleanInventoryPreferences(value)
-    await withLock(path.join(this.root, 'inventory-lock'), () => atomicWrite(path.join(this.root, 'inventory.json'), JSON.stringify(clean)))
+    await withLock(path.join(this.root, 'inventory-lock'), async () => {
+      // 旧界面缓存不能覆盖无法读取或来自更高版本的资料。
+      await this.read()
+      await atomicWrite(path.join(this.root, 'inventory.json'), JSON.stringify(clean))
+    })
     return { saved: true }
   }
 }

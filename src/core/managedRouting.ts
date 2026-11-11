@@ -51,6 +51,12 @@ export function ruleStrings(apps: ManagedApplication[]): string[] {
   return apps.flatMap(app => (app.processPaths ?? app.processes).map(process => `${app.processPaths ? 'PROCESS-PATH' : 'PROCESS-NAME'},${process},${app.mode === 'direct' ? 'DIRECT' : app.target}`))
 }
 
+/** 同一纯函数供即时配置和订阅覆写使用。旧记录默认沿用原规则，新策略可明确拒绝连接。 */
+export function effectiveApplications(apps: ManagedApplication[], names: string[]): ManagedApplication[] {
+  return apps.flatMap(app => app.mode === 'direct' || names.includes(app.target!) ? [app]
+    : app.missingTargetAction === 'block' ? [{ ...app, target: 'REJECT' }] : [])
+}
+
 export function managedProcessMatches(app: ManagedApplication, metadata: { process?: string; processPath?: string }): boolean {
   return app.processPaths ? Boolean(metadata.processPath && app.processPaths.some(p => normalizeProcessPath(p) === normalizeProcessPath(metadata.processPath!)))
     : app.processes.some(p => p.toLowerCase() === metadata.process?.toLowerCase())
@@ -83,15 +89,15 @@ export function removeManagedRules(config: Record<string, any>): Record<string, 
 export function addManagedRules(config: Record<string, any>, apps: ManagedApplication[], strategy?: ProxyStrategy): Record<string, any> {
   const clean = reconcileProxyStrategy(removeManagedRules(config), strategy, strategyOwnership, strategyTestUrl)
   const names = new Set(['DIRECT', ...(clean.proxies ?? []).map((p: any) => p.name), ...(clean['proxy-groups'] ?? []).map((p: any) => p.name)])
-  const eligible = apps.filter(app => app.mode === 'direct' || names.has(app.target))
+  const eligible = effectiveApplications(apps, [...names])
   const rules = ruleStrings(eligible)
   if (!rules.length) return clean
   return { ...clean, rules: [...rules, ...(clean.rules ?? [])], [markerKey]: { owner: ownerId, rules } }
 }
 
-/** 生成独立覆写；目标在订阅更新后消失时跳过该条，不能让整个代理配置失效。 */
+/** 生成独立覆写；失效目标按明确策略处理，不让整个配置失效。 */
 export function overrideScript(apps: ManagedApplication[], strategy?: ProxyStrategy): string {
-  return `${scriptHeader}\nfunction main(input) {\n try {\n  var config = JSON.parse(JSON.stringify(input));\n  var key = ${JSON.stringify(markerKey)};\n  var old = config[key];\n  if (old && old.owner === ${JSON.stringify(ownerId)} && Array.isArray(old.rules)) {\n    if (!Array.isArray(config.rules) || !old.rules.every(function(r,i){return config.rules[i] === r})) return config;\n    config.rules = config.rules.slice(old.rules.length);\n    delete config[key];\n  }\n  config = (${reconcileProxyStrategy.toString()})(config, ${JSON.stringify(strategy) ?? 'undefined'}, ${JSON.stringify(strategyOwnership)}, ${JSON.stringify(strategyTestUrl)});\n  var apps = ${JSON.stringify(apps)};\n  var names = ['DIRECT'].concat((config.proxies || []).map(function(p){return p.name}), (config['proxy-groups'] || []).map(function(p){return p.name}));\n  var rules = [];\n  apps.forEach(function(app){\n    var target = app.mode === 'direct' ? 'DIRECT' : app.target;\n    if (names.indexOf(target) < 0) return;\n    (app.processPaths || app.processes).forEach(function(p){rules.push((app.processPaths ? 'PROCESS-PATH,' : 'PROCESS-NAME,') + p + ',' + target)});\n  });\n  if (rules.length) {\n    config.rules = rules.concat(config.rules || []);\n    config[key] = {owner:${JSON.stringify(ownerId)},rules:rules};\n  }\n  return config;\n } catch (_) { return input; }\n}\n`
+  return `${scriptHeader}\n// AppRoute record: ${JSON.stringify({version:1,apps,strategy})}\nfunction main(input) {\n try {\n  var config = JSON.parse(JSON.stringify(input));\n  var key = ${JSON.stringify(markerKey)};\n  var old = config[key];\n  if (old && old.owner === ${JSON.stringify(ownerId)} && Array.isArray(old.rules)) {\n    if (!Array.isArray(config.rules) || !old.rules.every(function(r,i){return config.rules[i] === r})) return config;\n    config.rules = config.rules.slice(old.rules.length);\n    delete config[key];\n  }\n  config = (${reconcileProxyStrategy.toString()})(config, ${JSON.stringify(strategy) ?? 'undefined'}, ${JSON.stringify(strategyOwnership)}, ${JSON.stringify(strategyTestUrl)});\n  var apps = ${JSON.stringify(apps)};\n  var names = ['DIRECT'].concat((config.proxies || []).map(function(p){return p.name}), (config['proxy-groups'] || []).map(function(p){return p.name}));\n  apps = (${effectiveApplications.toString()})(apps, names);\n  var rules = [];\n  apps.forEach(function(app){\n    var target = app.mode === 'direct' ? 'DIRECT' : app.target;\n    if (target !== 'REJECT' && names.indexOf(target) < 0) return;\n    (app.processPaths || app.processes).forEach(function(p){rules.push((app.processPaths ? 'PROCESS-PATH,' : 'PROCESS-NAME,') + p + ',' + target)});\n  });\n  if (rules.length) {\n    config.rules = rules.concat(config.rules || []);\n    config[key] = {owner:${JSON.stringify(ownerId)},rules:rules};\n  }\n  return config;\n } catch (_) { return input; }\n}\n`
 }
 
 export interface ProxyInfo { name: string; type: string; all?: string[]; now?: string; fixed?: string; udp?: boolean; alive?: boolean; history?: { time: string; delay: number }[] }

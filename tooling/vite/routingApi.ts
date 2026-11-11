@@ -3,6 +3,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage } from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { RoutingService } from '../../src/main/services/routingService.ts'
+import { inspectManagementRepair, repairManagementRecords } from '../../src/main/services/managementRepair.ts'
 import { previewPort } from './applicationScanner.ts'
 
 async function readBody(request: IncomingMessage): Promise<any> {
@@ -46,6 +47,8 @@ export function createRoutingApi(service: RoutingService): Connect.NextHandleFun
         else if (route === '/api/integration/rollback') result = await service.rollback(body.id)
         else if (route === '/api/integration/recover') result = await service.recoverAll()
         else if (route === '/api/integration/diagnose') result = await service.diagnose()
+        else if (route === '/api/integration/repair-preview') { const { state: _state, ...preview } = await inspectManagementRepair(service); result = preview }
+        else if (route === '/api/integration/repair-records') result = await repairManagementRecords(service, body.fingerprint)
         else { response.statusCode = 404; result = { error: '未知操作。' } }
       } else { response.statusCode = 405; result = { error: '不支持的请求方法。' } }
       response.end(JSON.stringify(result))

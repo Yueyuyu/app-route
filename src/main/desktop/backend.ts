@@ -1,3 +1,5 @@
+import { inspectManagementRepair, repairManagementRecords } from '../services/managementRepair.ts'
+import { diagnosticExport } from '../services/diagnosticExport.ts'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ApplicationIconService } from '../services/applicationIconService.ts'
@@ -19,7 +21,7 @@ let lastScan = 0, mutations = 0, disconnected = false
 const attempts = new Set<string>()
 async function scan(force = false) {
   if (!force && cachedScan && Date.now() - lastScan < 60000) return cachedScan
-  const result = await icons.scanApplications(); cachedScan = result; lastScan = Date.now(); return result
+  const result = await service.timings.measure('应用扫描', () => icons.scanApplications()); cachedScan = result; lastScan = Date.now(); return result
 }
 async function dispatch(action: DesktopAction, body: any = {}) {
   switch (action) {
@@ -27,6 +29,10 @@ async function dispatch(action: DesktopAction, body: any = {}) {
     case 'applications.running': return runningApplications()
     case 'inventory.read': return inventory.read()
     case 'inventory.write': return inventory.write(body)
+    case 'integration.reconcile': await service.reconcileInterrupted(); return service.status()
+    case 'integration.repair-preview': { const { state: _state, ...preview } = await inspectManagementRepair(service); return preview }
+    case 'integration.repair-records': return repairManagementRecords(service, body.fingerprint)
+    case 'integration.diagnostics-export': return diagnosticExport(await service.status())
     case 'integration.status': return service.status()
     case 'integration.apply-automatic': return service.applyAutomatically(body)
     case 'integration.proxy-group': return service.setProxyGroup(body)
@@ -62,6 +68,7 @@ const monitor = setInterval(async () => {
   if (mutations || checking || disconnected) return
   checking = true
   try {
+    await service.reconcileInterrupted()
     const status = await service.status()
     if (!status.connected || status.pending || !status.rulesLoaded) return
     const missing = status.uncoveredProcesses ?? []
@@ -75,4 +82,6 @@ const monitor = setInterval(async () => {
   } catch { /* 状态接口继续显示未覆盖/恢复结果，用户可手动重试；不无限重放。 */ }
   finally { checking = false; if (disconnected && !mutations) process.exit(0) }
 }, 10000)
+mutations++
+void service.reconcileInterrupted().catch(() => {}).finally(() => { mutations--; if (disconnected && !mutations && !checking) process.exit(0) })
 process.on('disconnect', () => { disconnected = true; clearInterval(monitor); if (!mutations && !checking) process.exit(0) })

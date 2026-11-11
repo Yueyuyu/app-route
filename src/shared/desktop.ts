@@ -1,7 +1,7 @@
 import type { Application } from './application.ts'
 
 export const desktopActions = ['applications.scan', 'applications.running', 'inventory.read', 'inventory.write',
-  'integration.status', 'integration.apply-automatic', 'integration.proxy-group', 'integration.proxy-strategy', 'integration.apply', 'integration.confirm', 'integration.rollback', 'integration.recover', 'integration.diagnose',
+  'integration.status', 'integration.reconcile', 'integration.repair-preview', 'integration.repair-records', 'integration.diagnostics-export', 'integration.apply-automatic', 'integration.proxy-group', 'integration.proxy-strategy', 'integration.apply', 'integration.confirm', 'integration.rollback', 'integration.recover', 'integration.diagnose',
   'icons.state', 'icons.scan', 'icons.register', 'icons.replace', 'icons.reset', 'icons.image', 'application.choose', 'language.read', 'language.write'] as const
 export type DesktopAction = typeof desktopActions[number]
 export interface InventoryPreferences { version: 1; applications: Application[]; favorites: string[] }
