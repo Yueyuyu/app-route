@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "design": "同笔连接：纵向舒展、无副标题",
+  "selectedOn": "2026-11-11",
+  "approval": "用户确认组合方案并授权替换应用内品牌区",
+  "constraints": [
+    "分叉箭头保持左低右高，不做等高对称",
+    "箭头尾部延伸至接近两个 p 的下沿",
+    "图标与 A 以同一笔画连接，不单独缩放",
+    "不显示应用分流、各走其路副标题",
+    "桌面、窗口与托盘继续使用原有 02 深灰蓝图标"
+  ],
+  "approvedPreview": {
+    "file": "resources/brand/lockup/approved-preview.png",
+    "sha256": "ba7b5f3bcf7dc3349ca132efe33180e090b1a3881e14c78ac3cff054fa24e8e4",
+    "sourceFile": "exec-6a210a9d-644f-4c19-8f52-339bb0f55ab8.png"
+  },
+  "productionAsset": {
+    "file": "public/brand/app-route-lockup.png",
+    "sha256": "07cd6c6407ff158eb5c4ac6eb10142f5f499fdda9e45ae5d4d7bec23abc2f256",
+    "sourceFile": "exec-03e3cc3a-3536-418e-b68e-7d482f40429d.png",
+    "promptFile": "resources/brand/lockup/prepare-prompt.txt",
+    "preparation": "内置 image_gen 从确认预览整理为单份白底组合标志；保留确认稿用于对照",
+    "width": 2172,
+    "height": 724,
+    "viewBox": [145, 117, 1971, 494],
+    "display": "浅色导航使用 multiply 融合白底，未提供透明或深色主题定稿"
+  },
+  "desktopIconSha256": "b9adf250184a3437485e60f2003b2a89bd0a61833e44b934e76a766680b5bbb3"
+}

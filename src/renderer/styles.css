@@ -41,14 +41,11 @@ p { line-height: 1.75; }
 .heading-actions { display: flex; align-items: center; gap: 10px; }
 .workspace-footer { padding: 12px 28px; color: #b34d2e; font-size: 12px; }
 
-/* 已确认的图标和字标原图，仅调整组合留白。 */
-.brand { display: flex; align-items: center; gap: 9px; padding: 0 3px; white-space: nowrap; }
-.brand-icon { width: 36px; height: 36px; flex: 0 0 36px; object-fit: contain; }
-.brand-copy { min-width: 0; }
-.brand-wordmark { display: block; width: 126px; height: auto; aspect-ratio: 1756 / 466; overflow: hidden; mix-blend-mode: multiply; }
-.brand-tagline { display: block; font-size: 11px; color: #788191; margin: 5px 0 0 3px; }
-.navigation-drawer .brand { gap: 8px; }
-.navigation-drawer .brand-wordmark { width: 146px; }
+/* 一体组合标志保留笔画连接，白底通过叠底融入浅色导航。 */
+.brand { display: flex; align-items: center; justify-content: center; min-height: 52px; }
+.brand-lockup { display: block; width: 100%; max-width: 186px; height: auto; aspect-ratio: 1971 / 494; overflow: hidden; mix-blend-mode: multiply; }
+.navigation-drawer .brand { justify-content: flex-start; }
+.navigation-drawer .brand-lockup { max-width: 208px; }
 
 /* 正常状态保持一张摘要卡，解释与诊断进入详情。 */
 .routing-panel { border: 1px solid #dce5f4; border-radius: 12px; padding: 18px 20px; background: #fff; margin-bottom: 24px; }
@@ -245,9 +242,7 @@ p { line-height: 1.75; }
 @media (max-width: 1050px) {
   .sidebar { width: 190px; flex-basis: 190px; padding-inline: 10px; }
   .workspace { margin-left: 190px; }
-  .sidebar .brand-icon { width: 29px; height: 29px; flex-basis: 29px; }
-  .sidebar .brand-wordmark { width: 116px; }
-  .sidebar .brand-tagline { font-size: 10px; }
+  .sidebar .brand-lockup { max-width: 168px; }
   .main-content { padding: 22px 20px; }
   .topbar { padding-inline: 20px; }
   .routing-summary { align-items: flex-start; flex-direction: column; gap: 14px; }
