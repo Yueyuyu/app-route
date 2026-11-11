@@ -1,6 +1,13 @@
 /** 中文原句作为 gettext 风格键；译文顺序为 English、日本語、Français。
  * 修改原句时同步更新三种译文，保留 {0} 等插值参数。用户数据不进入此目录。 */
 export const messages: Record<string, readonly [string, string, string]> = {
+  "构建于 {0}": ["Built on {0}", "ビルド日時 {0}", "Compilé le {0}"],
+  "项目主页": ["Project", "プロジェクト", "Projet"],
+  "反馈问题": ["Report an issue", "問題を報告", "Signaler un problème"],
+  "复制版本信息": ["Copy version info", "バージョン情報をコピー", "Copier la version"],
+  "版本信息已复制": ["Version information copied", "バージョン情報をコピーしました", "Informations de version copiées"],
+  "复制失败，请稍后重试。": ["Could not copy. Please try again.", "コピーできませんでした。再試行してください。", "Copie impossible. Réessayez."],
+  "无法打开链接，请稍后重试。": ["Could not open the link. Please try again.", "リンクを開けませんでした。再試行してください。", "Impossible d’ouvrir le lien. Réessayez."],
   "连接方式": ["Connection", "接続方法", "Connexion"],
   "代理组": ["Proxy group", "プロキシグループ", "Groupe proxy"],
   "内核已连接": ["Core connected", "コアに接続済み", "Moteur connecté"],

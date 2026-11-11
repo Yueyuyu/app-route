@@ -9,6 +9,7 @@ const listeners = new Set<() => void>()
 export const t = (source: string, params?: readonly (string | number | null | undefined)[]) => translate(currentLocale, source, params)
 export const outletLabel = (outlet?: ProxyOutlet) => translateProxyOutlet(currentLocale, outlet)
 export const formatTime = (value: string, options?: Intl.DateTimeFormatOptions) => new Date(value).toLocaleTimeString(currentLocale, options)
+export const formatDateTime = (value: string) => new Date(value).toLocaleString(currentLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 export async function initializeLanguage() {
   try {
     if (window.appRoute) settings = await window.appRoute.request<LanguageSettings>('language.read')

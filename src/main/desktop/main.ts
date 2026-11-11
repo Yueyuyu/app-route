@@ -1,6 +1,7 @@
 import { resolveLocale, translate, type LanguagePreference } from '../../shared/i18n/index.ts'
 import { LanguagePreferencesStore } from './languagePreferences.ts'
-import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, protocol, session, shell, nativeImage, powerMonitor } from 'electron'
+import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, protocol, session, shell, nativeImage, powerMonitor, clipboard } from 'electron'
+import { projectLink, versionSummary, type BuildInfo } from '../../shared/appInfo.ts'
 import { fork, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -101,6 +102,15 @@ else {
     ipcMain.handle('approute:request', async (event, action: unknown, body?: unknown) => {
       if (event.sender !== window?.webContents || !isTrustedDesktopSender(event.senderFrame?.url ?? '', event.senderFrame === event.sender.mainFrame)) throw new Error(tr("桌面请求来源无效。"))
       validateDesktopRequest(action, body)
+      if (action === 'app.open-link') {
+        await shell.openExternal(projectLink((body as { target?: unknown } | undefined)?.target))
+        return { opened: true }
+      }
+      if (action === 'app.copy-version') {
+        const info: BuildInfo = JSON.parse(await fs.readFile(path.join(resources, 'ui', 'build-info.json'), 'utf8'))
+        await clipboard.writeText(versionSummary(info))
+        return { copied: true }
+      }
       if (action === 'language.read') {
         const previousLocale = resolveLocale(language, systemLanguages)
         systemLanguages = app.getPreferredSystemLanguages()

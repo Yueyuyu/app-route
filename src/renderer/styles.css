@@ -348,3 +348,7 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .managed-rule-line { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #edf0f7; }
 .first-use-guide { display: flex; gap: 8px 18px; flex-wrap: wrap; padding: 14px 0 0; color: #62718b; font-size: 12px; }
 .application-label strong .ant-tag { margin-inline-start: 8px; font-size: 11px; font-weight: 400; }
+
+.about-app-content .about-app-version { margin-bottom: 5px; }
+.about-build-date { color: #748197; font-size: 12px; margin: 0 0 18px; }
+.about-app-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
