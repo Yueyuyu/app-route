@@ -24,6 +24,8 @@ AppRoute 是一个桌面应用（Windows 预览版，macOS 实验性预览版）
 ![图标管理](docs/images/zh-CN-icons.png)
 ![使用帮助](docs/images/zh-CN-help.png)
 
+![关于与版本信息](docs/images/zh-CN-about.png)
+
 </details>
 
 ## 可以做什么

@@ -23,6 +23,8 @@ AppRoute は **Clash Party / Mihomo** と連携する デスクトップアプ�
 ![アイコン管理](docs/images/ja-icons.png)
 ![ヘルプ](docs/images/ja-help.png)
 
+![アプリについて・ビルド情報](docs/images/ja-about.png)
+
 </details>
 
 ## 主な機能
@@ -91,7 +93,7 @@ AppRoute 所有のルールと専用自動グループを無効にし、元の�
 ```powershell
 npm run dev          # 開発用プレビュー
 npm run check        # テスト・型検査・ビルド
-npm run check:i18n   # Windows：隔離デスクトップでの言語検証とデモ撮影
+npm run check:i18n   # Windows / macOS：隔離デスクトップでの言語検証とデモ撮影
 ```
 
 言語変更で振り分け・アプリ識別子・パス・ノード名は変わりません。未分類の技術診断は原文を保持し、独立復旧コマンドラインは現在中国語です。[翻訳の保守](docs/LOCALIZATION.md) · [構成](docs/ARCHITECTURE.md) · [計画](docs/ROADMAP.md) · [検証記録](docs/VERIFICATION.md) · [貢献ガイド](CONTRIBUTING.md)（中国語）

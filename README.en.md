@@ -22,6 +22,8 @@ Real Electron UI captures with **synthetic paths, proxy groups and connection re
 ![Icon library](docs/images/en-icons.png)
 ![Help](docs/images/en-help.png)
 
+![About and build information](docs/images/en-about.png)
+
 </details>
 
 ## Features
@@ -90,7 +92,7 @@ Inside the app, an asymmetric cyan-to-blue routing arrow joins the handwritten A
 ```powershell
 npm run dev          # Development preview only
 npm run check        # Tests, type checking and build
-npm run check:i18n   # Windows: isolated desktop language checks and demo captures
+npm run check:i18n   # Windows / macOS: isolated desktop language checks and demo captures
 ```
 
 Language changes never rewrite routing or translate app identities, paths or node names. Unknown technical diagnostics retain their original language; the independent recovery command line remains Chinese. See [localization maintenance](docs/LOCALIZATION.md), [architecture](docs/ARCHITECTURE.md), [roadmap](docs/ROADMAP.md), [verification](docs/VERIFICATION.md) and [contributing](CONTRIBUTING.md) (Chinese).

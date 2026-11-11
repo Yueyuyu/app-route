@@ -23,6 +23,8 @@ Captures de l’interface Electron réelle avec des **chemins, groupes et connex
 ![Bibliothèque d’icônes](docs/images/fr-icons.png)
 ![Aide](docs/images/fr-help.png)
 
+![À propos et informations de compilation](docs/images/fr-about.png)
+
 </details>
 
 ## Fonctionnalités
@@ -91,7 +93,7 @@ Dans l’application, une flèche asymétrique cyan-bleu rejoint le A manuscrit 
 ```powershell
 npm run dev          # Aperçu de développement uniquement
 npm run check        # Tests, types et compilation
-npm run check:i18n   # Windows : tests isolés et captures de démonstration
+npm run check:i18n   # Windows / macOS : tests isolés et captures de démonstration
 ```
 
 Changer la langue ne modifie ni le routage ni les identités, chemins ou noms des nœuds. Les diagnostics techniques inconnus restent dans leur langue d’origine ; l’outil de restauration en ligne de commande reste en chinois. [Traductions](docs/LOCALIZATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Feuille de route](docs/ROADMAP.md) · [Vérifications](docs/VERIFICATION.md) · [Contributions](CONTRIBUTING.md) (en chinois)
