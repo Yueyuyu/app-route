@@ -4,7 +4,7 @@
 
 - 名称：AppRoute 应用分流。
 - 仓库：`Yueyuyu/app-route`，公开源码，MIT 自有代码许可。
-- 首版平台：Windows。
+- 首版平台：Windows；macOS 提供 Apple Silicon / Intel 实验性构建，真实分流仍待实机验证。
 - 使用者：希望按软件选择联网方式，而不直接编辑复杂代理配置的人。
 - 首个正式集成目标：现有 Clash Party。架构目标是兼容多种执行端，而不是绑定某一个客户端名称。
 

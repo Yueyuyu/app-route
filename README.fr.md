@@ -2,9 +2,11 @@
 <p align="center"><strong>Choisissez la connexion de chaque application, sans écrire de règles proxy.</strong></p>
 <p align="center"><a href="README.md">简体中文</a> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a> · Français</p>
 
-AppRoute est une application Windows qui accompagne **Clash Party / Mihomo**. Elle détecte vos logiciels et propose **Règles Clash, Direct ou Suivre le groupe**, en distinguant les règles chargées des connexions réellement vérifiées.
+AppRoute est une application de bureau (préversion Windows et version macOS expérimentale) qui accompagne **Clash Party / Mihomo**. Elle détecte vos logiciels et propose **Règles Clash, Direct ou Suivre le groupe**, en distinguant les règles chargées des connexions réellement vérifiées.
 
-> **0.2.0-preview.1 · Test d’intégration.** La compilation et l’installation locales sont disponibles. Aucun installateur signé ni mise à jour automatique pour le moment. Un redémarrage normal de Clash Party sur la machine de test a régénéré les règles existantes ; les changements d’abonnement, sorties de veille et la matrice complète de compatibilité restent à valider.
+> **0.2.0-preview.1 · Préversion, pas une version stable.** Cibles : Windows x64, macOS Apple Silicon et Intel. Le redémarrage et le passage entre deux abonnements réels ont été vérifiés sous Windows. La mise à jour distante des abonnements, la veille réelle et le routage réel sur Mac restent à valider. Aucune signature d’éditeur, notarisation Apple ni mise à jour automatique.
+
+[Téléchargements](https://github.com/Yueyuyu/app-route/releases) · [Périmètre macOS](docs/MACOS.md)
 
 ## Découvrir l’interface
 

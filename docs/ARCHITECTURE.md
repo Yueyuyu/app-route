@@ -25,7 +25,9 @@
 | src/core/routingQueue.ts | 立即显示待应用选择、合并短时间内的修改、按应用保留最终意图、串行事务与异常停队 |
 | src/main/platform/windows/processFamily.ts | 固定只读进程查询、独立安装目录组件预识别，重建可信进程路径 |
 | src/main/platform/windows | 开始菜单、注册表和可见进程的固定只读扫描 |
-| src/main/adapters/mihomoRuntime.ts | 发现唯一 Clash Party 命名管道，调用内核 API |
+| src/main/platform/macos | 应用包元数据、系统图标、运行进程及包内可信路径 |
+| src/main/platform/applications.ts / paths.ts | 按系统分派原生能力及独立数据、运行时与恢复入口 |
+| src/main/adapters/mihomoRuntime.ts | 发现唯一 Clash Party 命名管道或当前用户 Unix socket，调用内核 API |
 | src/main/adapters/clashPartyConfiguration.ts | 配置拥有者识别、快照、独立覆写登记、原生内核校验 |
 | src/main/adapters/runtimeRules.ts | 排除命中统计后的规则配置指纹；检测磁盘/运行时漂移 |
 | src/main/services/routingService.ts | 应用、确认、回退、全部恢复、自检与实际连接证据 |
@@ -57,7 +59,7 @@ API 热重载不会将整个 YAML 写回用户文件。AppRoute 不修改订阅�
 
 Clash Party 的全局本地 JS 覆写重新生成应用规则。目标组在订阅更新后消失时，由 missingTargetAction 明确决定 REJECT 或跳过专属规则；旧记录默认跳过，首次配置策略推荐拒绝。即时配置与覆写共用 effectiveApplications，避免无效目标导致整份配置无法启动。组内成员的正常切换由内核执行，无需重写应用规则；失效引用、直连/拒绝选择或最近探测失败会明确显示。
 
-Clash Party 2.0.4 缓存覆写登记；首次登记后需要重新打开客户端。代码不会为刷新缓存而强制结束用户程序。界面只有观察到客户端生成的所有权标记与当前规则一致后才显示持久化已被观察到。本机正常重启已观察到既有规则重新生成；重启后再修改规则，需要另行观测，不能沿用旧版证据。真实订阅切换及完整矩阵尚待验收；隔离配置的重新生成、目标消失和新订阅恢复已有自动测试。
+Clash Party 2.0.4 缓存覆写登记；首次登记后需要重新打开客户端。代码不会为刷新缓存而强制结束用户程序。界面只有观察到客户端生成的所有权标记与当前规则一致后才显示持久化已被观察到。Windows 本机正常重启和两份真实订阅往返切换已观察到规则重新生成；远程订阅刷新、整机睡眠及 Mac 真实客户端仍待验收。隔离配置的重新生成、目标消失和新订阅恢复已有自动测试。
 
 新应用通过 PROCESS-PATH 精确匹配；保留对旧 PROCESS-NAME 状态的恢复兼容。组件预识别仅限名称与主程序相符的独立安装目录，限制递归深度、数量并跳过链接、安装/修复程序和修复通道。目录外子进程提示未覆盖；不把共享浏览器纳入当前应用。运行时 API 相似并不代表其他客户端的配置生命周期兼容。EngineRuntimeAdapter / ConfigurationOwnerAdapter / TrafficInterceptorAdapter 保留为未来跨引擎契约，当前具体实现不宣称已完成所有通用接口。
 

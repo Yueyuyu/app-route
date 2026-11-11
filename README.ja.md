@@ -2,9 +2,11 @@
 <p align="center"><strong>アプリごとに接続方法を選択。プロキシルールの手書きは不要です。</strong></p>
 <p align="center"><a href="README.md">简体中文</a> · <a href="README.en.md">English</a> · 日本語 · <a href="README.fr.md">Français</a></p>
 
-AppRoute は **Clash Party / Mihomo** と連携する Windows デスクトップアプリです。端末のアプリを検出し、**Clash ルール・直接接続・グループに従う**から選択できます。ルールの読み込みと実際の接続の検証は別々に表示します。
+AppRoute は **Clash Party / Mihomo** と連携する デスクトップアプリです（Windows プレビュー版・macOS 実験版）。端末のアプリを検出し、**Clash ルール・直接接続・グループに従う**から選択できます。ルールの読み込みと実際の接続の検証は別々に表示します。
 
-> **0.2.0-preview.1 · 統合テスト版。** ローカルでのビルド・インストールに対応しています。署名付きインストーラーと自動更新は未提供です。実機の Clash Party を通常再起動し、既存のアプリルールが再生成されることを確認しました。サブスクリプション切り替え、スリープ、全互換性の検証は未完了です。
+> **0.2.0-preview.1 · プレビュー版。安定版ではありません。** Windows x64、macOS Apple Silicon・Intel 向けのビルドに対応。Windows の通常再起動と実際の2つのサブスクリプション間の切り替えは確認済みです。リモート更新、実機スリープ、Mac の実際の振り分けは未検証です。発行者署名・Apple 公証・自動更新はありません。
+
+[プレビュー版](https://github.com/Yueyuyu/app-route/releases) · [macOS の対応範囲](docs/MACOS.md)
 
 ## 画面を見る
 

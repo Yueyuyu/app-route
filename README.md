@@ -1,11 +1,13 @@
 <p align="center"><img src="public/brand/app-route-lockup.png" width="440" alt="AppRoute" /></p>
 <p align="center"><strong>为每个应用选择联网方式，无需手写代理规则。</strong></p>
 <p align="center">简体中文 · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a> · <a href="README.fr.md">Français</a></p>
-<p align="center"><a href="https://github.com/Yueyuyu/app-route/actions/workflows/ci.yml"><img src="https://github.com/Yueyuyu/app-route/actions/workflows/ci.yml/badge.svg?branch=codex%2Fclash-party-recovery" alt="CI" /></a> <img src="https://img.shields.io/badge/platform-Windows-0078D4" alt="Windows" /> <img src="https://img.shields.io/badge/status-preview-orange" alt="Preview" /> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" /></a></p>
+<p align="center"><a href="https://github.com/Yueyuyu/app-route/actions/workflows/ci.yml"><img src="https://github.com/Yueyuyu/app-route/actions/workflows/ci.yml/badge.svg?branch=codex%2Fclash-party-recovery" alt="CI" /></a> <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0078D4" alt="Windows and macOS" /> <img src="https://img.shields.io/badge/status-preview-orange" alt="Preview" /> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" /></a></p>
 
-AppRoute 是一个 Windows 桌面应用：扫描本机软件，为应用选择 **按 Clash 规则、直接联网或跟随代理组**，并显示规则加载与实际连接的验证状态。当前配合已有的 Clash Party / Mihomo 使用。
+AppRoute 是一个桌面应用（Windows 预览版，macOS 实验性预览版）：扫描本机软件，为应用选择 **按 Clash 规则、直接联网或跟随代理组**，并显示规则加载与实际连接的验证状态。当前配合已有的 Clash Party / Mihomo 使用。
 
-> **0.2.0-preview.1 · 集成测试版。** 已有本机桌面打包与安装流程，尚未发布签名安装器或自动更新。已观察到本机 Clash Party 正常重启后重新生成既有分流；订阅切换、休眠及完整兼容矩阵仍待验收。公开源码不等于稳定发行版。
+> **0.2.0-preview.1 · 预览版，非稳定版。** 提供 Windows x64、macOS Apple Silicon 和 Intel 构建流程。本机 Windows 已验证正常重启与两份真实订阅往返切换；远程订阅刷新、整机睡眠及 Mac 真实分流仍待验收。安装包尚无发布者签名或 Apple 公证，也没有自动更新。
+
+[预览版下载](https://github.com/Yueyuyu/app-route/releases) · [Mac 支持范围](docs/MACOS.md) · [验收记录](docs/VERIFICATION.md)
 
 ## 看看界面
 
@@ -29,11 +31,11 @@ AppRoute 是一个 Windows 桌面应用：扫描本机软件，为应用选择 *
 | 功能 | 使用方式 |
 | --- | --- |
 | 按应用分流 | 点击联网方式自动应用；连续选择可排队、合并，失败自动回退。 |
-| 自动发现软件 | 启动、返回窗口及定时检查新应用；支持手动选择 exe、运行中筛选和系统工具折叠。 |
+| 自动发现软件 | 启动、返回窗口及定时检查新应用；支持手动选择 Windows exe / Mac 应用包、运行中筛选和系统工具折叠。 |
 | 已设置 | 只收录直接联网或跟随代理组的应用；收藏独立筛选，搜索覆盖全部应用。 |
 | 跟随代理组 | 统一绑定 Clash Party 中常用的组；组内换节点后，新连接自动跟随。 |
 | 三种代理策略 | 沿用已有组、按优先级故障备用、按探测延迟选择；自动策略由 Mihomo 执行。 |
-| 状态可核对 | 蓝色“等待应用联网”表示规则已加载、还没有新连接证据；绿色表示已观察到符合设置的新连接；组当前选择与实际连接分别显示。 |
+| 状态可核对 | 蓝色“规则已就绪”表示规则已加载、还没有新连接证据；绿色表示已观察到符合设置的新连接；组当前选择与实际连接分别显示。 |
 | 桌面与托盘 | 双击快捷方式打开；关闭窗口收至托盘，退出后已确认规则继续保留。 |
 | 图标管理 | 本机提取、50 个公共图标、默认图标与自定义替换；素材留在本机。 |
 | 四种显示语言 | 简体中文、English、日本語、Français；右上角切换，自动保存。 |
