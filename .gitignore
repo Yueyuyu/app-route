@@ -3,6 +3,7 @@ dist/
 dist-electron/
 release/
 .runtime/
+output/playwright/
 coverage/
 *.log
 *.local
