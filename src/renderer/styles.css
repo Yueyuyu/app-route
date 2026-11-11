@@ -298,3 +298,23 @@ p { line-height: 1.75; }
   .process-list { columns: 1; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
+
+/* 不压缩译文：较长的法语和日语允许换行，保留全部操作名称。 */
+.language-switcher { width: 164px; flex-shrink: 0; }
+.topbar-left, .topbar-right { min-width: 0; }
+.routing-summary-actions, .heading-actions, .drawer-footer, .strategy-footer { flex-wrap: wrap; }
+.view-filters .ant-select { min-width: 160px; }
+html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select { min-width: 190px; }
+.view-filters, .view-filters > div { flex-wrap: wrap; }
+.route-selector .ant-segmented-item-label { white-space: normal; line-height: 1.35; display: flex; align-items: center; justify-content: center; min-height: 32px; padding-block: 5px; }
+.route-selector .ant-segmented-group { align-items: stretch; }
+.sidebar .ant-menu-title-content { white-space: normal; line-height: 1.35; }
+.strategy-options .ant-radio-wrapper { min-width: 0; }
+.strategy-options small, .help-card p, .help-popover { overflow-wrap: anywhere; }
+.icon-card-actions { flex-wrap: wrap; }
+@media (max-width: 767px) {
+  .topbar-right { display: flex; }
+  .topbar-right > .ant-tag, .topbar-app-icon { display: none; }
+  .language-switcher { width: 142px; }
+  .topbar-left .ant-breadcrumb { display: none; }
+}
