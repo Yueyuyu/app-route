@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AutomaticApplyResult, IntegrationStatus } from '../../shared/integration.ts'
 import type { Application, RouteMode } from '../../shared/application.ts'
+import { RoutingQueue, type PendingRoute } from '../../core/routingQueue.ts'
 
 let token: string | undefined
 export async function integrationRequest<T>(action: string, body?: unknown): Promise<T> {
@@ -21,60 +22,78 @@ export async function integrationRequest<T>(action: string, body?: unknown): Pro
 
 export function useRoutingIntegration() {
   const [status, setStatus] = useState<IntegrationStatus>()
+  const currentStatus = useRef<IntegrationStatus>(undefined)
   const [error, setError] = useState('')
   const [groupBusy, setGroupBusy] = useState(false)
-  const [busyIds, setBusyIds] = useState<string[]>([])
+  const strategyBusy = useRef(false)
+  const [pendingRoutes, setPendingRoutes] = useState<Record<string, PendingRoute>>({})
   const [failures, setFailures] = useState<Record<string, string>>({})
-  const busy = useRef(false)
+  const [notice, setNotice] = useState<{ sequence: number; type: 'success' | 'error'; text: string }>()
+  const noticeSequence = useRef(0)
   const familyAttempts = useRef(new Set<string>())
   const requestSequence = useRef(0)
   const refresh = useCallback(async () => {
     const sequence = ++requestSequence.current
     try {
       const next = await integrationRequest<IntegrationStatus>('status')
-      if (sequence === requestSequence.current) { setStatus(next); setError('') }
+      if (sequence === requestSequence.current) { currentStatus.current = next; setStatus(next); setError('') }
       return next
-    } catch (error) { if (sequence === requestSequence.current) setError(error instanceof Error ? error.message : '连接失败') }
+    } catch (error) {
+      if (sequence === requestSequence.current) {
+        setError(error instanceof Error ? error.message : '连接失败')
+        currentStatus.current = undefined
+        // 保留最后一次设置记录，但接口失联后不能继续显示绿色连接或允许应用。
+        setStatus(previous => previous ? { ...previous, connected: false } : undefined)
+      }
+    }
   }, [])
-  useEffect(() => { void refresh(); const timer = window.setInterval(() => void refresh(), 5000); return () => { window.clearInterval(timer); requestSequence.current++ } }, [refresh])
-  async function apply(applications: Application[], mode: RouteMode, target?: string) {
-    if (busy.current) throw new Error('正在检查上一项设置，请稍后重试。')
-    busy.current = true; setBusyIds(applications.map(app => app.id))
+  const queue = useRef<RoutingQueue>(undefined)
+  queue.current ??= new RoutingQueue({
+    onChange: setPendingRoutes,
+    execute: async (applications, target) => {
+      const current = currentStatus.current ?? await refresh()
+      if (!current?.connected || current.pending) throw new Error('尚未连接或上一轮操作未确认，请检查恢复状态后重试。')
+      setFailures(values => Object.fromEntries(Object.entries(values).filter(([id]) => !applications.some(app => app.id === id))))
+      try {
+        return await integrationRequest<AutomaticApplyResult>('apply-automatic', { revision: current.revision, target,
+          applications: applications.map(({ icon: _icon, processPaths: _paths, processWarnings: _warnings, ...app }) => app) })
+      } catch (error) { await refresh(); throw error }
+    },
+    onResult: result => {
+      requestSequence.current++; currentStatus.current = result.status; setStatus(result.status)
+      if (result.outcome === 'applied') setNotice({ sequence: ++noticeSequence.current, type: 'success', text: result.message })
+    },
+    onFailure: (text, intents) => {
+      setFailures(current => ({ ...current, ...Object.fromEntries(intents.map(item => [item.application.id, text])) }))
+      setNotice({ sequence: ++noticeSequence.current, type: 'error', text })
+    },
+  })
+  useEffect(() => { void refresh(); const timer = window.setInterval(() => void refresh(), 5000); return () => { window.clearInterval(timer); requestSequence.current++; queue.current?.cancelWaiting() } }, [refresh])
+  function apply(applications: Application[], mode: RouteMode, target?: string) {
+    if (strategyBusy.current) return
     setFailures(current => Object.fromEntries(Object.entries(current).filter(([id]) => !applications.some(app => app.id === id))))
-    try {
-      const current = await refresh()
-      if (!current?.connected) throw new Error('尚未连接 Clash Party，设置未修改。')
-      const result = await integrationRequest<AutomaticApplyResult>('apply-automatic', { revision: current.revision, target,
-        applications: applications.map(({ icon: _icon, processPaths: _paths, processWarnings: _warnings, ...app }) => ({ ...app, mode })) })
-      requestSequence.current++; setStatus(result.status)
-      if (result.outcome !== 'applied') throw new Error(result.message)
-      return result
-    } catch (e) {
-      const text = e instanceof Error ? e.message : '请求中断，请等待独立恢复并检查状态。'
-      setFailures(current => ({ ...current, ...Object.fromEntries(applications.map(app => [app.id, text])) }))
-      throw e
-    } finally { busy.current = false; setBusyIds([]); await refresh() }
+    queue.current!.enqueue(applications, mode, target)
   }
   async function setProxyGroup(target: string) {
-    if (busy.current) throw new Error('请等待当前应用操作结束。')
-    busy.current = true; setGroupBusy(true)
+    if (strategyBusy.current || Object.keys(queue.current!.snapshot()).length) throw new Error('请等待当前应用操作结束。')
+    strategyBusy.current = true; setGroupBusy(true)
     try {
       const current = await refresh()
       if (!current?.connected || current.pending) throw new Error('尚未连接或上一轮操作未确认，请检查恢复状态。')
       const result = await integrationRequest<AutomaticApplyResult>('proxy-group', { target, revision: current.revision })
-      requestSequence.current++; setStatus(result.status)
+      requestSequence.current++; currentStatus.current = result.status; setStatus(result.status)
       if (result.outcome !== 'applied') throw new Error(result.message)
-    } finally { await refresh(); busy.current = false; setGroupBusy(false) }
+    } finally { await refresh(); strategyBusy.current = false; setGroupBusy(false) }
   }
   useEffect(() => {
-    if (window.appRoute || !status?.connected || status.pending || busy.current) return
+    if (window.appRoute || groupBusy || !status?.connected || status.pending || Object.keys(queue.current!.snapshot()).length) return
     const missing = status.uncoveredProcesses ?? []
     const attemptKey = (id: string) => JSON.stringify([id, missing.filter(item => item.applicationId === id).map(item => item.process).sort()])
     const managed = status.managed.find(app => app.processPaths?.length && missing.some(item => item.applicationId === app.id) && !familyAttempts.current.has(attemptKey(app.id)))
     if (!managed) return
     familyAttempts.current.add(attemptKey(managed.id))
     // 只为已经选择了专属模式的应用补充身份；仍经同一后端校验、网络检查和恢复事务。
-    void apply([{ ...managed, path: managed.processPaths![0], source: 'scan', category: '已管理应用' }], managed.mode, managed.target).catch(() => {})
-  }, [status])
-  return { status, error, refresh, apply, setProxyGroup, groupBusy, busyIds, failures }
+    apply([{ ...managed, path: managed.processPaths![0], source: 'scan', category: '已管理应用' }], managed.mode, managed.target)
+  }, [status, groupBusy])
+  return { status, error, refresh, apply, setProxyGroup, groupBusy, busyIds: Object.keys(pendingRoutes), pendingRoutes, failures, notice }
 }

@@ -1,3 +1,4 @@
+import type { PendingRoute } from '../../core/routingQueue'
 import { Button, Dropdown, Empty, Table, Tag, Tooltip } from 'antd'
 import { DeleteOutlined, EditOutlined, InfoCircleOutlined, MoreOutlined, StarOutlined, StarFilled } from '@ant-design/icons'
 import type { Key } from 'react'
@@ -19,6 +20,7 @@ interface Props {
   clearFilters: () => void
   status?: IntegrationStatus
   busyIds: string[]
+  pendingRoutes: Record<string, PendingRoute>
   failures: Record<string, string>
   loading: boolean
   favorites: string[]
@@ -27,10 +29,12 @@ interface Props {
   groupBusy?: boolean
 }
 
-export function ApplicationTable({ applications, selected, setSelected, changeMode, edit, remove, clearFilters, status, busyIds, failures, loading, favorites, toggleFavorite, emptyDescription, groupBusy }: Props) {
-  const disabled = groupBusy || busyIds.length > 0 || Boolean(status?.pending) || !status?.connected
-  const selector = (app: Application) => <RouteSelector disabled={disabled} legacyProxy={app.mode === 'proxy' && managedFor(app, status?.managed)?.target !== status?.proxyGroup} label={`${app.name} 的连接方式`} value={app.mode} onChange={(mode) => changeMode([app.id], mode)} />
+export function ApplicationTable({ applications, selected, setSelected, changeMode, edit, remove, clearFilters, status, busyIds, pendingRoutes, failures, loading, favorites, toggleFavorite, emptyDescription, groupBusy }: Props) {
+  const disabled = groupBusy || !status?.connected || (Boolean(status?.pending) && !busyIds.length)
+  const selector = (app: Application) => <RouteSelector disabled={disabled} legacyProxy={app.mode === 'proxy' && managedFor(app, status?.managed)?.target !== status?.proxyGroup} pending={Boolean(pendingRoutes[app.id])} label={`${app.name} 的连接方式`} value={pendingRoutes[app.id]?.mode ?? app.mode} onChange={(mode) => changeMode([app.id], mode)} />
   function feedback(app: Application) {
+    const pending = pendingRoutes[app.id]
+    if (pending) return <div className="application-routing-status" aria-live="polite"><Tag color="processing">{pending.phase === 'queued' ? '等待应用' : '正在应用与检查…'}</Tag><small>待应用选项尚未确认生效，可以继续选择；检查失败会自动恢复。</small></div>
     const state = routingPresentation(app, status)
     const managed = managedFor(app, status?.managed)
     const outlet = managed?.mode === 'proxy' ? status?.outlets?.[managed.target ?? ''] : undefined
