@@ -4,7 +4,7 @@
 
 阅读 `README.md` 了解当前可运行能力，阅读 `docs/PROJECT.md`、`docs/ARCHITECTURE.md` 和 `docs/COMPATIBILITY.md` 了解产品及适配边界。功能状态以 `docs/ROADMAP.md` 为准；完成对应功能时同步更新。
 
-当前为 0.2 集成测试版：已实现 Clash Party / Mihomo 运行控制、专属覆写、试运行与独立离线恢复；本机正常重启已观察到既有规则重新生成，订阅切换及完整兼容验收仍待完成。已有本机 Electron 桌面打包/安装流程，尚未签名或发布稳定安装版。
+当前为 0.2 集成测试版：已实现 Clash Party / Mihomo 运行控制、专属覆写、试运行与独立离线恢复；本机正常重启及两份真实订阅往返切换已观察到规则重新生成，远程订阅刷新、整机睡眠及完整兼容验收仍待完成。已有本机 Electron 桌面打包/安装流程，尚未签名或发布稳定安装版。
 
 涉及品牌图标、艺术字或复用视觉效果时，先读 `docs/design/README.md`、`docs/design/app-icon.md` 和 `docs/design/wordmark.md`。AppRoute 沿用已确认原图；跨项目的通用风格按字标规范中的 UI Design Lab 来源提交、ID 与版本读取，不把字标图片当作可安装字体。
 
