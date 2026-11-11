@@ -1,6 +1,6 @@
 import { t, formatTime } from './i18n'
 import { useEffect, useMemo, useState, type Key } from 'react'
-import { Alert, App as AntApp, Breadcrumb, Button, Collapse, Drawer, Dropdown, Input, Menu, Select, Tabs } from 'antd'
+import { Alert, App as AntApp, Button, Collapse, Drawer, Dropdown, Input, Menu, Select, Tabs } from 'antd'
 import { AppstoreOutlined, BookOutlined, CloseOutlined, FileTextOutlined, InfoCircleOutlined, MenuOutlined, PlusOutlined, ScanOutlined, SearchOutlined, PictureOutlined, StarOutlined } from '@ant-design/icons'
 import { ApplicationTable } from './components/ApplicationTable'
 import { ApplicationEditor } from './components/ApplicationEditor'
@@ -20,8 +20,6 @@ import { ConnectionStatus } from './components/ConnectionStatus'
 import { AboutApp } from './components/AboutApp'
 import { useNetworkDiagnostics } from './hooks/useNetworkDiagnostics'
 import { routeLabels, type Application, type Page, type RouteMode } from './types'
-
-const pageLabels: Record<Page, string> = { apps: '应用管理', drafts: '分流规则', help: '使用帮助', icons: '图标管理' }
 
 export default function App() {
   const inventory = useApplicationInventory()
@@ -89,7 +87,7 @@ export default function App() {
       {navigation}
       <div className="sidebar-bottom"><ConnectionStatus status={routing.status} error={routing.error} busy={applying} diagnostics={diagnostics} onDetails={tab => { setPage('apps'); setInspectionTab(tab ?? 'overview'); setInspectionOpen(true) }} /><AboutApp /></div>
     </aside>
-    <div className="workspace"><header className="topbar"><div className="topbar-left"><Button type="text" className="mobile-menu-button" icon={<MenuOutlined />} aria-label={t("打开导航")} onClick={() => setMenuOpen(true)} /><Breadcrumb items={[{ title: t("工作空间") }, { title: t(pageLabels[page]) }]} /></div><div className="topbar-right"><LanguageSwitcher /></div></header>
+    <div className="workspace"><header className="topbar"><div className="topbar-left"><Button type="text" className="mobile-menu-button" icon={<MenuOutlined />} aria-label={t("打开导航")} onClick={() => setMenuOpen(true)} /></div><div className="topbar-right"><LanguageSwitcher /></div></header>
       <main className="main-content">
         {page === 'apps' ? <section aria-label={t("应用管理")}>
           <div className="page-heading"><div><h1>{t("应用管理")}</h1><p>{t("为常用应用选择联网方式。")}</p></div><div className="heading-actions"><Button icon={<PlusOutlined />} onClick={() => { setEditing(undefined); setEditorOpen(true) }}>{t("添加应用")}</Button><Button icon={<ScanOutlined />} loading={inventory.loading} disabled={applying} onClick={() => void inventory.scan(true)}>{t("扫描应用")}</Button></div></div>
