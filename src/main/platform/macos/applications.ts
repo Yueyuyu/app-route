@@ -51,7 +51,14 @@ let pendingProcesses: Promise<RunningProcess[]> | undefined
 export function runningMacApplications(): Promise<RunningProcess[]> {
   if (process.platform !== 'darwin') return Promise.resolve([])
   // comm 只读取程序身份，不采集进程参数、窗口标题或访问内容。
-  pendingProcesses ??= run('/bin/ps', ['-axww', '-o', 'pid=,ppid=,comm='], commandOptions).then(({ stdout }) => parseMacProcesses(stdout)).finally(() => { pendingProcesses = undefined })
+  pendingProcesses ??= run('/bin/ps', ['-axww', '-o', 'pid=,ppid=,comm='], commandOptions).then(async ({ stdout }) => {
+    // /var、/tmp 等系统别名与扫描所得 realpath 必须使用同一身份。
+    const records = await Promise.all(parseMacProcesses(stdout).map(async item => {
+      const canonical = await fs.realpath(item.path).catch(() => undefined)
+      return canonical && validProcessPath(canonical) ? { ...item, path: canonical } : undefined
+    }))
+    return records.filter((item): item is RunningProcess => Boolean(item))
+  }).finally(() => { pendingProcesses = undefined })
   return pendingProcesses
 }
 
