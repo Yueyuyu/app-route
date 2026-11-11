@@ -35,7 +35,7 @@
 | scripts/build-recovery.mjs | 将恢复入口及 YAML 依赖打包为独立 CJS |
 | src/main/desktop | 独立窗口、单实例、托盘、固定资源协议、来源校验与 Node 后台生命周期 |
 | src/preload | 仅暴露白名单业务请求及刷新事件，不暴露原始 Electron/文件/shell 能力 |
-| src/core/applicationViews.ts | 我的应用、精确路径运行匹配、收藏身份、系统工具折叠与扫描合并 |
+| src/core/applicationViews.ts | 已设置分类、精确路径运行匹配、收藏身份、系统工具折叠与扫描合并 |
 | src/main/services/inventoryPreferences.ts | 独立本机资料存储，禁止缓存模式重放 |
 | tests | 输入、接口边界、所有权、事务失败恢复与配置漂移测试 |
 
@@ -55,9 +55,9 @@ API 热重载不会将整个 YAML 写回用户文件。AppRoute 不修改订阅�
 
 ## 持久化与边界
 
-Clash Party 的全局本地 JS 覆写重新生成应用规则。目标出口在订阅更新后消失时跳过该应用，让客户端原规则接管，避免无效出口导致整份配置无法启动。组内成员的正常切换由内核执行，无需重写应用规则；失效引用、直连/拒绝选择或最近探测失败会明确显示。
+Clash Party 的全局本地 JS 覆写重新生成应用规则。目标组在订阅更新后消失时，由 missingTargetAction 明确决定 REJECT 或跳过专属规则；旧记录默认跳过，首次配置策略推荐拒绝。即时配置与覆写共用 effectiveApplications，避免无效目标导致整份配置无法启动。组内成员的正常切换由内核执行，无需重写应用规则；失效引用、直连/拒绝选择或最近探测失败会明确显示。
 
-Clash Party 2.0.4 缓存覆写登记；首次登记后需要重新打开客户端。代码不会为刷新缓存而强制结束用户程序。界面只有观察到客户端生成的所有权标记后才显示持久化已被观察到。真实客户端重启、真实订阅切换验收仍未完成；隔离配置的重新生成、目标消失和新订阅恢复已有自动测试。
+Clash Party 2.0.4 缓存覆写登记；首次登记后需要重新打开客户端。代码不会为刷新缓存而强制结束用户程序。界面只有观察到客户端生成的所有权标记与当前规则一致后才显示持久化已被观察到。本机正常重启已观察到既有规则重新生成；重启后再修改规则，需要另行观测，不能沿用旧版证据。真实订阅切换及完整矩阵尚待验收；隔离配置的重新生成、目标消失和新订阅恢复已有自动测试。
 
 新应用通过 PROCESS-PATH 精确匹配；保留对旧 PROCESS-NAME 状态的恢复兼容。组件预识别仅限名称与主程序相符的独立安装目录，限制递归深度、数量并跳过链接、安装/修复程序和修复通道。目录外子进程提示未覆盖；不把共享浏览器纳入当前应用。运行时 API 相似并不代表其他客户端的配置生命周期兼容。EngineRuntimeAdapter / ConfigurationOwnerAdapter / TrafficInterceptorAdapter 保留为未来跨引擎契约，当前具体实现不宣称已完成所有通用接口。
 
@@ -74,7 +74,7 @@ Clash Party 2.0.4 缓存覆写登记；首次登记后需要重新打开客户�
 
 生效证据按每个应用最近应用时间过滤新连接，并同时核对进程路径、命中规则及出口 chains；修改一个应用不会抹掉另一个应用的时间基准。界面列出已观测的进程，未观察到的组件不宣称已验证。自检 HTTPS 探测只代表目标站点的瞬时结果，成功后不构成无限期网络保障。
 
-桌面版已落实 renderer 沙箱、contextIsolation、禁止远程导航、权限拒绝与 IPC 主框架来源校验。正式版仍需事务崩溃点覆盖、更多安装/休眠/重启测试、备份限额与脱敏诊断导出。参见 [功能规划](ROADMAP.md) 和 [Mihomo API](https://wiki.metacubex.one/api/)。
+桌面版已落实 renderer 沙箱、contextIsolation、禁止远程导航、权限拒绝与 IPC 主框架来源校验。已增加有限备份、状态版本验证、脱敏导出和中断事务核对；正式版仍需完整崩溃点矩阵、更多实机安装/休眠/重启测试。参见 [功能规划](ROADMAP.md) 和 [Mihomo API](https://wiki.metacubex.one/api/)。
 
 ## 桌面列表与生命周期
 
@@ -83,3 +83,14 @@ Clash Party 2.0.4 缓存覆写登记；首次登记后需要重新打开客户�
 资料与收藏使用 inventory.json；运行进程仅在内存中按可执行文件完整路径关联，辅助路径使用已识别的精确集合。不记录窗口标题或使用时长。启动/焦点返回触发扫描，60 秒节流，窗口可见时每 5 分钟补查；手动扫描绕过缓存，并发扫描共用同一任务。普通已安装条目以最新扫描为准，手动及运行中发现的便携条目保留；扫描不写入分流状态，收藏以路径为键，重新识别 ID 不丢失收藏。
 
 统一跟随组通过 `integration.proxy-group` 执行 `setProxyGroup`：读取后台已有代理应用，统一迁移目标并保存 `RoutingState.proxyGroup`，复用完整自动事务，失败回退包含默认组。单纯切换组内节点不改变 AppRoute 状态或规则。状态中的 `outlets` 是配置当前选择，`evidence` 是带应用身份和命中规则的连接观测；旧连接与当前选择不一致时不能误报新节点已经验证。详见 [代理组跟随](PROXY-GROUPS.md)。
+
+## 成熟度补强模块
+
+- `storage/routingStateStore.ts`：兼容无版本号的旧状态，拒绝未知版本；写前备份，限制已完成数据的保留数。
+- `services/managementRepair.ts`：只解析自有脚本中的 JSON，核对生成规则及内核完整签名；使用指纹与同一锁防止预览后漂移，只恢复管理记录。
+- `services/operationTimings.ts`：最多 40 条阶段耗时，不记录应用身份或错误原文；详情按需展开。
+- `services/diagnosticExport.ts`：从白名单字段重新组装报告，主进程通过保存对话框导出，renderer 不持有写文件权限。
+- `RoutingService.reconcileInterrupted`：后台启动、10 秒定时器及 Electron resume 后，核对未完成事务；只修复事务，不自动重放确认过的配置。
+- `renderer/components/ConnectionInspector.tsx`：连接概况、应用规则、恢复与诊断三个页签。修改业务语义时同步四语目录。
+
+实现依据：[Electron resume 事件](https://www.electronjs.org/docs/latest/api/power-monitor)、[electron-builder NSIS](https://www.electron.build/nsis/)。

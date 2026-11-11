@@ -4,7 +4,7 @@
 
 AppRoute is a Windows desktop companion for **Clash Party / Mihomo**. Discover apps, choose **Clash rules, Direct or Follow group**, and distinguish loaded rules from verified connections.
 
-> **0.2.0-preview.1 — integration preview.** Local desktop builds and installation are available. There is no signed installer or automatic updater yet. Real client restarts, subscription changes, sleep and the full compatibility matrix still need acceptance testing.
+> **0.2.0-preview.1 — integration preview.** Local desktop builds and installation are available. There is no signed installer or automatic updater yet. A normal local Clash Party restart regenerated the existing app rules; subscription changes, sleep and the full compatibility matrix still need acceptance testing.
 
 ## A look inside
 
@@ -14,6 +14,7 @@ Real Electron UI captures with **synthetic paths, proxy groups and connection re
 
 <details><summary>Proxy strategy, rules, icons and help</summary>
 
+![Connection overview](docs/images/en-connection.png)
 ![Proxy strategy](docs/images/en-strategy.png)
 ![Routing rules](docs/images/en-rules.png)
 ![Icon library](docs/images/en-icons.png)
@@ -24,13 +25,19 @@ Real Electron UI captures with **synthetic paths, proxy groups and connection re
 ## Features
 
 - **Click to apply:** queue successive choices, merge compatible changes and roll back failures.
-- **Find your apps:** automatic discovery, executable picker, running filter and collapsed system tools. My apps means favorites plus apps with specific routing—not usage tracking.
+- **Find your apps:** automatic discovery, executable picker, running filter and collapsed system tools. Configured shows only apps with dedicated routing. Favorites are a separate filter.
 - **Follow a group:** bind your usual Clash Party group once. New connections follow changes inside it.
 - **Choose a strategy:** keep an existing group, order failover candidates, or prefer measured low latency. Mihomo runs automatic selection.
-- **Check the result:** blue means rules loaded; green means matching new connections observed. Group selection and actual connection nodes remain distinct.
+- **Check the result:** blue means rules loaded while waiting for app traffic; green means matching new connections observed. Group selection and actual connection nodes remain distinct.
 - **Desktop and tray:** close to tray; quitting preserves confirmed rules. Independent offline recovery is included.
 - **Manage icons:** local extraction, 50 public icons, fallbacks and custom images stored locally.
 - **Four languages:** Simplified Chinese, English, Japanese and French, with a persistent top-right selector.
+
+## Recent improvements
+
+Startup and resume reconcile interrupted transactions. Missing proxy groups have an explicit block-or-original-rules policy; existing settings retain their behavior. New apps carry a seven-day badge. Connection details now separate overview, app rules and recovery, including phase timings and redacted diagnostic export. Missing records can be restored only after matching the script, generated configuration and runtime rules. Local backups are bounded. A user-level NSIS installer can be built with `npm run installer:build`; it preserves data and remains unsigned, without automatic updates.
+
+[Implementation and acceptance](docs/MATURITY-PLAN.md) (Chinese)
 
 ## Connection methods
 

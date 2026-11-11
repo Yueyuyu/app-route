@@ -4,13 +4,15 @@
 
 AppRoute est une application Windows qui accompagne **Clash Party / Mihomo**. Elle détecte vos logiciels et propose **Règles Clash, Direct ou Suivre le groupe**, en distinguant les règles chargées des connexions réellement vérifiées.
 
-> **0.2.0-preview.1 · Test d’intégration.** La compilation et l’installation locales sont disponibles. Aucun installateur signé ni mise à jour automatique pour le moment. Les redémarrages réels, changements d’abonnement, sorties de veille et la matrice complète de compatibilité restent à valider.
+> **0.2.0-preview.1 · Test d’intégration.** La compilation et l’installation locales sont disponibles. Aucun installateur signé ni mise à jour automatique pour le moment. Un redémarrage normal de Clash Party sur la machine de test a régénéré les règles existantes ; les changements d’abonnement, sorties de veille et la matrice complète de compatibilité restent à valider.
 
 ## Découvrir l’interface
 
 ![Gestion des applications](docs/images/fr-applications.png)
 
 Captures de l’interface Electron réelle avec des **chemins, groupes et connexions fictifs**. Elles ne constituent pas une preuve de routage réseau réel.
+
+![Connection overview](docs/images/fr-connection.png)
 
 <details><summary>Stratégie proxy, règles, icônes et aide</summary>
 
@@ -24,13 +26,19 @@ Captures de l’interface Electron réelle avec des **chemins, groupes et connex
 ## Fonctionnalités
 
 - **Application au clic** : mise en attente des choix successifs, regroupement des changements compatibles et retour automatique en cas d’échec.
-- **Découverte des logiciels** : analyse automatique, choix d’un exe, filtre des processus actifs et outils système repliés. Mes applications réunit favoris et routages spécifiques, sans mesurer l’utilisation.
+- **Découverte des logiciels** : analyse automatique, choix d’un exe, filtre des processus actifs et outils système repliés. Configurées contient uniquement les routages dédiés ; les favoris constituent un filtre séparé.
 - **Suivi d’un groupe** : associez votre groupe habituel une fois ; les nouvelles connexions suivent ses changements.
 - **Trois stratégies** : groupe existant, secours par priorité ou choix selon la latence mesurée. Mihomo exécute la sélection automatique.
-- **Résultat vérifiable** : bleu pour les règles chargées, vert pour les nouvelles connexions conformes observées. Sélection du groupe et nœuds réellement utilisés restent distincts.
+- **Résultat vérifiable** : bleu pour les règles chargées en attente de trafic, vert pour les nouvelles connexions conformes observées. Sélection du groupe et nœuds réellement utilisés restent distincts.
 - **Bureau et zone de notification** : fermer réduit l’application ; quitter conserve les règles confirmées. Restauration hors ligne indépendante incluse.
 - **Gestion des icônes** : extraction locale, 50 icônes publiques, images par défaut et personnalisées, conservées localement.
 - **Quatre langues** : chinois simplifié, anglais, japonais et français, avec sélection persistante en haut à droite.
+
+## Améliorations récentes
+
+Le démarrage et la sortie de veille vérifient les transactions interrompues. La disparition d’un groupe propose explicitement le blocage ou les règles initiales, sans changer le comportement existant. Les nouvelles applications sont signalées pendant sept jours. Les détails séparent aperçu, règles et récupération, avec durées et diagnostic anonymisé. La restauration des enregistrements exige la concordance du script, de la configuration générée et des règles actives. Les sauvegardes locales sont limitées. `npm run installer:build` génère un installateur NSIS par utilisateur qui conserve les données. Il reste non signé, sans mise à jour automatique.
+
+[Implementation and acceptance](docs/MATURITY-PLAN.md) (Chinese)
 
 ## Méthodes de connexion
 

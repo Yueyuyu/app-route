@@ -22,9 +22,15 @@ npm run desktop:install
 
 恢复网络会停用全部 AppRoute 专属分流，保留 Clash Party 原规则和收藏。桌面程序无法打开时，可使用原来的 AppRoute - Restore Network 独立快捷方式。
 
+### 双击图标弹出属性
+
+“快捷方式属性”与程序启动后无法联网是两类问题。若双击多个图标都弹出属性，可先按下并松开左右 Alt，再重试；Windows 的 Alt+Enter 也会打开所选项目属性，见 [Microsoft 快捷键说明](https://support.microsoft.com/en-us/accessibility/windows/keyboard-shortcuts-in-windows)。这只是输入状态的排查步骤，不代表已经确认 Alt 是原因。问题持续时核对快捷方式目标、EXE 文件关联与键盘工具，不直接重建全部快捷方式或重置系统网络。
+
+如果程序能启动但退出代理客户端后无法联网，则检查系统代理是否仍指向已退出的本机端口。AppRoute 的恢复只处理自有分流，不承诺自动关闭其他软件拥有的系统代理。
+
 ## 应用如何出现
 
-- 我的应用：已收藏或实际设置了专属分流的条目。
+- 已设置：实际设置了直接联网或跟随代理组的条目；收藏通过“只看收藏”独立筛选。
 - 正在运行：已知应用与运行进程按完整路径关联，已识别辅助进程归入主应用。权限不足的进程可能不可见。
 - 全部应用：开始菜单、安装登记、可读取商店清单和运行中的可见窗口扫描结果。
 - 自动检查：启动和回到窗口时检查，间隔至少 60 秒；窗口可见时每 5 分钟补查。运行状态每 15 秒刷新。
@@ -41,3 +47,11 @@ npm run desktop:install
 分流继续读取原 `%LOCALAPPDATA%\AppRoute\state.json`，图标和恢复目录也复用。收藏及资料为 inventory.json，桌面窗口缓存为 desktop 子目录。开发预览的浏览器资料不自动读取；桌面重新扫描、恢复已管理应用，旧浏览器缓存保留。资料文件损坏时不覆盖原文件，不重放缓存里的联网选项。
 
 当前不统计常用程度，不采集窗口标题、使用时长或访问内容。
+
+## 安装器与升级
+
+`npm run installer:build` 生成 `release/installer/AppRoute-<version>-setup-x64.exe` 和 SHA-256 文件。它是未签名预览版：用户级安装、不请求管理员权限，不自动启动应用。安装位置保持 `%LOCALAPPDATA%\Programs\AppRoute`，避免与旧目录安装并存。升级前从托盘退出 AppRoute，再运行安装器；数据、收藏、语言和离线恢复保存在独立的 `%LOCALAPPDATA%\AppRoute`，卸载也不自动清理该目录。卸载前若希望撤销分流，先使用恢复网络。
+
+开发验收可运行 `pwsh -File scripts/verify-install-upgrade.ps1 -InstallerPath release/installer/AppRoute-<version>-setup-x64.exe`。这是实际本机安装操作，要求 AppRoute 已退出；同时核对旧数据及代理配置哈希、新程序文件与本次构建的一致性。升级失败保留数据，使用上一版完整桌面包恢复程序；目前没有自动更新或二进制自动回滚。
+
+在连接详情的“恢复与诊断”可查看最近阶段耗时和导出脱敏 JSON；导出只包含状态、数量、阶段及耗时，不包含用户数据。状态备份保留最近 20 份；已结束事务保留最近 20 个，未完成、恢复中或未知记录不自动删除。文件备份不是可以直接重放的网络配置。
