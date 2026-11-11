@@ -46,15 +46,26 @@ export function ApplicationTable({ applications, selected, setSelected, changeMo
       <Button onClick={clearFilters}>查看全部应用</Button>
     </Empty> }}
     columns={[
-      { title: '应用', key: 'name', render: (_, app) => <div><div className="application-identity"><Button type="text" size="small" className={favorites.includes(applicationKey(app)) ? 'favorite-button is-favorite' : 'favorite-button'} aria-label={`${favorites.includes(applicationKey(app)) ? '取消收藏' : '收藏'} ${app.name}`} aria-pressed={favorites.includes(applicationKey(app))} icon={favorites.includes(applicationKey(app)) ? <StarFilled /> : <StarOutlined />} onClick={() => toggleFavorite(app)} /><button className="application-name" onClick={() => details(app)} aria-label={`查看 ${app.name} 详情`}>
+      { title: '应用', key: 'name', render: (_, app) => <div><button className="application-name" onClick={() => details(app)} aria-label={`查看 ${app.name} 详情`}>
         <ApplicationIcon name={app.name} icon={app.icon} application={app} />
         <span className="application-label"><strong>{app.name}</strong><span className="process-label">{app.processes[0]}{app.processes.length > 1 && ` +${app.processes.length - 1}`}</span></span>
-      </button></div><div className="compact-row-status">{feedback(app)}</div><div className="mobile-route">{selector(app)}</div></div> },
+      </button><div className="compact-row-status">{feedback(app)}</div><div className="mobile-route">{selector(app)}</div></div> },
       { title: '状态', key: 'status', width: 174, responsive: ['xl'], render: (_, app) => feedback(app) },
       { title: <span>联网方式 <HelpTip title="点击即应用"><p>选择后自动应用，可连续操作。等待中的选项尚未生效，失败会恢复上一版。</p><p>按 Clash 规则：沿用原有规则。直接联网：不经远端节点。跟随代理组：由顶部策略选择出口。</p></HelpTip></span>, key: 'mode', width: 322, responsive: ['md'], render: (_, app) => selector(app) },
       { title: '', key: 'actions', width: 52, render: (_, app) => <Dropdown trigger={['click']} menu={{
-        items: [{ key: 'details', icon: <InfoCircleOutlined />, label: '应用详情' }, { key: 'retry', label: '重新识别并应用', disabled: disabled || app.mode === 'rule' || Boolean(pendingRoutes[app.id]) }, { type: 'divider' }, { key: 'delete', icon: <DeleteOutlined />, label: '从列表移除', danger: true, disabled: app.mode !== 'rule' || disabled || Boolean(pendingRoutes[app.id]) }],
-        onClick: ({ key }) => key === 'details' ? details(app) : key === 'retry' ? changeMode([app.id], app.mode) : remove(app),
+        items: [
+          { key: 'details', icon: <InfoCircleOutlined />, label: '应用详情' },
+          { key: 'favorite', icon: favorites.includes(applicationKey(app)) ? <StarFilled /> : <StarOutlined />, label: favorites.includes(applicationKey(app)) ? '取消收藏' : '加入收藏' },
+          { key: 'retry', label: '重新识别并应用', disabled: disabled || app.mode === 'rule' || Boolean(pendingRoutes[app.id]) },
+          { type: 'divider' },
+          { key: 'delete', icon: <DeleteOutlined />, label: '从列表移除', danger: true, disabled: app.mode !== 'rule' || disabled || Boolean(pendingRoutes[app.id]) },
+        ],
+        onClick: ({ key }) => {
+          if (key === 'details') details(app)
+          else if (key === 'favorite') toggleFavorite(app)
+          else if (key === 'retry') changeMode([app.id], app.mode)
+          else if (key === 'delete') remove(app)
+        },
       }}><Tooltip title="更多操作"><Button type="text" aria-label={`${app.name} 更多操作`} icon={<MoreOutlined rotate={90} />} /></Tooltip></Dropdown> },
     ]}
   />

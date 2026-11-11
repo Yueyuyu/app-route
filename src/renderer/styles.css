@@ -91,7 +91,6 @@ p { line-height: 1.75; }
 .application-table .ant-table-cell, .rules-table .ant-table-cell { padding: 15px 12px; line-height: 1.45; }
 .application-table .ant-table-thead th, .rules-table .ant-table-thead th { font-size: 12px; font-weight: 550; height: 44px; padding-block: 12px; }
 .application-table .ant-table-row:last-child td { border-bottom: none; }
-.application-identity { display: flex; gap: 8px; align-items: center; }
 .application-name { display: flex; align-items: center; gap: 11px; border: 0; text-align: left; background: transparent; cursor: pointer; padding: 0; color: #283142; min-width: 0; }
 .application-label { min-width: 0; }
 .application-label strong { display: block; font-size: 14px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 360px; }
@@ -99,12 +98,10 @@ p { line-height: 1.75; }
 .application-icon { width: 34px; height: 34px; display: inline-flex; justify-content: center; align-items: center; flex: 0 0 34px; }
 .application-icon img { width: 32px; height: 32px; object-fit: contain; }
 .application-icon-fallback { width: 32px; height: 32px; display: grid; place-items: center; color: #7185ac; background: #edf2fa; border-radius: 8px; font-size: 20px; }
-.favorite-button.ant-btn { color: #99a5b7; flex-shrink: 0; }
-.favorite-button.is-favorite.ant-btn { color: #d39425; }
 .routing-status-button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: transparent; cursor: pointer; color: #8c9aaf; text-align: left; }
 .routing-status-button .ant-tag { margin: 0; font-size: 11px; padding-inline: 6px; white-space: normal; }
 .routing-status-button > .anticon { font-size: 12px; flex-shrink: 0; }
-.compact-row-status { display: none; margin: 7px 0 0 34px; }
+.compact-row-status { display: none; margin-top: 7px; }
 .route-selector.ant-segmented { padding: 3px; width: 298px; min-width: 298px; border: 1px solid #e4e9f1; border-radius: 7px; font-size: 12px; background: #f6f8fb; }
 .route-selector .ant-segmented-group { width: 100%; display: flex; }
 .route-selector .ant-segmented-item { flex: 1; text-align: center; color: #6d7b91; }
@@ -256,7 +253,6 @@ p { line-height: 1.75; }
   .routing-summary { align-items: flex-start; flex-direction: column; gap: 14px; }
   .route-selector.ant-segmented { width: 280px; min-width: 280px; font-size: 11px; }
   .application-table .ant-table-cell { padding-inline: 8px; }
-  .application-identity { gap: 5px; }
   .application-name { gap: 8px; }
   .application-label strong { max-width: 180px; font-size: 13px; }
   .process-label { max-width: 180px; }
