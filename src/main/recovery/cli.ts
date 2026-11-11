@@ -1,20 +1,12 @@
-import path from 'node:path'
 import { RoutingService } from '../services/routingService.ts'
-import { atomicWrite } from '../storage/localState.ts'
+import { watchTransaction } from './watchTransaction.ts'
 
 async function main() {
   const service = new RoutingService()
   const command = process.argv[2]
   if (command === 'watch') {
-    const id = process.argv[3]
-    await service.transaction(id)
-    await atomicWrite(path.join(service.root, 'transactions', `${id}.ready`), JSON.stringify({ pid: process.pid }))
-    while (true) {
-      const tx = await service.transaction(id)
-      if (!['prepared', 'pending'].includes(tx.phase)) return
-      if (Date.now() >= tx.deadline) { await service.rollback(id); return }
-      await new Promise(resolve => setTimeout(resolve, Math.min(1000, tx.deadline - Date.now())))
-    }
+    await watchTransaction(service, process.argv[3])
+    return
   }
   if (command === 'doctor') { console.log(JSON.stringify(await service.diagnose(), null, 2)); return }
   if (command === 'recover') {
