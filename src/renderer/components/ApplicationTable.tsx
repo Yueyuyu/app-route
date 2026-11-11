@@ -30,8 +30,8 @@ interface Props {
 }
 
 export function ApplicationTable({ applications, selected, setSelected, changeMode, edit, remove, clearFilters, status, busyIds, pendingRoutes, failures, loading, favorites, toggleFavorite, emptyDescription, groupBusy }: Props) {
-  const disabled = groupBusy || !status?.connected || (Boolean(status?.pending) && !busyIds.length)
-  const selector = (app: Application) => <RouteSelector disabled={disabled} legacyProxy={app.mode === 'proxy' && managedFor(app, status?.managed)?.target !== status?.proxyGroup} pending={Boolean(pendingRoutes[app.id])} label={`${app.name} 的连接方式`} value={pendingRoutes[app.id]?.mode ?? app.mode} onChange={(mode) => changeMode([app.id], mode)} />
+  const disabled = groupBusy || !status?.connected || Boolean(status.untrackedRuleCount) || (Boolean(status?.pending) && !busyIds.length)
+  const selector = (app: Application) => status?.untrackedRuleCount ? <span>待核对历史规则</span> : <RouteSelector disabled={disabled} legacyProxy={app.mode === 'proxy' && managedFor(app, status?.managed)?.target !== status?.proxyGroup} pending={Boolean(pendingRoutes[app.id])} label={`${app.name} 的连接方式`} value={pendingRoutes[app.id]?.mode ?? app.mode} onChange={(mode) => changeMode([app.id], mode)} />
   function feedback(app: Application) {
     const pending = pendingRoutes[app.id]
     if (pending) return <div className="application-routing-status" aria-live="polite"><Tag color="processing">{pending.phase === 'queued' ? '等待应用' : '正在应用与检查…'}</Tag><small>待应用选项尚未确认生效，可以继续选择；检查失败会自动恢复。</small></div>

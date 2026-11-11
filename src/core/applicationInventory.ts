@@ -20,6 +20,7 @@ export function inventoryWithRouting(inventory: Application[], status?: Integrat
 }
 export function routingPresentation(app: Application, status?: IntegrationStatus): { label: string; detail: string; color: string } {
   if (!status?.connected) return { label: '尚未确认', detail: '等待连接 Clash Party，未修改联网方式。', color: 'default' }
+  if (status.untrackedRuleCount) return { label: '状态待核对', detail: '内核存在历史 AppRoute 规则，但缺少管理记录，无法确认该应用的当前分流。请查看连接详情。', color: 'warning' }
   const managed = managedFor(app, status.managed)
   if (!managed) return { label: '沿用原有规则', detail: '没有 AppRoute 专属规则。', color: 'default' }
   if (!status.rulesLoaded) return { label: '规则异常', detail: '运行规则与保存的设置不一致，请检查或恢复。', color: 'error' }

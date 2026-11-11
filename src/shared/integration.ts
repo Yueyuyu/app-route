@@ -45,6 +45,8 @@ export interface ConnectionEvidence {
   usesCurrentNode?: boolean
 }
 export interface IntegrationStatus {
+  /** 内核仍加载自有规则，但本机管理记录为空；只能提示核对，不能当成默认路由。 */
+  untrackedRuleCount?: number
   persistenceObserved?: boolean
   connected: boolean
   version?: string

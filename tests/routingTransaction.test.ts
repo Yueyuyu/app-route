@@ -64,6 +64,26 @@ test('直连试运行、确认和恢复保留原有文件与规则', async t => 
   assert.deepEqual(f.runtime.current, f.config)
   assert.equal(await fs.readFile(path.join(f.party, 'override/original.js'), 'utf8'), original)
 })
+test('管理记录缺失时识别仍在内核加载的历史规则，不能误报默认或持久化通过', async t => {
+  const f = await fixture(t)
+  const pending = await f.service.apply({ applications: [app], revision: 'initial' })
+  await f.service.confirm(pending.pending!.id)
+  const generated = structuredClone(f.runtime.current)
+  await atomicWrite(path.join(f.party, 'work/config.yaml'), YAML.stringify(generated))
+  await fs.unlink(f.service.statePath)
+  const before = structuredClone(f.runtime.current)
+  const status = await f.service.status()
+  assert.equal(status.connected, true)
+  assert.equal(status.untrackedRuleCount, 1)
+  assert.equal(status.rulesLoaded, false)
+  assert.equal(status.persistenceObserved, false)
+  assert.match(status.warning!, /管理记录为空/)
+  assert.equal(routingPresentation(app, status).label, '状态待核对')
+  assert.deepEqual(f.runtime.current, before)
+  // 内核恢复后即使磁盘生成文件还留有旧标记，也不能继续误报历史规则正在运行。
+  f.runtime.current = structuredClone(f.config)
+  assert.equal((await f.service.status()).untrackedRuleCount, 0)
+})
 test('重载失败自动回退，不把失败配置当作已应用', async t => {
   const f = await fixture(t); f.runtime.failNextReload = true
   await assert.rejects(f.service.apply({ applications: [app], revision: 'initial' }), /模拟重载失败/)

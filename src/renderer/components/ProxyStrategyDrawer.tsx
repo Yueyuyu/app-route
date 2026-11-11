@@ -23,7 +23,7 @@ export function ProxyStrategyDrawer({ status, busy, apply }: Props) {
   const available = status?.strategyNodes ?? []
   const candidates = available.filter(node => node.name.toLowerCase().includes(search.toLowerCase()))
   const missing = nodes.filter(name => !available.some(node => node.name === name))
-  const disabled = saving || busy || !status?.connected || Boolean(status.pending)
+  const disabled = saving || busy || !status?.connected || Boolean(status.pending) || Boolean(status.untrackedRuleCount)
   function edit() {
     const strategy = status?.proxyStrategy
     setMode(strategy?.mode ?? 'existing'); setGroup(strategy?.mode === 'existing' ? strategy.group : !strategy ? status?.proxyGroup : undefined)
@@ -48,6 +48,7 @@ export function ProxyStrategyDrawer({ status, busy, apply }: Props) {
     <Drawer title="代理策略" open={open} onClose={() => !saving && setOpen(false)} closable={!saving} maskClosable={!saving} keyboard={!saving} size={640}
       footer={<div className="strategy-footer"><span>应用到所有已设为走代理的应用</span><Space><Button disabled={saving} onClick={() => setOpen(false)}>取消</Button><Button type="primary" loading={saving} disabled={disabled || (mode === 'existing' ? !groups.some(item => item.name === group) : nodes.length < 2 || nodes.length > 32 || missing.length > 0)} onClick={() => void save()}>应用策略</Button></Space></div>}>
       <p className="strategy-intro">为所有“跟随代理组”的应用选择出口。</p>
+      {Boolean(status?.untrackedRuleCount) && <Alert type="warning" showIcon title="请先核对历史规则，当前可查看选项但不能应用策略。" />}
       <Radio.Group value={mode} onChange={event => setMode(event.target.value)} disabled={saving} className="strategy-options">
         {(['existing', 'fallback', 'url-test'] as const).map(value => <Radio value={value} key={value}><strong>{strategyLabels[value]}</strong><small>{value === 'existing' ? '使用 Clash Party 已有组，继续跟随它的选择。' : value === 'fallback' ? '按优先顺序使用可用节点，当前节点故障时使用备用。' : '根据探测延迟选择节点，差距较小时保持当前节点。'}</small></Radio>)}
       </Radio.Group>

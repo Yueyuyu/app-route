@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import YAML from 'yaml'
 import type { ApplyRequest, AutomaticApplyResult, DiagnosticCheck, IntegrationStatus, ManagedApplication } from '../../shared/integration.ts'
 import type { Application } from '../../shared/application.ts'
-import { addManagedRules, assertNoProcessOverlap, configuredProxySelections, isProxyOnly, managedApplications, managedProcessMatches, markerKey, overrideScript, removeManagedRules, ruleStrings, scriptHeader } from '../../core/managedRouting.ts'
+import { addManagedRules, assertNoProcessOverlap, configuredProxySelections, isProxyOnly, managedApplications, managedProcessMatches, markerKey, ownerId, overrideScript, removeManagedRules, ruleStrings, scriptHeader } from '../../core/managedRouting.ts'
 import { ClashPartyConfiguration, findInstalledCore, validateWithCore } from '../adapters/clashPartyConfiguration.ts'
 import { discoverPipe, MihomoRuntime } from '../adapters/mihomoRuntime.ts'
 import { configRuleSignature, runtimeRuleSignature } from '../adapters/runtimeRules.ts'
@@ -115,7 +115,9 @@ export class RoutingService {
       const runtime = await this.runtime()
       const [version, config, proxies, connections, rulesLoaded] = await Promise.all([runtime.version(), runtime.config(), runtime.proxies(), runtime.connections(), this.matches(runtime, state.managed, state.proxyStrategy)])
       const snapshot = await this.party.snapshot()
-      const persistenceObserved = Boolean(snapshot.config[markerKey])
+      const marker = snapshot.config[markerKey]
+      const untrackedRuleCount = await this.countUntrackedRules(runtime, state, snapshot.config)
+      const persistenceObserved = state.managed.length > 0 && marker?.owner === ownerId && JSON.stringify(marker.rules) === JSON.stringify(ruleStrings(state.managed))
       const declared = new Set([...(snapshot.config.proxies ?? []), ...(snapshot.config['proxy-groups'] ?? [])].map(p => p.name))
       if (state.proxyStrategy && state.proxyStrategy.mode !== 'existing') declared.add(strategyOwnership.name)
       const strategyNodes = (snapshot.config.proxies ?? []).filter((p: any) => typeof p.name === 'string' && !/[,\r\n\x00-\x1f]/.test(p.name) && !proxies.proxies[p.name]?.all && resolveProxyOutlet(p.name, proxies.proxies).kind === 'proxy')
@@ -152,13 +154,20 @@ export class RoutingService {
         if (!app || managedProcessMatches(app, connection.metadata)) return []
         return [{ applicationId: app.id, process: path.win32.basename(connection.metadata.processPath) }]
       }).filter((item, index, items) => items.findIndex(other => other.applicationId === item.applicationId && other.process === item.process) === index)
-      return { ...base, connected: true, version: version.version, mode: config.mode, tun: config.tun?.enable ?? false, processMode: config['find-process-mode'], choices, rulesLoaded: rulesLoaded && config.mode === 'rule', evidence,
+      return { ...base, connected: true, version: version.version, mode: config.mode, tun: config.tun?.enable ?? false, processMode: config['find-process-mode'], choices, rulesLoaded: rulesLoaded && config.mode === 'rule' && !untrackedRuleCount, evidence, untrackedRuleCount,
         uncoveredProcesses, groupChoices, outlets, strategyNodes, strategyLoaded, strategyWarning,
         // 只有唯一组时才推荐；多个独立选择不能猜成同一个“当前代理”。已保存组失效时也不静默换组。
         suggestedTarget: state.proxyGroup ?? (groupChoices.length === 1 ? groupChoices[0].name : undefined),
         persistenceObserved,
-        warning: config.mode !== 'rule' ? '当前内核不是规则模式，应用规则不会按预期执行。' : changedTarget ? '代理组或成员不存在，跟随尚未确认。订阅重新生成时会跳过失效目标、沿用原有规则；请重新绑定有效组。' : !rulesLoaded ? '规则与运行内核不一致，请检查覆写启用状态或恢复后重新应用。' : state.managed.length && !persistenceObserved ? '当前规则已加载，持久化尚未验证。首次登记后请正常退出并重新打开 Clash Party，再检查规则是否仍已加载。' : config.tun?.enable ? undefined : '当前使用系统代理；不遵循系统代理的软件可能不会进入 Clash，需以实际连接检查为准。' }
+        warning: config.mode !== 'rule' ? '当前内核不是规则模式，应用规则不会按预期执行。' : untrackedRuleCount ? `检测到 ${untrackedRuleCount} 条历史 AppRoute 规则仍在运行，但本机管理记录为空。当前分流无法从列表确认；请核对记录，或使用恢复网络停用历史规则后重新设置。` : changedTarget ? '代理组或成员不存在，跟随尚未确认。订阅重新生成时会跳过失效目标、沿用原有规则；请重新绑定有效组。' : !rulesLoaded ? '规则与运行内核不一致，请检查覆写启用状态或恢复后重新应用。' : state.managed.length && !persistenceObserved ? '当前规则已加载，持久化尚未验证。首次登记后请正常退出并重新打开 Clash Party，再检查规则是否仍已加载。' : config.tun?.enable ? undefined : '当前使用系统代理；不遵循系统代理的软件可能不会进入 Clash，需以实际连接检查为准。' }
     } catch (e) { return { ...base, warning: (e as Error).message } }
+  }
+  async countUntrackedRules(runtime: MihomoRuntime, state: RoutingState, config: Record<string, any>): Promise<number> {
+    const marker = config[markerKey]
+    if (state.managed.length || marker?.owner !== ownerId || !Array.isArray(marker.rules) || !marker.rules.length) return 0
+    // 正常恢复后磁盘生成文件可能尚未更新，必须核对内核前缀，避免把旧磁盘标记当成仍在生效。
+    const actual = (await runtime.rules()).rules.slice(0, marker.rules.length)
+    return runtimeRuleSignature(actual) === configRuleSignature(marker.rules) ? marker.rules.length : 0
   }
   async diagnose(): Promise<DiagnosticCheck[]> {
     const checks: DiagnosticCheck[] = []
@@ -167,7 +176,8 @@ export class RoutingService {
       const cfg = await runtime.config()
       checks.push({ name: 'Clash Party 控制连接', ok: true, detail: `已连接，当前模式 ${cfg.mode}` })
       const state = await this.state()
-      checks.push({ name: '应用规则与代理策略加载', ok: cfg.mode === 'rule' && await this.matches(runtime, state.managed, state.proxyStrategy), detail: '核对专属规则和已保存的代理策略' })
+      const untracked = await this.countUntrackedRules(runtime, state, (await this.party.snapshot()).config)
+      checks.push({ name: '应用规则与代理策略加载', ok: !untracked && cfg.mode === 'rule' && await this.matches(runtime, state.managed, state.proxyStrategy), detail: untracked ? `${untracked} 条历史规则仍在内核运行，但缺少对应管理记录` : '核对专属规则和已保存的代理策略' })
       const probes = await Promise.allSettled([
         runtime.delay('DIRECT', 'https://www.baidu.com/'),
         runtime.delay(state.proxyGroup ?? state.managed.find(app => app.target)?.target ?? 'GLOBAL', strategyTestUrl),
