@@ -22,22 +22,12 @@ if ((Get-AssetHash $wordmarkPath) -ne $spec.wordmarkSha256) {
 
 # 把同一箭头嵌入独立 SVG，避免 img 加载 SVG 时无法引用外部图片。
 $glyphBase64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($glyphPath))
-$inline = $spec.inline
 $inset = $spec.glyphInsetRatio * 100
 $contentPercent = 100 - $inset * 2
 $inlineSvg = @"
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
   <svg x="$inset%" y="$inset%" width="$contentPercent%" height="$contentPercent%" viewBox="0 0 256 256" overflow="visible">
-    <defs><filter id="contour" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
-      <feMorphology in="SourceAlpha" operator="dilate" radius="$($inline.outerRadius)" result="outer"/>
-      <feGaussianBlur in="outer" stdDeviation="$($inline.edgeBlur)" result="edge"/>
-      <feFlood flood-color="$($inline.rimColor)"/><feComposite in2="edge" operator="in" result="rim"/>
-      <feMorphology in="SourceAlpha" operator="dilate" radius="$($inline.innerRadius)" result="inner"/>
-      <feGaussianBlur in="inner" stdDeviation="$($inline.edgeBlur)" result="soft-inner"/>
-      <feFlood flood-color="$($inline.fillColor)"/><feComposite in2="soft-inner" operator="in" result="enamel"/>
-      <feMerge><feMergeNode in="rim"/><feMergeNode in="enamel"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter></defs>
-    <image href="data:image/png;base64,$glyphBase64" width="256" height="256" filter="url(#contour)"/>
+    <image href="data:image/png;base64,$glyphBase64" width="256" height="256"/>
   </svg>
 </svg>
 "@
@@ -106,4 +96,4 @@ try {
     $graphics.Dispose()
     $bitmap.Dispose()
 }
-Write-Output '已导出应用内随形 SVG 和桌面深灰蓝 1024px 主图；艺术字未修改。'
+Write-Output '已导出应用内透明箭头 SVG 和桌面深灰蓝 1024px 主图；艺术字未修改。'
