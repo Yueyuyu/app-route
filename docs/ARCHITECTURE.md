@@ -12,11 +12,14 @@
 | public/icons/apps、public/icons/fallbacks、public/icons/licenses | 生成的公共应用图标、项目默认图标、素材许可全文 |
 | src/core/applicationIcons.ts | 精确公共匹配、本机显示关联和默认图标选择，不修改分流身份 |
 | src/main/services/applicationIconService.ts | PNG 校验、图标索引、缓存、用户替换与恢复自动选择 |
-| src/renderer/components/IconManagement.tsx | 设置下的图标管理页面、搜索筛选、替换和公共库浏览 |
+| src/renderer/components/IconManagement.tsx | 平级图标管理页面、搜索筛选、替换和公共库浏览 |
 | src/core/proxyGroups.ts | 解析嵌套组当前选择、失效引用与最近探测；显示口径不依赖 UI |
+| src/core/proxyStrategy.ts | 策略输入校验、专用组所有权和编译；同一纯函数生成本机配置与持久化覆写 |
+| src/renderer/components/ProxyStrategyDrawer.tsx | 策略草稿、节点勾选、拖动/按钮排序、高级设置与应用结果 |
 | src/core/managedRouting.ts | 进程校验、受保护通道、规则所有权、纯代理出口检查、覆写生成 |
 | src/core/processFamily.ts | 主程序路径与父子进程归属校验，排除目录外共享程序 |
 | src/core/applicationInventory.ts | 旧资料迁移、实际联网状态映射、规则与连接证据呈现 |
+| src/core/routingQueue.ts | 立即显示待应用选择、合并短时间内的修改、按应用保留最终意图、串行事务与异常停队 |
 | src/main/platform/windows/processFamily.ts | 固定只读进程查询、独立安装目录组件预识别，重建可信进程路径 |
 | src/main/platform/windows | 开始菜单、注册表和可见进程的固定只读扫描 |
 | src/main/adapters/mihomoRuntime.ts | 发现唯一 Clash Party 命名管道，调用内核 API |
@@ -39,8 +42,9 @@
 
 `apply-automatic` 组合已有 apply/confirm/rollback 事务。前端传入的辅助路径不受信任，必须由系统查询重建；旧手动试运行接口保留给兼容和恢复测试。自动测速/故障转移组的即时节点允许正常变化，手动 Selector 和 fixed 选择必须保持。页面每 5 秒查询状态；发现新辅助进程时同样通过自动事务补充，失败保留提示并支持手动重试。
 
+界面队列约 180 毫秒合并一次兼容修改，同一应用尚未发送的选择以后一次为准；不同代理出口分别提交。已经开始的事务必须完成确认或恢复后才处理下一批，失败且恢复未确认时清空等待队列并明确报错。等待状态独立于实际模式、导出记录和连接证据；不将排队直接标为成功，也不把等待队列持久化后自动重放。
 
-新辅助进程的目录检测只用于明确的应用独立目录，系统共享目录不会触发隐式的反复应用。
+进程识别与网络基线检查并行；内核配置校验与离线恢复准备并行，二者都结束后才能写配置。每次仍执行内核校验、当前文件读取、并发指纹检查和前后联网探测。相同配置文本只复用解析结果并返回副本；内核位置缓存最多 60 秒且检查文件身份；恢复工具只在代码、运行时、入口与快捷方式都未改变时复用，任一丢失或变化则重新安装验证。新辅助进程的目录检测只用于明确的应用独立目录，系统共享目录不会触发隐式的反复应用。
 
 事务默认 120 秒。页面、服务、独立恢复共享写锁；陈旧守护只能处理自己仍处于 pending/prepared 的事务。失败先恢复专属脚本，再用**当前订阅**与上一轮应用策略生成配置，不直接覆盖旧完整快照。
 
