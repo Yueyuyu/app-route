@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$InstallerPath)
+﻿param([Parameter(Mandatory=$true)][string]$InstallerPath)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $installer = (Resolve-Path -LiteralPath $InstallerPath).Path
@@ -23,7 +23,7 @@ $changed = @($hashes.Keys | Where-Object { -not (Test-Path -LiteralPath $_) -or 
 if ($changed.Count) { throw "Upgrade changed $($changed.Count) protected data files; keep backups and investigate." }
 $executable = Join-Path $env:LOCALAPPDATA 'Programs\AppRoute\AppRoute.exe'
 if (-not (Test-Path -LiteralPath $executable)) { throw 'Expected user-level installation was not found.' }
-foreach ($relative in @('resources\app\backend.mjs', 'resources\app\main.cjs', 'resources\app\preload.cjs', 'resources\app\ui\index.html')) {
+foreach ($relative in @('resources\app\backend.mjs', 'resources\app\main.cjs', 'resources\app\preload.cjs', 'resources\app\ui\index.html', 'resources\app\ui\build-info.json')) {
   $installed = Join-Path (Split-Path -Parent $executable) $relative
   $built = Join-Path (Join-Path $root 'release\AppRoute-win32-x64') $relative
   if ((Get-FileHash -LiteralPath $installed -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $built -Algorithm SHA256).Hash) { throw 'Installed payload differs from the verified build.' }
