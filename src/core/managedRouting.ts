@@ -2,7 +2,7 @@ import type { Application } from '../shared/application.ts'
 import type { ManagedApplication } from '../shared/integration.ts'
 import { validProcessName } from './applicationRules.ts'
 import { normalizeProcessPath, validProcessPath } from './processFamily.ts'
-import path from 'node:path'
+import { macApplicationBundle, processBasename } from '../shared/applicationIdentity.ts'
 import type { ProxyStrategy } from '../shared/proxyStrategy.ts'
 import { reconcileProxyStrategy, strategyOwnership, strategyTestUrl } from './proxyStrategy.ts'
 
@@ -10,6 +10,11 @@ export const ownerId = 'approute-managed-v1'
 export const markerKey = 'x-approute-managed-v1'
 export const scriptHeader = '// AppRoute managed override v1; edit through AppRoute.'
 export const protectedProcesses = new Set(['codex.exe', 'chatgpt.exe', 'node.exe', 'approute.exe', 'clash party.exe', 'mihomo.exe', 'mihomo-alpha.exe', 'mihomo-smart.exe', 'powershell.exe', 'pwsh.exe'])
+for (const name of ['codex', 'chatgpt', 'node', 'approute', 'clash party', 'mihomo', 'mihomo-alpha', 'mihomo-smart', 'sh', 'bash', 'zsh', 'pwsh']) protectedProcesses.add(name)
+export function protectedProcessPath(value: string): boolean {
+  const bundle = macApplicationBundle(value)
+  return protectedProcesses.has(processBasename(value).toLowerCase()) || Boolean(bundle && ['approute.app', 'clash party.app', 'codex.app', 'chatgpt.app'].includes(processBasename(bundle).toLowerCase()))
+}
 
 // 共享系统宿主可能代表多个功能，不能把整台电脑的宿主流量当作一个普通应用管理。
 const systemHostProcesses = new Set([
@@ -18,12 +23,15 @@ const systemHostProcesses = new Set([
   'runtimebroker.exe', 'applicationframehost.exe', 'shellexperiencehost.exe', 'startmenuexperiencehost.exe',
   'searchhost.exe', 'searchindexer.exe', 'textinputhost.exe', 'ctfmon.exe', 'systemsettings.exe',
   'services.exe', 'lsass.exe', 'wininit.exe', 'winlogon.exe', 'dwm.exe', 'smss.exe', 'csrss.exe',
+  'finder', 'dock', 'system settings', 'loginwindow', 'windowserver', 'terminal', 'osascript',
 ])
 export function assertNoSystemHostRouting(apps: Application[]) {
   for (const app of apps) {
     // 老版本记录仍可读取和撤销；检查只在新写入入口执行，不因新增限制使全部旧记录失效。
     if (app.mode === 'rule') continue
-    const names = [...app.processes, ...[app.path, ...(app.processPaths ?? [])].filter((value): value is string => typeof value === 'string').map(value => path.win32.basename(value))]
+    const paths = [app.path, ...(app.processPaths ?? [])].filter((value): value is string => typeof value === 'string')
+    if (paths.some(value => value.startsWith('/System/Library/'))) throw new Error('系统共享进程不能设置专属分流，请选择具体应用；已有设置可切回按 Clash 规则。')
+    const names = [...app.processes, ...paths.map(processBasename)]
     if (names.some(name => systemHostProcesses.has(name.trim().toLowerCase()))) throw new Error('系统共享进程不能设置专属分流，请选择具体应用；已有设置可切回按 Clash 规则。')
   }
 }
@@ -40,7 +48,8 @@ export function managedApplications(input: Application[], target?: string): Mana
     }
     ids.add(app.id)
     const processes = app.processes.map(name => {
-      if (typeof name !== 'string' || !validProcessName(name)) throw new Error('进程名无效。')
+      const mac = Boolean(macApplicationBundle(app.path ?? app.processPaths?.[0] ?? ''))
+      if (typeof name !== 'string' || !validProcessName(name, mac)) throw new Error('进程名无效。')
       const normalized = name.trim().toLowerCase()
       if (protectedProcesses.has(normalized)) throw new Error('为保留修复通道，AppRoute 不改写自身、ChatGPT/Codex、代理内核和恢复工具的分流。')
       if (!app.processPaths) {
@@ -52,7 +61,7 @@ export function managedApplications(input: Application[], target?: string): Mana
     if (app.processPaths !== undefined) {
       if (!Array.isArray(app.processPaths) || !app.processPaths.length || app.processPaths.length > 40) throw new Error('进程路径无效。')
       for (const value of app.processPaths) {
-        if (!validProcessPath(value) || !processes.some(p => p.toLowerCase() === path.win32.basename(value).toLowerCase()) || protectedProcesses.has(path.win32.basename(value).toLowerCase())) throw new Error('进程路径无效或属于受保护程序。')
+        if (!validProcessPath(value) || !processes.some(p => value.startsWith('/') ? p === processBasename(value) : p.toLowerCase() === processBasename(value).toLowerCase()) || protectedProcessPath(value)) throw new Error('进程路径无效或属于受保护程序。')
         const key = normalizeProcessPath(value)
         if (seen.has(key)) throw new Error('同一进程不能同时属于多个应用。')
         seen.add(key)

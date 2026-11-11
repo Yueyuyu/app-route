@@ -1,3 +1,4 @@
+import { processPathKey } from '../../shared/applicationIdentity.ts'
 import { t } from '../i18n'
 import { App as AntApp, Button, Collapse, Drawer, Form, Input, Select } from 'antd'
 import { useEffect } from 'react'
@@ -29,12 +30,12 @@ export function ApplicationEditor({ open, application, applications, onClose, on
       {application ? <Collapse items={[{ key: 'processes', label: t("已识别进程 · {0} 个", [application.processes.length]), children: <ul className="process-list">{application.processes.map(name => <li key={name}>{name}</li>)}</ul> }]} /> : null}
       <Form.Item hidden={Boolean(application)} label={t("主进程文件名")} name="processes" rules={[{ required: true, message: t("请至少添加一个进程") }, { validator: (_, values: string[]) => {
         if (!values?.length) return Promise.resolve()
-        if (values.some((name) => !validProcessName(name))) return Promise.reject(new Error(t("请输入有效的文件名，例如 QQMusic.exe，不要填写完整路径")))
-        const executable = form.getFieldValue('path')?.trim().toLowerCase()
-        const duplicate = applications.find((app) => app.id !== application?.id && executable && app.path?.toLowerCase() === executable)
+        if (values.some((name) => !validProcessName(name, window.appRoute?.platform === 'darwin'))) return Promise.reject(new Error(t("请输入有效的文件名，例如 QQMusic.exe，不要填写完整路径")))
+        const executable = processPathKey(form.getFieldValue('path')?.trim() ?? '')
+        const duplicate = applications.find((app) => app.id !== application?.id && executable && processPathKey(app.path ?? '') === executable)
         return duplicate ? Promise.reject(new Error(t("该主程序路径已属于「{0}」，请编辑已有应用", [duplicate.name]))) : Promise.resolve()
-      } }]}><Select disabled={Boolean(application)} mode="tags" open={false} placeholder={t("例如：QQMusic.exe")} /></Form.Item>
-      <Form.Item hidden={Boolean(application)} label={t("主程序完整路径")} name="path" rules={[{ required: true, message: t("请输入本机 exe 完整路径") }]}><Input disabled={Boolean(application)} placeholder={t("本机 exe 文件的完整路径")} /></Form.Item>
+      } }]}><Select disabled={Boolean(application)} mode="tags" open={false} placeholder={window.appRoute?.platform === 'darwin' ? 'QQMusic' : t("例如：QQMusic.exe")} /></Form.Item>
+      <Form.Item hidden={Boolean(application)} label={t("主程序完整路径")} name="path" rules={[{ required: true, message: t("主程序完整路径") }]}><Input disabled={Boolean(application)} placeholder={t("主程序完整路径")} /></Form.Item>
       {application?.path && <div className="path-detail"><span>{t("程序位置")}</span><code>{application.path}</code></div>}
       <p className="secondary-copy form-note">{t("这里只保存资料。联网方式在应用列表中选择。")}</p>
     </Form>

@@ -1,3 +1,4 @@
+import { recoveryEntryName } from '../src/main/platform/paths.ts'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
@@ -18,10 +19,10 @@ test('只复用完整且未变化的离线工具，入口丢失和源代码更�
   await installRecoveryKit(root, source, createShortcut)
   assert.equal(shortcutsCreated, 1)
   assert.equal((await fs.stat(path.join(folder, 'recovery.cjs'))).mtimeMs, before)
-  await fs.rm(path.join(folder, 'Restore-Network.cmd'))
+  await fs.rm(path.join(folder, recoveryEntryName()))
   await installRecoveryKit(root, source, createShortcut)
   assert.equal(shortcutsCreated, 2)
-  assert.match(await fs.readFile(path.join(folder, 'Restore-Network.cmd'), 'utf8'), /recovery\.cjs/)
+  assert.match(await fs.readFile(path.join(folder, recoveryEntryName()), 'utf8'), /recovery\.cjs/)
   await atomicWrite(source, '// updated recovery fixture')
   await installRecoveryKit(root, source, createShortcut)
   assert.equal(await fs.readFile(path.join(folder, 'recovery.cjs'), 'utf8'), '// updated recovery fixture')

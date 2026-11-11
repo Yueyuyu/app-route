@@ -1,4 +1,5 @@
 import path from 'node:path'
+import os from 'node:os'
 import fs from 'node:fs/promises'
 import YAML from 'yaml'
 import { execFile } from 'node:child_process'
@@ -73,6 +74,13 @@ export async function findInstalledCore(): Promise<string> {
   return coreLookup
 }
 async function discoverInstalledCore(): Promise<string> {
+  if (process.platform === 'darwin') {
+    const candidates = ['/Applications', path.join(os.homedir(), 'Applications')].map(folder => path.join(folder, 'Clash Party.app', 'Contents', 'Resources', 'sidecar', 'mihomo'))
+    const present = (await Promise.all(candidates.map(async file => await fs.stat(file).then(s => s.isFile() ? file : undefined, () => undefined)))).filter((file): file is string => Boolean(file))
+    if (present.length !== 1) throw new Error('请在 Applications 目录保留一份 Clash Party 安装，以便核对内核。')
+    await fs.access(present[0], fs.constants.X_OK)
+    return present[0]
+  }
   const command = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); $r=@('HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'); Get-ItemProperty $r -ErrorAction SilentlyContinue | Where-Object {$_.DisplayName -eq 'Clash Party'} | Select-Object -ExpandProperty DisplayIcon | ConvertTo-Json -Compress"
   const { stdout } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { windowsHide: true, timeout: 8000, encoding: 'utf8' })
   const item = JSON.parse(stdout.trim())

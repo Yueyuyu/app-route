@@ -1,5 +1,5 @@
 export type ApplicationIconSource = 'local' | 'builtin' | 'custom' | 'fallback'
-export type LocalIconMethod = 'executable' | 'shortcut' | 'registry' | 'package' | 'legacy'
+export type LocalIconMethod = 'executable' | 'shortcut' | 'registry' | 'package' | 'bundle' | 'legacy'
 
 export interface ApplicationIconView {
   key: string

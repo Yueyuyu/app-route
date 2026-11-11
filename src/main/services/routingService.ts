@@ -1,3 +1,5 @@
+import { appRouteDataDirectory, clashPartyDataDirectory, recoveryEntryName } from '../platform/paths.ts'
+import { processBasename, macApplicationBundle } from '../../shared/applicationIdentity.ts'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -10,7 +12,7 @@ import { discoverPipe, MihomoRuntime } from '../adapters/mihomoRuntime.ts'
 import { configRuleSignature, runtimeRuleSignature } from '../adapters/runtimeRules.ts'
 import { atomicWrite, digest, readOptional, withLock, writeIfUnchanged } from '../storage/localState.ts'
 import { installRecoveryKit, startGuardian } from '../recovery/recoveryKit.ts'
-import { isDedicatedApplicationDirectory, resolveProcessFamily } from '../platform/windows/processFamily.ts'
+import { isDedicatedApplicationDirectory, resolveProcessFamily } from '../platform/applications.ts'
 import { normalizeProcessPath } from '../../core/processFamily.ts'
 import { isFollowGroup, resolveProxyOutlet } from '../../core/proxyGroups.ts'
 import type { ProxyStrategy, ProxyStrategyRequest } from '../../shared/proxyStrategy.ts'
@@ -61,10 +63,10 @@ export class RoutingService {
   readonly options: ServiceOptions
   constructor(options: ServiceOptions = {}) {
     this.options = options
-    this.root = options.root ?? path.join(process.env.LOCALAPPDATA ?? '', 'AppRoute')
-    this.party = new ClashPartyConfiguration(options.partyRoot ?? path.join(process.env.APPDATA ?? '', 'mihomo-party'))
+    this.root = options.root ?? appRouteDataDirectory()
+    this.party = new ClashPartyConfiguration(options.partyRoot ?? clashPartyDataDirectory())
     this.statePath = path.join(this.root, 'state.json')
-    this.recoveryPath = path.join(this.root, 'recovery', 'Restore-Network.cmd')
+    this.recoveryPath = path.join(this.root, 'recovery', recoveryEntryName())
   }
   runtime() { return this.options.runtime ? this.options.runtime() : discoverPipe().then(pipe => new MihomoRuntime(pipe)) }
   async state(): Promise<RoutingState> {
@@ -105,7 +107,7 @@ export class RoutingService {
     return expected.every((text, i) => {
       const [type, payload, proxy] = text.split(',')
       const actual = rules[i]
-      return actual?.type.replaceAll('-', '').toLowerCase() === type.replaceAll('-', '').toLowerCase() && actual.payload.toLowerCase() === payload.toLowerCase() && actual.proxy === proxy && !actual.extra?.disabled
+      return actual?.type.replaceAll('-', '').toLowerCase() === type.replaceAll('-', '').toLowerCase() && (payload.startsWith('/') ? actual.payload === payload : actual.payload.toLowerCase() === payload.toLowerCase()) && actual.proxy === proxy && !actual.extra?.disabled
     })
   }
   async status(): Promise<IntegrationStatus> {
@@ -144,7 +146,7 @@ export class RoutingService {
         if (!app || Date.parse(connection.start) < Date.parse(app.appliedAt ?? state.appliedAt ?? new Date().toISOString())) return []
         const chains = connection.chains ?? []
         const direct = chains.some(p => p === 'DIRECT')
-        const currentRuleMatched = connection.rule.replaceAll('-', '').toLowerCase() === (app.processPaths ? 'processpath' : 'processname') && (app.processPaths ?? app.processes).some(p => p.toLowerCase() === connection.rulePayload.toLowerCase())
+        const currentRuleMatched = connection.rule.replaceAll('-', '').toLowerCase() === (app.processPaths ? 'processpath' : 'processname') && (app.processPaths ?? app.processes).some(p => (p.startsWith('/') ? p === connection.rulePayload : p.toLowerCase() === connection.rulePayload.toLowerCase()))
         const followsGroup = isFollowGroup(proxies.proxies[app.target ?? ''])
         const matched = currentRuleMatched && (app.mode === 'direct' ? direct : chains.includes(app.target ?? '') && (followsGroup || !direct))
         const node = chains[0]
@@ -155,9 +157,9 @@ export class RoutingService {
       const uncoveredProcesses = connections.connections.flatMap(connection => {
         if (!connection.metadata.processPath) return []
         // 共享目录中的其他程序不是辅助进程，不能因其建立连接而反复自动应用。
-        const app = state.managed.find(app => app.processPaths?.length && isDedicatedApplicationDirectory(app.processPaths[0]) && normalizeProcessPath(connection.metadata.processPath!).startsWith(path.win32.dirname(normalizeProcessPath(app.processPaths[0])) + '\\'))
+        const app = state.managed.find(app => app.processPaths?.length && isDedicatedApplicationDirectory(app.processPaths[0]) && normalizeProcessPath(connection.metadata.processPath!).startsWith((macApplicationBundle(app.processPaths[0]) ? macApplicationBundle(app.processPaths[0]) + '/' : path.win32.dirname(normalizeProcessPath(app.processPaths[0])) + '\\')))
         if (!app || managedProcessMatches(app, connection.metadata)) return []
-        return [{ applicationId: app.id, process: path.win32.basename(connection.metadata.processPath) }]
+        return [{ applicationId: app.id, process: processBasename(connection.metadata.processPath) }]
       }).filter((item, index, items) => items.findIndex(other => other.applicationId === item.applicationId && other.process === item.process) === index)
       return { ...base, configurationFingerprint: digest(snapshot.profileId + '\n' + snapshot.workText), connected: true, version: version.version, mode: config.mode, tun: config.tun?.enable ?? false, processMode: config['find-process-mode'], choices, rulesLoaded: rulesLoaded && config.mode === 'rule' && !untrackedRuleCount && !dataIssue, evidence, untrackedRuleCount,
         uncoveredProcesses, groupChoices, outlets, strategyNodes, strategyLoaded, strategyWarning,

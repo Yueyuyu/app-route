@@ -1,3 +1,4 @@
+import { processPathKey } from '../shared/applicationIdentity.ts'
 import type { Application } from '../shared/application.ts'
 import type { IntegrationStatus, ManagedApplication } from '../shared/integration.ts'
 
@@ -8,7 +9,7 @@ export function migrateInventory(value: unknown): Application[] {
     .map(app => ({ ...app, mode: 'rule', processPaths: undefined, processWarnings: undefined }))
 }
 export function managedFor(app: Application, managed: ManagedApplication[] = []) {
-  return managed.find(item => item.id === app.id || Boolean(app.path && item.processPaths?.some(p => p.toLowerCase() === app.path!.toLowerCase())))
+  return managed.find(item => item.id === app.id || Boolean(app.path && item.processPaths?.some(p => processPathKey(p) === processPathKey(app.path!))))
 }
 export function inventoryWithRouting(inventory: Application[], status?: IntegrationStatus): Application[] {
   const byId = new Map<string, { application: Application; priority: number }>()
@@ -16,7 +17,7 @@ export function inventoryWithRouting(inventory: Application[], status?: Integrat
     const managed = managedFor(app, status?.managed)
     const application = { ...app, mode: managed?.mode ?? 'rule', ...(managed ? { id: managed.id, processes: managed.processes, processPaths: managed.processPaths, processWarnings: managed.processWarnings } : {}) } as Application
     // 主程序及辅助程序可能各有开始菜单入口；同一分流记录只占一行，优先保留主程序资料。
-    const priority = managed ? app.id === managed.id ? 2 : app.path?.toLowerCase() === managed.processPaths?.[0]?.toLowerCase() ? 1 : 0 : 0
+    const priority = managed ? app.id === managed.id ? 2 : app.path && managed.processPaths?.[0] && processPathKey(app.path) === processPathKey(managed.processPaths[0]) ? 1 : 0 : 0
     const existing = byId.get(application.id)
     if (!existing || priority > existing.priority) byId.set(application.id, { application, priority })
   }

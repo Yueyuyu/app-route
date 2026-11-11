@@ -1,3 +1,5 @@
+import { appRouteDataDirectory, nodeExecutableName } from '../platform/paths.ts'
+import { readMacApplication } from '../platform/macos/applications.ts'
 import { resolveLocale, translate, type LanguagePreference } from '../../shared/i18n/index.ts'
 import { LanguagePreferencesStore } from './languagePreferences.ts'
 import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, protocol, session, shell, nativeImage, powerMonitor, clipboard } from 'electron'
@@ -9,11 +11,11 @@ import { desktopAssetPath, desktopOrigin, isTrustedDesktopSender, validateDeskto
 import type { DesktopAction } from '../../shared/desktop.ts'
 
 app.setName('AppRoute')
-app.setPath('userData', path.join(process.env.LOCALAPPDATA!, 'AppRoute', 'desktop'))
+app.setPath('userData', path.join(appRouteDataDirectory(), 'desktop'))
 app.setAppUserModelId('com.approute.desktop')
 protocol.registerSchemesAsPrivileged([{ scheme: 'approute', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }])
 let window: BrowserWindow | undefined, tray: Tray | undefined, worker: ChildProcess | undefined, quitting = false, sequence = 0
-const languageStore = new LanguagePreferencesStore(path.join(process.env.LOCALAPPDATA!, 'AppRoute'))
+const languageStore = new LanguagePreferencesStore(appRouteDataDirectory())
 let language: LanguagePreference = 'system'
 let systemLanguages: string[] = []
 const tr = (source: string) => translate(resolveLocale(language, systemLanguages), source)
@@ -21,10 +23,10 @@ const languageSettings = () => ({ language, systemLanguages })
 let languageWrite: Promise<unknown> = Promise.resolve()
 const pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
 const resources = app.getAppPath()
-const icon = path.join(resources, 'ui', 'favicon.ico')
+const icon = path.join(resources, 'ui', process.platform === 'darwin' ? 'brand/app-route-512.png' : 'favicon.ico')
 function startBackend() {
   if (worker?.connected) return
-  const child = fork(path.join(resources, 'backend.mjs'), [], { execPath: path.join(resources, 'runtime', 'node.exe'), execArgv: [], windowsHide: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined, NODE_OPTIONS: undefined } })
+  const child = fork(path.join(resources, 'backend.mjs'), [], { execPath: path.join(resources, 'runtime', nodeExecutableName()), execArgv: [], windowsHide: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined, NODE_OPTIONS: undefined } })
   worker = child
   child.on('message', (response: any) => { const task = pending.get(response.id); if (!task) return; clearTimeout(task.timer); pending.delete(response.id); response.error ? task.reject(new Error(response.error)) : task.resolve(response.value) })
   const failed = () => { if (worker !== child) return; worker = undefined; for (const task of pending.values()) { clearTimeout(task.timer); task.reject(new Error(tr("桌面后台已退出，已开始的分流仍有独立恢复保护。请重试。"))) } pending.clear() }
@@ -45,7 +47,7 @@ function updateNativeLanguage() {
       { label: tr("打开 AppRoute"), click: showWindow },
       { label: tr("检查新应用"), click: () => { showWindow(); window!.webContents.send('approute:refresh') } },
       { type: 'separator' }, { label: tr("恢复网络…"), click: () => void restoreFromTray() },
-      { label: tr("打开独立恢复工具目录"), click: () => void shell.openPath(path.join(process.env.LOCALAPPDATA!, 'AppRoute', 'recovery')) },
+      { label: tr("打开独立恢复工具目录"), click: () => void shell.openPath(path.join(appRouteDataDirectory(), 'recovery')) },
       { type: 'separator' }, { label: tr("退出 AppRoute（保留分流规则）"), click: () => app.quit() },
     ]))
     Menu.setApplicationMenu(Menu.buildFromTemplate([{ label: 'AppRoute', submenu: [
@@ -135,9 +137,10 @@ else {
         return { saved: true }
       }
       if (action === 'application.choose') {
-        const result = await dialog.showOpenDialog(window!, { title: tr("选择应用主程序"), filters: [{ name: tr("Windows 应用"), extensions: ['exe'] }], properties: ['openFile'] })
+        const result = await dialog.showOpenDialog(window!, { title: tr("选择应用主程序"), filters: [{ name: process.platform === 'darwin' ? 'macOS' : tr("Windows 应用"), extensions: [process.platform === 'darwin' ? 'app' : 'exe'] }], properties: ['openFile'] })
         if (result.canceled) return null
         const file = result.filePaths[0]
+        if (process.platform === 'darwin') { const app = await readMacApplication(file); return { path: app.path, name: app.name, processes: app.processes } }
         if (!/^[a-z]:\\.+\.exe$/i.test(file) || !(await fs.stat(file)).isFile()) throw new Error(tr("请选择本机 exe 程序。"))
         return { path: file, name: path.basename(file, '.exe'), processes: [path.basename(file)] }
       }
@@ -146,7 +149,7 @@ else {
     })
     startBackend(); createWindow()
     powerMonitor.on('resume', () => { window?.webContents.send('approute:resume'); void request('integration.reconcile').catch(() => {}).finally(() => window?.webContents.send('approute:refresh')) })
-    tray = new Tray(nativeImage.createFromPath(icon))
+    tray = new Tray(process.platform === 'darwin' ? nativeImage.createFromPath(icon).resize({ width: 18, height: 18 }) : nativeImage.createFromPath(icon))
     tray.on('double-click', showWindow)
     updateNativeLanguage()
   }).catch(() => { dialog.showErrorBox(tr("AppRoute 启动失败"), tr("请保留现有数据并重新打开应用。网络异常时可使用独立恢复入口。")); app.quit() })

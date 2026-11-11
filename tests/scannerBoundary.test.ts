@@ -45,7 +45,7 @@ test('授权的本机请求返回扫描结果且禁止缓存', async (t) => {
   assert.deepEqual(JSON.parse(result.body).applications, [])
 })
 
-test('非 Windows 环境明确返回不支持，不执行扫描', async (t) => {
+test('尚未适配的 Linux 环境明确返回不支持，不执行扫描', async (t) => {
   let scans = 0
   const call = await start(t, async () => { scans++; return { applications: [], scannedAt: '' } }, 'linux')
   assert.equal((await call(localHeaders)).status, 501)

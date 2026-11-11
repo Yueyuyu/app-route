@@ -44,7 +44,7 @@ function runningProcesses(): Promise<RunningProcess[]> {
 
 export async function resolveProcessFamily(app: Application, previousPaths: string[] = []): Promise<Application> {
   if (process.platform !== 'win32') throw new Error('自动识别进程目前仅支持 Windows。')
-  if (!validProcessPath(app.path) || !await fs.stat(app.path).then(s => s.isFile(), () => false)) throw new Error('主程序不存在或路径不可读取，请重新扫描。')
+  if (!app.path || !/^[a-z]:\\/i.test(app.path) || !validProcessPath(app.path) || !await fs.stat(app.path).then(s => s.isFile(), () => false)) throw new Error('主程序不存在或路径不可读取，请重新扫描。')
   const [running, bundled] = await Promise.all([runningProcesses(), bundledExecutables(app.path)])
   const result = identifyProcessFamily(app, running, [...previousPaths, ...bundled])
   if (bundled.length) result.processWarnings = ['已按独立安装目录预识别组件，并结合运行中的父子关系核对；只写入各 exe 的精确路径。', ...(result.processWarnings ?? [])]

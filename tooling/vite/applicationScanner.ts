@@ -1,6 +1,6 @@
 import type { Connect, Plugin } from 'vite'
-import { runningApplications } from '../../src/main/platform/windows/runningApplications.ts'
-import { scanApplications } from '../../src/main/platform/windows/scanApplications.ts'
+import { runningApplications } from '../../src/main/platform/applications.ts'
+import { scanApplications } from '../../src/main/platform/applications.ts'
 
 export const previewPort = 4318
 
@@ -18,9 +18,9 @@ export function createScanMiddleware(scan = scanApplications, platform = process
       response.end(JSON.stringify({ error: '只允许本机界面发起扫描。' }))
       return
     }
-    if (platform !== 'win32') {
+    if (!['win32', 'darwin'].includes(platform)) {
       response.statusCode = 501
-      response.end(JSON.stringify({ error: '扫描应用需要在 Windows 本机运行，可先使用手动添加。' }))
+      response.end(JSON.stringify({ error: '扫描应用需要在 Windows 或 macOS 本机运行。' }))
       return
     }
     try {

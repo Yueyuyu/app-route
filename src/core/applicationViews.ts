@@ -1,11 +1,12 @@
 import type { Application } from '../shared/application.ts'
 import type { RunningApplicationProcess } from '../shared/desktop.ts'
+import { processPathKey } from '../shared/applicationIdentity.ts'
 
 export type ApplicationView = 'configured' | 'running' | 'all'
-export const applicationKey = (app: Application) => (app.path || app.id).replaceAll('/', '\\').toLowerCase()
+export const applicationKey = (app: Application) => processPathKey(app.path || app.id)
 export function isRunningApplication(app: Application, running: RunningApplicationProcess[]): boolean {
-  const paths = new Set([app.path, ...(app.processPaths ?? [])].filter(Boolean).map(p => p!.replaceAll('/', '\\').toLowerCase()))
-  return running.some(process => paths.has(process.path.replaceAll('/', '\\').toLowerCase()))
+  const paths = new Set([app.path, ...(app.processPaths ?? [])].filter(Boolean).map(p => processPathKey(p!)))
+  return running.some(process => paths.has(processPathKey(process.path)))
 }
 /** 仅影响折叠展示；未知软件保持展开，不用发布者或名字推断联网策略。 */
 export function isSystemTool(app: Application): boolean {

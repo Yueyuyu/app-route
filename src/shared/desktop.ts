@@ -7,6 +7,7 @@ export type DesktopAction = typeof desktopActions[number]
 export interface InventoryPreferences { version: 1; applications: Application[]; favorites: string[] }
 export interface RunningApplicationProcess { path: string; pid: number; parentPid: number }
 export interface DesktopBridge {
+  platform?: string
   request<T>(action: DesktopAction, body?: unknown): Promise<T>
   onRefresh(callback: () => void): () => void
   onResume?(callback: () => void): () => void

@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import os from 'node:os'
+import { appRouteDataDirectory } from '../platform/paths.ts'
+import { macApplicationBundle } from '../../shared/applicationIdentity.ts'
 import { PNG } from 'pngjs'
 import { atomicWrite, digest, readOptional, withLock } from '../storage/localState.ts'
-import { scanApplications } from '../platform/windows/scanApplications.ts'
+import { scanApplications } from '../platform/applications.ts'
 import { catalogIconUrl, fallbackIconUrl, matchApplicationIcon, matchLocalApplicationIcon } from '../../core/applicationIcons.ts'
 import { validProcessName } from '../../core/applicationRules.ts'
 import type { Application, ApplicationScanResult } from '../../shared/application.ts'
@@ -11,7 +12,7 @@ import type { ApplicationIconState, ApplicationIconView, LocalIconMethod } from 
 
 interface StoredImage { hash: string; width: number; height: number; updatedAt: string; method?: LocalIconMethod; contrastAdjusted?: boolean }
 interface IconRecord {
-  key: string; applicationId: string; name: string; processes: string[]; category: string; publisher?: string
+  path?: string; key: string; applicationId: string; name: string; processes: string[]; category: string; publisher?: string
   origin: Application['source']; available: boolean; automatic?: StoredImage; custom?: StoredImage; extractionFailed?: boolean
 }
 interface IconIndex { version: 1; applications: IconRecord[]; scannedAt?: string; scanWarnings: string[] }
@@ -57,7 +58,7 @@ export function normalizeIconPng(data: unknown, ensureContrast = false): { bytes
 function validateApplication(value: unknown): asserts value is Application {
   const app = value as Application | undefined
   if (!app || typeof app.id !== 'string' || !app.id || app.id.length > 2048 || typeof app.name !== 'string' || !app.name.trim() || app.name.length > 256 ||
-    !Array.isArray(app.processes) || !app.processes.length || app.processes.length > 32 || !app.processes.every(p => typeof p === 'string' && validProcessName(p))) throw new Error('应用标识无效。')
+    !Array.isArray(app.processes) || !app.processes.length || app.processes.length > 32 || !app.processes.every(p => typeof p === 'string' && validProcessName(p, Boolean(macApplicationBundle(app.path ?? ''))))) throw new Error('应用标识无效。')
 }
 
 export class ApplicationIconService {
@@ -65,7 +66,7 @@ export class ApplicationIconService {
   private scan: () => Promise<ApplicationScanResult>
   private pendingScan?: Promise<ApplicationScanResult>
   constructor(options: { root?: string; scan?: () => Promise<ApplicationScanResult> } = {}) {
-    this.root = options.root ?? path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local'), 'AppRoute', 'icons')
+    this.root = options.root ?? path.join(appRouteDataDirectory(), 'icons')
     this.scan = options.scan ?? scanApplications
   }
 
@@ -134,9 +135,9 @@ export class ApplicationIconService {
         const key = keyFor(app.id)
         let entry = index.applications.find(item => item.key === key)
         if (!entry) {
-          entry = { key, applicationId: app.id, name: app.name, processes: app.processes, category: typeof app.category === 'string' ? app.category.slice(0, 80) : '', origin: app.source === 'example' ? 'example' : 'manual', available: true }
+          entry = { key, applicationId: app.id, path: app.path, name: app.name, processes: app.processes, category: typeof app.category === 'string' ? app.category.slice(0, 80) : '', origin: app.source === 'example' ? 'example' : 'manual', available: true }
           index.applications.push(entry)
-        } else if (entry.origin !== 'scan') { entry.name = app.name; entry.processes = app.processes; entry.category = typeof app.category === 'string' ? app.category.slice(0, 80) : '' }
+        } else if (entry.origin !== 'scan') { entry.path = app.path; entry.name = app.name; entry.processes = app.processes; entry.category = typeof app.category === 'string' ? app.category.slice(0, 80) : '' }
         if (!entry.automatic && typeof app.icon === 'string' && app.icon.startsWith('data:image/png;base64,')) {
           try { entry.automatic = await this.store(app.icon, 'cache', 'legacy') } catch { entry.extractionFailed = true }
         }
@@ -159,7 +160,7 @@ export class ApplicationIconService {
       for (const app of result.applications) {
         const key = keyFor(app.id), old = index.applications.find(entry => entry.key === key)
         const builtin = matchApplicationIcon(app)
-        const entry: IconRecord = { ...old, key, applicationId: app.id, name: app.name, processes: app.processes, publisher: app.publisher,
+        const entry: IconRecord = { ...old, key, applicationId: app.id, path: app.path, name: app.name, processes: app.processes, publisher: app.publisher,
           category: app.category || builtin?.category || '其他应用', origin: 'scan', available: true }
         try { entry.automatic = await this.store(app.icon, 'cache', app.iconMethod); entry.extractionFailed = false }
         catch { entry.extractionFailed = true }
