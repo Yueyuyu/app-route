@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { applicationKey, applicationView, isSystemTool, isRunningApplication, mergeScannedApplications } from '../src/core/applicationViews.ts'
+import { applicationKey, applicationView, filterApplications, isSystemTool, isRunningApplication, mergeScannedApplications } from '../src/core/applicationViews.ts'
 import { desktopAssetPath, isTrustedDesktopSender, validateDesktopRequest } from '../src/main/desktop/boundary.ts'
 import { InventoryPreferencesStore } from '../src/main/services/inventoryPreferences.ts'
 import type { Application } from '../src/shared/application.ts'
@@ -23,6 +23,22 @@ test('折叠系统维护工具，不凭未知发布者或共享宿主名隐藏�
   assert.equal(isSystemTool(app('AMD Bug Report Tool', 'C:\\AMD\\AMDBugReportTool.exe')), true)
   assert.equal(isSystemTool(app('音乐', 'C:\\Apps\\Music\\music.exe')), false)
   assert.equal(isSystemTool(app('商店软件', 'C:\\Program Files\\WindowsApps\\Example\\app.exe')), false)
+})
+test('搜索跨越我的应用和运行视图，支持空格大小写及辅助进程，同时保留显式筛选', () => {
+  const music = { ...app('music', 'C:\\Apps\\Music\\QQMusic.exe', 'direct'), name: 'QQ 音乐', processes: ['QQMusic.exe', 'qmbrowser.exe'], category: '音乐娱乐' }
+  const browser = { ...app('browser', 'C:\\Apps\\Browser\\chrome.exe'), name: 'Google Chrome' }
+  const tool = app('control', 'C:\\Windows\\System32\\control.exe')
+  const apps = [music, browser, tool]
+  const options = { view: 'mine' as const, favorites: [] as string[], running: [], query: '', mode: 'all', category: 'all', favoritesOnly: false }
+  assert.deepEqual(filterApplications(apps, options).map(a => a.id), ['music'])
+  for (const query of ['google chrome', 'GOOGLECHROME', 'Chrome.exe']) assert.deepEqual(filterApplications(apps, { ...options, query }).map(a => a.id), ['browser'])
+  for (const query of ['QQ音乐', 'ＱＱ 音乐', 'QMBROWSER.EXE']) assert.deepEqual(filterApplications(apps, { ...options, query }).map(a => a.id), ['music'])
+  assert.deepEqual(filterApplications(apps, { ...options, view: 'running', query: 'control.exe' }).map(a => a.id), ['control'])
+  assert.equal(filterApplications(apps, { ...options, query: 'chrome', mode: 'direct' }).length, 0)
+  assert.equal(filterApplications(apps, { ...options, query: 'music', category: '开发工具' }).length, 0)
+  assert.equal(filterApplications(apps, { ...options, query: 'chrome', favoritesOnly: true }).length, 0)
+  assert.deepEqual(filterApplications(apps, { ...options, query: 'chrome', favoritesOnly: true, favorites: [applicationKey(browser)] }).map(a => a.id), ['browser'])
+  assert.equal(browser.mode, 'rule')
 })
 test('重扫增加新应用并保持默认规则，保留手动和便携资料，不重放缓存代理设置', () => {
   const original = { ...app('manual', 'C:\\Apps\\Music\\music.exe', 'proxy'), source: 'manual' as const, name: '我的音乐', category: '音乐娱乐' }

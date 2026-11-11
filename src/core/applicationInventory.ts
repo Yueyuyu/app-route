@@ -11,10 +11,16 @@ export function managedFor(app: Application, managed: ManagedApplication[] = [])
   return managed.find(item => item.id === app.id || Boolean(app.path && item.processPaths?.some(p => p.toLowerCase() === app.path!.toLowerCase())))
 }
 export function inventoryWithRouting(inventory: Application[], status?: IntegrationStatus): Application[] {
-  const applications = inventory.map(app => {
+  const byId = new Map<string, { application: Application; priority: number }>()
+  for (const app of inventory) {
     const managed = managedFor(app, status?.managed)
-    return { ...app, mode: managed?.mode ?? 'rule', ...(managed ? { id: managed.id, processes: managed.processes, processPaths: managed.processPaths, processWarnings: managed.processWarnings } : {}) } as Application
-  })
+    const application = { ...app, mode: managed?.mode ?? 'rule', ...(managed ? { id: managed.id, processes: managed.processes, processPaths: managed.processPaths, processWarnings: managed.processWarnings } : {}) } as Application
+    // 主程序及辅助程序可能各有开始菜单入口；同一分流记录只占一行，优先保留主程序资料。
+    const priority = managed ? app.id === managed.id ? 2 : app.path?.toLowerCase() === managed.processPaths?.[0]?.toLowerCase() ? 1 : 0 : 0
+    const existing = byId.get(application.id)
+    if (!existing || priority > existing.priority) byId.set(application.id, { application, priority })
+  }
+  const applications = [...byId.values()].map(item => item.application)
   for (const managed of status?.managed ?? []) if (!applications.some(app => app.id === managed.id)) applications.push({ ...managed, source: 'manual', category: '已管理应用', path: managed.processPaths?.[0] })
   return applications
 }
@@ -33,5 +39,5 @@ export function routingPresentation(app: Application, status?: IntegrationStatus
   if (evidence.some(item => !item.matched)) return { label: '连接不符合设置', detail: '已观察到不符合当前规则的新连接，请检查或恢复。', color: 'error' }
   if (evidence.length && evidence.every(item => item.usesCurrentNode === false)) return { label: '等待新节点连接', detail: '当前观察到的连接仍用其他节点；已有连接不会强制断开，新建连接交给组当前选择。', color: 'warning' }
   if (evidence.length) return { label: '已验证新连接', detail: `已验证 ${[...new Set(evidence.map(item => item.process))].join('、')} 的 ${evidence.length} 条新连接；其余进程仍待观测。`, color: 'success' }
-  return { label: '规则已加载', detail: '等待应用建立新连接；现有连接不会自动切换。', color: 'warning' }
+  return { label: '规则已加载', detail: '规则已写入并在内核加载。等待应用建立新连接后再验证实际出口；现有连接不会自动切换。', color: 'blue' }
 }

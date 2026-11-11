@@ -18,6 +18,20 @@ export function applicationView(apps: Application[], view: ApplicationView, favo
   return apps.filter(app => view === 'all' || (view === 'mine' ? favorites.includes(applicationKey(app)) || app.mode !== 'rule' : isRunningApplication(app, running)))
     .sort((a, b) => Number(favorites.includes(applicationKey(b))) - Number(favorites.includes(applicationKey(a))) || a.name.localeCompare(b.name, 'zh-CN'))
 }
+
+const searchText = (value: string) => value.normalize('NFKC').toLowerCase().replace(/[\s_-]+/g, '')
+/** 搜索始终覆盖全部应用；用户显式选择的分类、联网方式和收藏条件仍然有效。 */
+export function filterApplications(apps: Application[], options: {
+  view: ApplicationView; favorites: string[]; running: RunningApplicationProcess[]
+  query: string; mode: string; category: string; favoritesOnly: boolean
+}): Application[] {
+  const query = searchText(options.query)
+  return applicationView(apps, options.query.trim() ? 'all' : options.view, options.favorites, options.running).filter(app =>
+    (options.mode === 'all' || app.mode === options.mode) &&
+    (options.category === 'all' || app.category === options.category) &&
+    (!options.favoritesOnly || options.favorites.includes(applicationKey(app))) &&
+    (!query || [app.name, ...app.processes, app.path ?? '', ...(app.processPaths ?? [])].some(value => searchText(value).includes(query))))
+}
 /** 扫描只更新资料，不重放联网方式；保留便携/手动条目及用户编辑过的分类。 */
 export function mergeScannedApplications(current: Application[], scanned: Application[]): Application[] {
   const next = scanned.map(app => {

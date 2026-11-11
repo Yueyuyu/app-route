@@ -9,6 +9,21 @@ import type { IntegrationStatus } from '../src/shared/integration.ts'
 import { isDedicatedApplicationDirectory } from '../src/main/platform/windows/processFamily.ts'
 
 const app: Application = { id: 'music', name: '音乐应用', path: 'C:\\Apps\\Music\\Music.exe', processes: ['Music.exe'], mode: 'direct', category: '音乐娱乐', source: 'scan' }
+test('主程序与辅助程序扫描入口合并为同一分流行，保留主程序资料和全部匹配路径', () => {
+  const helper = { ...app, id: 'helper', name: '辅助入口', path: 'C:\\Apps\\Music\\Helper.exe', processes: ['Helper.exe'] }
+  const other = { ...app, id: 'other', name: '另一安装', path: 'D:\\Apps\\Music\\Music.exe' }
+  const managed = { ...app, processes: ['Music.exe', 'Helper.exe'], processPaths: [app.path!, helper.path!] }
+  const status: IntegrationStatus = { connected: true, revision: 'one', managed: [managed], choices: [], rulesLoaded: true, evidence: [], recoveryReady: true, recoveryPath: '' }
+  for (const entries of [[helper, app, other], [app, helper, other]]) {
+    const result = inventoryWithRouting(entries, status)
+    assert.equal(result.length, 2)
+    assert.equal(result[0].id, app.id)
+    assert.equal(result[0].name, app.name)
+    assert.equal(result[0].path, app.path)
+    assert.deepEqual(result[0].processPaths, managed.processPaths)
+    assert.equal(result[1].mode, 'rule')
+  }
+})
 test('仅预识别应用独立目录，拒绝共享工具和用户文件目录', () => {
   assert.equal(isDedicatedApplicationDirectory('C:\\Apps\\QQMusic123\\QQMusic.exe'), true)
   assert.equal(isDedicatedApplicationDirectory('C:\\Tools\\QQMusic.exe'), false)
@@ -56,10 +71,14 @@ test('不重放旧示例和草稿；加载成功与连接验证分开，刷新�
   const view = inventoryWithRouting(inventory, status)
   assert.equal(view[0].mode, 'direct')
   assert.equal(routingPresentation(view[0], status).label, '规则已加载')
+  assert.equal(routingPresentation(view[0], status).color, 'blue')
+  assert.equal(routingPresentation(view[0], { ...status, connected: false }).color, 'default')
   status.evidence = [{ applicationId: 'real', process: 'Music.exe', destination: 'music.example', outbound: 'DIRECT', matched: true, startedAt: new Date().toISOString() }]
   assert.equal(routingPresentation(view[0], status).label, '已验证新连接')
+  assert.equal(routingPresentation(view[0], status).color, 'success')
   status.evidence[0].matched = false
   assert.equal(routingPresentation(view[0], status).label, '连接不符合设置')
+  assert.equal(routingPresentation(view[0], status).color, 'error')
   status.managed = []
   assert.equal(inventoryWithRouting(inventory, status)[0].mode, 'rule')
 })
