@@ -352,3 +352,6 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .about-app-content .about-app-version { margin-bottom: 5px; }
 .about-build-date { color: #748197; font-size: 12px; margin: 0 0 18px; }
 .about-app-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+.diagnostic-report-time { display: grid; gap: 4px; margin: 12px 0; font-size: 12px; color: #748197; line-height: 1.6; }
+.diagnostic-report-time.is-stale { color: #9a6514; }
+.diagnostic-history .diagnostic-item { opacity: .8; }

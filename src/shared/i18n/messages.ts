@@ -1,6 +1,12 @@
 /** 中文原句作为 gettext 风格键；译文顺序为 English、日本語、Français。
  * 修改原句时同步更新三种译文，保留 {0} 等插值参数。用户数据不进入此目录。 */
 export const messages: Record<string, readonly [string, string, string]> = {
+  "规则已就绪": ["Rules ready", "ルール準備完了", "Règles prêtes"],
+  "规则已写入并在内核加载，尚未观察到新连接。打开应用并建立新连接后才能验证实际出口；现有连接不会自动切换。": ["Rules are loaded in the core; no new connection has been observed yet. Open the app and create a new connection to verify its route. Existing connections do not switch automatically.", "ルールはコアに読み込み済みですが、新しい接続はまだ観測されていません。アプリで新しく接続すると経路を検証できます。既存の接続は自動で切り替わりません。", "Les règles sont chargées dans le moteur, mais aucune nouvelle connexion n’a encore été observée. Ouvrez l’application et établissez une nouvelle connexion pour vérifier sa route. Les connexions existantes ne changent pas automatiquement."],
+  "上次自检 · {0}": ["Last check · {0}", "前回のチェック · {0}", "Dernière vérification · {0}"],
+  "连接或配置已变化，请重新检查": ["Connection or configuration changed. Run the checks again.", "接続または設定が変わりました。再チェックしてください。", "La connexion ou la configuration a changé. Relancez les vérifications."],
+  "结果已过期，请重新检查": ["Results have expired. Run the checks again.", "結果の有効期限が切れました。再チェックしてください。", "Les résultats ont expiré. Relancez les vérifications."],
+  "上次结果：通过 {0}/{1} 项": ["Previous results: {0}/{1} passed", "前回の結果：{0}/{1} 合格", "Résultats précédents : {0}/{1} réussies"],
   "构建于 {0}": ["Built on {0}", "ビルド日時 {0}", "Compilé le {0}"],
   "项目主页": ["Project", "プロジェクト", "Projet"],
   "反馈问题": ["Report an issue", "問題を報告", "Signaler un problème"],

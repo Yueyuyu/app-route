@@ -47,6 +47,8 @@ export interface ConnectionEvidence {
   usesCurrentNode?: boolean
 }
 export interface IntegrationStatus {
+  /** 当前客户端配置的指纹；用于识别同名组/节点下的订阅变化，不含配置原文。 */
+  configurationFingerprint?: string
   dataIssue?: boolean
   missingTargetAction?: 'block' | 'original'
   timings?: { phase: string; durationMs: number; ok: boolean; at: string }[]

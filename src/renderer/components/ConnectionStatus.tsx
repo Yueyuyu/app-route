@@ -4,6 +4,7 @@ import { CloseOutlined, RightOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { IntegrationStatus } from '../../shared/integration'
 import type { NetworkDiagnostics } from '../hooks/useNetworkDiagnostics'
 import { outletLabel, t } from '../i18n'
+import { DiagnosticReportTime } from './DiagnosticReportTime'
 
 interface Props {
   status?: IntegrationStatus; error: string; busy: boolean
@@ -22,7 +23,7 @@ export function ConnectionStatus({ status, error, busy, diagnostics, onDetails }
   const outlet = status?.proxyGroup ? status.outlets?.[status.proxyGroup] : undefined
   function close() { setOpen(false); trigger.current?.focus() }
   function details(tab = 'overview') { setOpen(false); onDetails(tab) }
-  return <Popover trigger="click" placement="topLeft" arrow={false} open={open} onOpenChange={setOpen} afterOpenChange={visible => { if (visible) closeButton.current?.focus() }} destroyOnHidden
+  return <Popover trigger="click" placement="topLeft" arrow={false} open={open} onOpenChange={setOpen} afterOpenChange={visible => { if (visible && open) closeButton.current?.focus() }} destroyOnHidden
     classNames={{ root: 'connection-popover' }} content={<section id={panelId} className="connection-quick" role="region" aria-label={t('连接概况')}
       onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close() } }}>
       <div className="connection-quick-heading"><div><strong>Clash Party</strong><span><i className={`connection-dot ${state}`} />{label}</span></div><Button ref={closeButton} type="text" size="small" aria-label={t('关闭')} icon={<CloseOutlined />} onClick={close} /></div>
@@ -33,7 +34,8 @@ export function ConnectionStatus({ status, error, busy, diagnostics, onDetails }
       </dl>
       {(error || (!status?.connected && status?.warning)) && <p className="connection-quick-error" role="status">{t(error || status!.warning!)}</p>}
       <p className="connection-quick-note">{t('连接状态来自内核控制接口；不代表所有节点都可用。')}</p>
-      {diagnostics.checks.length > 0 && <button className="diagnostic-summary" onClick={() => details('recovery')}><span>{t('自检通过 {0}/{1} 项', [diagnostics.checks.filter(check => check.ok).length, diagnostics.checks.length])}</span><RightOutlined /></button>}
+      <DiagnosticReportTime diagnostics={diagnostics} />
+      {diagnostics.checks.length > 0 && <button className="diagnostic-summary" onClick={() => details('recovery')}><span>{t(diagnostics.staleReason ? '上次结果：通过 {0}/{1} 项' : '自检通过 {0}/{1} 项', [diagnostics.checks.filter(check => check.ok).length, diagnostics.checks.length])}</span><RightOutlined /></button>}
       <div className="connection-quick-actions"><Button onClick={() => details()}>{t('查看详情')}</Button><Button icon={<ReloadOutlined />} loading={diagnostics.busy} disabled={busy} onClick={() => void diagnostics.run()}>{t('网络自检')}</Button></div>
     </section>}>
     <button ref={trigger} className="integration-status" aria-label={t('查看 Clash Party 连接状态')} aria-expanded={open} aria-controls={open ? panelId : undefined}

@@ -1,12 +1,15 @@
 import { Alert, App, Button, Collapse, Descriptions, Empty, Space, Table, Tabs, Tag } from 'antd'
 import { useState } from 'react'
-import type { DiagnosticCheck, IntegrationStatus } from '../../shared/integration'
+import type { IntegrationStatus } from '../../shared/integration'
+import type { NetworkDiagnostics } from '../hooks/useNetworkDiagnostics'
+import { DiagnosticReportTime } from './DiagnosticReportTime'
 import { integrationRequest } from '../hooks/useRoutingIntegration'
 import { formatTime, outletLabel, t } from '../i18n'
 import { strategyLabels } from '../../shared/proxyStrategy'
 
-interface Props { status?: IntegrationStatus; error: string; checks: DiagnosticCheck[]; tab: string; setTab: (tab: string) => void; refresh: () => Promise<unknown>; busy: boolean }
-export function ConnectionInspector({ status, error, checks, tab, setTab, refresh, busy }: Props) {
+interface Props { status?: IntegrationStatus; error: string; diagnostics: NetworkDiagnostics; tab: string; setTab: (tab: string) => void; refresh: () => Promise<unknown>; busy: boolean }
+export function ConnectionInspector({ status, error, diagnostics, tab, setTab, refresh, busy }: Props) {
+  const checks = diagnostics.checks
   const { modal, message } = App.useApp()
   const [repairing, setRepairing] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -52,7 +55,8 @@ export function ConnectionInspector({ status, error, checks, tab, setTab, refres
     { key: 'recovery', label: t('恢复与诊断'), children: <>
       <div className="detail-section"><h3>{t('离线恢复')} <Tag color={status?.recoveryReady ? 'success' : 'default'}>{status?.recoveryReady ? t('已准备') : t('尚未准备')}</Tag></h3><p>{status?.recoveryReady ? t('双击桌面的 AppRoute - Restore Network，无需联网即可恢复。') : t('首次应用前会自动准备独立恢复工具。准备失败时不会修改规则。')}</p>
         {status?.pending?.recoveryRequired && <Alert type="error" title={t('恢复尚未确认，请运行网络自检或离线恢复。')} />}</div>
-      <Collapse items={[
+      <DiagnosticReportTime diagnostics={diagnostics} />
+      <Collapse className={diagnostics.staleReason ? 'diagnostic-history' : undefined} items={[
         { key: 'checks', label: t('网络自检结果') + (checks.length ? ` · ${checks.filter(check => check.ok).length}/${checks.length}` : ''), children: checks.length ? checks.map(check => <div className="diagnostic-item" key={check.name}><Tag color={check.ok ? 'success' : 'warning'}>{check.ok ? t('通过') : t('待处理')}</Tag><strong>{t(check.name)}</strong><p>{t(check.detail)}</p></div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('点击底部“网络自检”开始检查')} /> },
         { key: 'timings', label: t('最近操作耗时'), children: <Table size="small" pagination={false} rowKey={(_, index) => String(index)} dataSource={[...(status?.timings ?? [])].reverse().slice(0, 16)} columns={[{ title: t('阶段'), dataIndex: 'phase', render: value => t(value) }, { title: t('耗时'), dataIndex: 'durationMs', render: value => `${value} ms` }, { title: t('状态'), dataIndex: 'ok', render: ok => <Tag color={ok ? 'success' : 'error'}>{ok ? t('通过') : t('失败')}</Tag> }]} /> },
         { key: 'files', label: t('恢复位置与数据保留'), children: <><code className="recovery-path">{status?.recoveryPath}</code><p>{t('最近 20 份状态备份和 20 个已结束事务保留在本机；待恢复或无法识别的事务不会自动删除。')}</p>{status?.lastRecovery && <p>{t('上次恢复：')}{t(status.lastRecovery)}</p>}</> },

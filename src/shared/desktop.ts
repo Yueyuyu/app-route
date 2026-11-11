@@ -9,5 +9,6 @@ export interface RunningApplicationProcess { path: string; pid: number; parentPi
 export interface DesktopBridge {
   request<T>(action: DesktopAction, body?: unknown): Promise<T>
   onRefresh(callback: () => void): () => void
+  onResume?(callback: () => void): () => void
 }
 declare global { interface Window { appRoute?: DesktopBridge } }

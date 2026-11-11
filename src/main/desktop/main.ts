@@ -145,7 +145,7 @@ else {
       return request(action, body)
     })
     startBackend(); createWindow()
-    powerMonitor.on('resume', () => { void request('integration.reconcile').catch(() => {}).finally(() => window?.webContents.send('approute:refresh')) })
+    powerMonitor.on('resume', () => { window?.webContents.send('approute:resume'); void request('integration.reconcile').catch(() => {}).finally(() => window?.webContents.send('approute:refresh')) })
     tray = new Tray(nativeImage.createFromPath(icon))
     tray.on('double-click', showWindow)
     updateNativeLanguage()

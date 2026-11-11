@@ -70,7 +70,8 @@ test('不重放旧示例和草稿；加载成功与连接验证分开，刷新�
   const status: IntegrationStatus = { connected: true, revision: 'one', managed: [{ ...app, id: 'real' }], choices: [], rulesLoaded: true, evidence: [], recoveryReady: true, recoveryPath: '' }
   const view = inventoryWithRouting(inventory, status)
   assert.equal(view[0].mode, 'direct')
-  assert.equal(routingPresentation(view[0], status).label, '等待应用联网')
+  assert.equal(routingPresentation(view[0], status).label, '规则已就绪')
+  assert.match(routingPresentation(view[0], status).detail, /尚未观察到新连接/)
   assert.equal(routingPresentation(view[0], status).color, 'blue')
   assert.equal(routingPresentation(view[0], { ...status, connected: false }).color, 'default')
   status.evidence = [{ applicationId: 'real', process: 'Music.exe', destination: 'music.example', outbound: 'DIRECT', matched: true, startedAt: new Date().toISOString() }]

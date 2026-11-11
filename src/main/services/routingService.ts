@@ -159,7 +159,7 @@ export class RoutingService {
         if (!app || managedProcessMatches(app, connection.metadata)) return []
         return [{ applicationId: app.id, process: path.win32.basename(connection.metadata.processPath) }]
       }).filter((item, index, items) => items.findIndex(other => other.applicationId === item.applicationId && other.process === item.process) === index)
-      return { ...base, connected: true, version: version.version, mode: config.mode, tun: config.tun?.enable ?? false, processMode: config['find-process-mode'], choices, rulesLoaded: rulesLoaded && config.mode === 'rule' && !untrackedRuleCount && !dataIssue, evidence, untrackedRuleCount,
+      return { ...base, configurationFingerprint: digest(snapshot.profileId + '\n' + snapshot.workText), connected: true, version: version.version, mode: config.mode, tun: config.tun?.enable ?? false, processMode: config['find-process-mode'], choices, rulesLoaded: rulesLoaded && config.mode === 'rule' && !untrackedRuleCount && !dataIssue, evidence, untrackedRuleCount,
         uncoveredProcesses, groupChoices, outlets, strategyNodes, strategyLoaded, strategyWarning,
         // 只有唯一组时才推荐；多个独立选择不能猜成同一个“当前代理”。已保存组失效时也不静默换组。
         suggestedTarget: state.proxyGroup ?? (groupChoices.length === 1 ? groupChoices[0].name : undefined),

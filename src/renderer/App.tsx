@@ -26,7 +26,7 @@ const pageLabels: Record<Page, string> = { apps: '应用管理', drafts: '分流
 export default function App() {
   const inventory = useApplicationInventory()
   const routing = useRoutingIntegration()
-  const diagnostics = useNetworkDiagnostics(routing.refresh)
+  const diagnostics = useNetworkDiagnostics(routing.status, routing.error, routing.refresh)
   const applications = useMemo(() => inventoryWithRouting(inventory.applications, routing.status), [inventory.applications, routing.status])
   const target = routing.status?.proxyGroup
   const applying = routing.busyIds.length > 0 || routing.groupBusy

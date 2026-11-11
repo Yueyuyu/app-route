@@ -2,7 +2,7 @@ import { ConnectionInspector } from './ConnectionInspector'
 import { t } from '../i18n'
 import { Alert, App, Button, Drawer } from 'antd'
 import { ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { IntegrationStatus } from '../../shared/integration'
 import type { NetworkDiagnostics } from '../hooks/useNetworkDiagnostics'
 import { integrationRequest } from '../hooks/useRoutingIntegration'
@@ -20,6 +20,7 @@ interface Props {
 export function RoutingPanel({ status, error, refresh, busy: applying, setProxyStrategy, inspectionOpen, setInspectionOpen, tab, setTab, diagnostics }: Props) {
   const { modal, message } = App.useApp()
   const [working, setWorking] = useState('')
+  const inspectionClose = useRef<HTMLButtonElement>(null)
   const busy = applying || diagnostics.busy
   const outlet = status?.proxyGroup ? status.outlets?.[status.proxyGroup] : undefined
   const currentNode = !status?.connected ? t("等待连接") : !status.proxyGroup ? t("尚未选择代理组") : outletLabel(outlet)
@@ -53,9 +54,9 @@ export function RoutingPanel({ status, error, refresh, busy: applying, setProxyS
       {status?.pending?.recoveryRequired && <Alert type="error" showIcon title={t('恢复尚未确认，请运行网络自检或离线恢复。')} />}
       {status?.pending && !status.pending.recoveryRequired && <div className="transaction-progress" role="status">{t("正在自动检查 · 失败将恢复上一版设置")}</div>}
     </section>
-    <Drawer title={t("连接详情与恢复")} open={inspectionOpen} onClose={() => setInspectionOpen(false)} size={580}
-      footer={<div className="drawer-footer"><Button onClick={() => setInspectionOpen(false)}>{t("关闭")}</Button><Button icon={<ReloadOutlined />} loading={diagnostics.busy} disabled={busy || Boolean(working)} onClick={() => void run('diagnose')}>{t("网络自检")}</Button><Button danger disabled={busy || Boolean(working)} onClick={recover}>{t("恢复网络")}</Button></div>}>
-      <ConnectionInspector status={status} error={error} checks={diagnostics.checks} tab={tab} setTab={setTab} refresh={refresh} busy={busy || Boolean(working)} />
+    <Drawer title={t("连接详情与恢复")} open={inspectionOpen} onClose={() => setInspectionOpen(false)} size={580} afterOpenChange={visible => { if (visible) inspectionClose.current?.focus() }}
+      footer={<div className="drawer-footer"><Button ref={inspectionClose} onClick={() => setInspectionOpen(false)}>{t("关闭")}</Button><Button icon={<ReloadOutlined />} loading={diagnostics.busy} disabled={busy || Boolean(working)} onClick={() => void run('diagnose')}>{t("网络自检")}</Button><Button danger disabled={busy || Boolean(working)} onClick={recover}>{t("恢复网络")}</Button></div>}>
+      <ConnectionInspector status={status} error={error} diagnostics={diagnostics} tab={tab} setTab={setTab} refresh={refresh} busy={busy || Boolean(working)} />
     </Drawer>
   </>
 }
