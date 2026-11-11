@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import YAML from 'yaml'
 import type { ApplyRequest, AutomaticApplyResult, DiagnosticCheck, IntegrationStatus, ManagedApplication } from '../../shared/integration.ts'
 import type { Application } from '../../shared/application.ts'
-import { addManagedRules, assertNoProcessOverlap, configuredProxySelections, isProxyOnly, managedApplications, managedProcessMatches, markerKey, ownerId, overrideScript, removeManagedRules, ruleStrings, scriptHeader } from '../../core/managedRouting.ts'
+import { addManagedRules, assertNoProcessOverlap, assertNoSystemHostRouting, configuredProxySelections, isProxyOnly, managedApplications, managedProcessMatches, markerKey, ownerId, overrideScript, removeManagedRules, ruleStrings, scriptHeader } from '../../core/managedRouting.ts'
 import { ClashPartyConfiguration, findInstalledCore, validateWithCore } from '../adapters/clashPartyConfiguration.ts'
 import { discoverPipe, MihomoRuntime } from '../adapters/mihomoRuntime.ts'
 import { configRuleSignature, runtimeRuleSignature } from '../adapters/runtimeRules.ts'
@@ -201,6 +201,7 @@ export class RoutingService {
       if (!Array.isArray(request.applications) || (!request.applications.length && !request.proxyGroup) || request.applications.length > 100) throw new Error('一次请选择 1 至 100 个应用。')
       if (new Set(request.applications.map(app => app?.id)).size !== request.applications.length) throw new Error('请求包含重复应用。')
       request.applications.forEach(app => managedApplications([app], request.target))
+      assertNoSystemHostRouting(request.applications)
       if (request.revision !== previous.revision || previous.pendingId) throw new Error('状态已变化或仍有恢复检查，请稍后重试。')
       const resolveApplications = () => Promise.all(request.applications.map(async app => {
         const clean = { ...app, processPaths: undefined, processWarnings: undefined }
@@ -271,6 +272,7 @@ export class RoutingService {
       if (!Array.isArray(request.applications) || (!request.applications.length && !request.proxyGroup)) throw new Error('请先选择应用。')
       const appliedAt = new Date().toISOString()
       const selected = managedApplications(request.applications, request.target).map(app => ({ ...app, appliedAt, ...(app.mode === 'proxy' ? { missingTargetAction } : {}) }))
+      assertNoSystemHostRouting(request.applications)
       const selectedIds = new Set(request.applications.map(app => app.id))
       const managed = [...previous.managed.filter(app => !selectedIds.has(app.id)), ...selected]
       if (request.missingTargetAction !== undefined && managed.some(app => app.mode === 'proxy' && (app.missingTargetAction ?? 'original') !== missingTargetAction)) throw new Error('代理失效策略必须同时更新全部代理应用。')

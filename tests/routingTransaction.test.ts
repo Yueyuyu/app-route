@@ -8,7 +8,7 @@ import vm from 'node:vm'
 import { RoutingService, type ServiceOptions } from '../src/main/services/routingService.ts'
 import { MihomoRuntime, type RuntimeConfig, type RuntimeConnection, type RuntimeRule } from '../src/main/adapters/mihomoRuntime.ts'
 import { atomicWrite, fileStamp, readOptional, writeIfUnchanged } from '../src/main/storage/localState.ts'
-import { markerKey, overrideScript, type ProxyInfo } from '../src/core/managedRouting.ts'
+import { addManagedRules, markerKey, overrideScript, type ProxyInfo } from '../src/core/managedRouting.ts'
 import { routingPresentation } from '../src/core/applicationInventory.ts'
 import type { Application } from '../src/shared/application.ts'
 import { identifyProcessFamily } from '../src/core/processFamily.ts'
@@ -52,6 +52,64 @@ async function fixture(t: TestContext, overrides: ServiceOptions = {}) {
   const service = new RoutingService({ root, partyRoot: party, runtime: async () => runtime, validate: async () => {}, installKit: async () => {}, guardian: async () => { guardianStarted = true }, ...overrides })
   return { service, runtime, config, party, guardianStarted: () => guardianStarted }
 }
+
+test('正常客户端离线时轮询和新选择不改磁盘；重新连接不重放旧规则', async t => {
+  const f = await fixture(t)
+  const pending = await f.service.apply({ applications: [app], revision: 'initial' })
+  const confirmed = await f.service.confirm(pending.pending!.id)
+  async function files(directory: string): Promise<Record<string, string>> {
+    const result: Record<string, string> = {}
+    for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+      const file = path.join(directory, entry.name)
+      if (entry.isDirectory()) Object.assign(result, await files(file))
+      else result[file] = (await fs.readFile(file)).toString('base64')
+    }
+    return result
+  }
+  const before = await files(path.dirname(f.party)), reloads = f.runtime.reloadCount
+  f.service.options.runtime = async () => { throw new Error('未找到 Clash Party 内核，请先启动 Clash Party。') }
+  for (let i = 0; i < 3; i++) {
+    await f.service.reconcileInterrupted()
+    assert.equal((await f.service.status()).connected, false)
+    assert.equal((await f.service.diagnose())[0].ok, false)
+  }
+  assert.equal((await f.service.applyAutomatically({ revision: confirmed.revision, applications: [{ ...app, mode: 'proxy' }], target: 'Group' })).outcome, 'unchanged')
+  assert.deepEqual(await files(path.dirname(f.party)), before)
+  f.service.options.runtime = async () => f.runtime
+  await f.service.reconcileInterrupted()
+  assert.equal((await f.service.status()).rulesLoaded, true)
+  assert.equal(f.runtime.reloadCount, reloads)
+  assert.deepEqual(await files(path.dirname(f.party)), before)
+})
+
+test('共享系统宿主在自动和底层写入入口均被拒绝，不启动恢复工具或改配置', async t => {
+  let prepared = 0
+  const f = await fixture(t, { installKit: async () => { prepared++ }, resolveFamily: async value => value })
+  const host = { ...app, processes: ['explorer.exe'] }
+  await assert.rejects(f.service.apply({ revision: 'initial', applications: [host] }), /系统共享进程/)
+  const rejected = await f.service.applyAutomatically({ revision: 'initial', applications: [host] })
+  assert.equal(rejected.outcome, 'unchanged')
+  assert.match(rejected.message, /系统共享进程/)
+  assert.equal(prepared, 0)
+  assert.equal(f.runtime.reloadCount, 0)
+  assert.equal(await readOptional(f.service.statePath), null)
+  assert.equal(await readOptional(f.service.party.scriptPath), null)
+  assert.deepEqual(f.runtime.current, f.config)
+})
+
+test('旧版共享宿主记录保留可读，只允许撤销对应设置，不清空其他应用', async t => {
+  const f = await fixture(t)
+  const host = { id: 'legacy-host', name: '旧系统工具', processes: ['control.exe'], mode: 'direct' as const }
+  const state = { revision: 'legacy', managed: [host, { id: app.id, name: app.name, processes: app.processes, mode: 'direct' as const }] }
+  await f.service.save(state)
+  f.runtime.current = addManagedRules(f.config, state.managed)
+  await atomicWrite(f.service.party.scriptPath, overrideScript(state.managed))
+  assert.equal((await f.service.state()).managed.length, 2)
+  const removed = await f.service.apply({ revision: 'legacy', applications: [{ ...host, mode: 'rule', source: 'manual', category: '系统工具' }] })
+  await f.service.confirm(removed.pending!.id)
+  assert.deepEqual((await f.service.state()).managed.map(item => item.id), [app.id])
+  assert.deepEqual(f.runtime.current.rules.slice(1), f.config.rules)
+})
 
 test('模拟事务中断后服务重新实例化，超时回退；内核离线保留待恢复编号', async t => {
   const f = await fixture(t, { trialMs: 1 })

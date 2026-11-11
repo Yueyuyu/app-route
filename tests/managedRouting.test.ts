@@ -1,11 +1,22 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import vm from 'node:vm'
-import { addManagedRules, isProxyOnly, managedApplications, markerKey, overrideScript, removeManagedRules } from '../src/core/managedRouting.ts'
+import { addManagedRules, assertNoSystemHostRouting, isProxyOnly, managedApplications, markerKey, overrideScript, removeManagedRules } from '../src/core/managedRouting.ts'
 import type { Application } from '../src/shared/application.ts'
 
 const app: Application = { id: 'music', name: '音乐', processes: ['Music.exe'], category: '音乐', source: 'manual', mode: 'proxy' }
 const config = { proxies: [{ name: 'Node', type: 'ss' }], 'proxy-groups': [{ name: 'Group', type: 'select', proxies: ['Node'] }], rules: ['DOMAIN,existing.example,DIRECT', 'MATCH,Group'], dns: { enable: true }, untouched: { nested: 1 } }
+
+test('新设置拒绝共享系统宿主，名称、主路径和辅助路径均不能绕过；允许撤销', () => {
+  for (const name of ['EXPLORER.EXE', 'svchost.exe', 'rundll32.exe', 'Control.exe', 'cmd.exe', 'RuntimeBroker.exe']) {
+    const host = { ...app, processes: [name] }
+    assert.throws(() => assertNoSystemHostRouting([host]), /系统共享进程/)
+    assert.throws(() => assertNoSystemHostRouting([{ ...app, path: `C:\\Windows\\${name}` }]), /系统共享进程/)
+    assert.throws(() => assertNoSystemHostRouting([{ ...app, processPaths: [`C:\\Windows\\${name}`] }]), /系统共享进程/)
+    assert.doesNotThrow(() => assertNoSystemHostRouting([{ ...host, mode: 'rule' }]))
+  }
+  assert.doesNotThrow(() => assertNoSystemHostRouting([app]))
+})
 
 test('应用与撤销仅增删带所有权标记的规则，原配置保持一致', () => {
   const managed = managedApplications([app], 'Group')

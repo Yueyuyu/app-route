@@ -1,6 +1,11 @@
 /** 中文原句作为 gettext 风格键；译文顺序为 English、日本語、Français。
  * 修改原句时同步更新三种译文，保留 {0} 等插值参数。用户数据不进入此目录。 */
 export const messages: Record<string, readonly [string, string, string]> = {
+  "系统共享进程不能设置专属分流，请选择具体应用；已有设置可切回按 Clash 规则。": [
+    "Shared system processes cannot have dedicated routing. Select a specific app; existing settings can be returned to Clash rules.",
+    "共有システムプロセスには専用ルールを設定できません。個別のアプリを選択してください。既存の設定は Clash ルールに戻せます。",
+    "Les processus système partagés ne peuvent pas recevoir de règles dédiées. Sélectionnez une application ; les réglages existants peuvent revenir aux règles Clash."
+  ],
   "应用管理": [
     "Applications",
     "アプリ管理",

@@ -11,6 +11,23 @@ export const markerKey = 'x-approute-managed-v1'
 export const scriptHeader = '// AppRoute managed override v1; edit through AppRoute.'
 export const protectedProcesses = new Set(['codex.exe', 'chatgpt.exe', 'node.exe', 'approute.exe', 'clash party.exe', 'mihomo.exe', 'mihomo-alpha.exe', 'mihomo-smart.exe', 'powershell.exe', 'pwsh.exe'])
 
+// 共享系统宿主可能代表多个功能，不能把整台电脑的宿主流量当作一个普通应用管理。
+const systemHostProcesses = new Set([
+  'explorer.exe', 'svchost.exe', 'rundll32.exe', 'dllhost.exe', 'taskhost.exe', 'taskhostw.exe',
+  'control.exe', 'msiexec.exe', 'cmd.exe', 'conhost.exe', 'wscript.exe', 'cscript.exe', 'windowsterminal.exe',
+  'runtimebroker.exe', 'applicationframehost.exe', 'shellexperiencehost.exe', 'startmenuexperiencehost.exe',
+  'searchhost.exe', 'searchindexer.exe', 'textinputhost.exe', 'ctfmon.exe', 'systemsettings.exe',
+  'services.exe', 'lsass.exe', 'wininit.exe', 'winlogon.exe', 'dwm.exe', 'smss.exe', 'csrss.exe',
+])
+export function assertNoSystemHostRouting(apps: Application[]) {
+  for (const app of apps) {
+    // 老版本记录仍可读取和撤销；检查只在新写入入口执行，不因新增限制使全部旧记录失效。
+    if (app.mode === 'rule') continue
+    const names = [...app.processes, ...[app.path, ...(app.processPaths ?? [])].filter((value): value is string => typeof value === 'string').map(value => path.win32.basename(value))]
+    if (names.some(name => systemHostProcesses.has(name.trim().toLowerCase()))) throw new Error('系统共享进程不能设置专属分流，请选择具体应用；已有设置可切回按 Clash 规则。')
+  }
+}
+
 export function managedApplications(input: Application[], target?: string): ManagedApplication[] {
   if (!Array.isArray(input) || input.length > 100) throw new Error('一次最多管理 100 个应用。')
   const seen = new Set<string>()
