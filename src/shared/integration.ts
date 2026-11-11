@@ -1,4 +1,5 @@
 import type { Application, RouteMode } from './application.ts'
+import type { ProxyStrategy, StrategyNode } from './proxyStrategy.ts'
 
 export interface ManagedApplication {
   id: string
@@ -14,6 +15,7 @@ export interface ApplyRequest {
   applications: Application[]; target?: string; revision: string
   /** 保存默认跟随组时，必须同时迁移全部已设置代理的应用。 */
   proxyGroup?: string
+  proxyStrategy?: ProxyStrategy
 }
 export interface AutomaticApplyResult {
   outcome: 'applied' | 'restored' | 'unchanged' | 'recovery-required'
@@ -54,6 +56,10 @@ export interface IntegrationStatus {
   suggestedTarget?: string
   proxyGroup?: string
   groupChoices?: ProxyChoice[]
+  proxyStrategy?: ProxyStrategy
+  strategyNodes?: StrategyNode[]
+  strategyLoaded?: boolean
+  strategyWarning?: string
   outlets?: Record<string, ProxyOutlet>
   managed: ManagedApplication[]
   rulesLoaded: boolean

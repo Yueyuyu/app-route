@@ -40,6 +40,7 @@ export function createRoutingApi(service: RoutingService): Connect.NextHandleFun
         const body = await readBody(request)
         if (route === '/api/integration/apply-automatic') result = await service.applyAutomatically(body)
         else if (route === '/api/integration/proxy-group') result = await service.setProxyGroup(body)
+        else if (route === '/api/integration/proxy-strategy') result = await service.setProxyStrategy(body)
         else if (route === '/api/integration/apply') result = await service.apply(body)
         else if (route === '/api/integration/confirm') result = await service.confirm(body.id)
         else if (route === '/api/integration/rollback') result = await service.rollback(body.id)

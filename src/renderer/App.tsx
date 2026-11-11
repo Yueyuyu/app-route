@@ -81,7 +81,7 @@ export default function App() {
       <main className="main-content">
         {page === 'apps' ? <section aria-label="应用管理">
           <div className="page-heading"><div><h1>应用管理</h1><p>收藏常用应用，按需选择联网方式。未设置的应用沿用原有规则。</p></div><div className="heading-actions"><Button icon={<PlusOutlined />} onClick={() => { setEditing(undefined); setEditorOpen(true) }}>添加应用</Button><Button type="primary" icon={<ScanOutlined />} loading={inventory.loading} disabled={applying} onClick={() => void inventory.scan(true)}>重新扫描</Button></div></div>
-          <RoutingPanel status={routing.status} error={routing.error} refresh={routing.refresh} busy={applying} setProxyGroup={routing.setProxyGroup} />
+          <RoutingPanel status={routing.status} error={routing.error} refresh={routing.refresh} busy={applying} setProxyGroup={routing.setProxyGroup} setProxyStrategy={routing.setProxyStrategy} />
           <Alert className="preview-notice" type="info" showIcon title="本机真实应用 · 点击连接方式即自动应用，失败自动恢复。" description="规则加载与新连接验证分别显示。桌面后台自动检测进入 Clash 的新辅助进程；已有连接不会自动切换。" />
           {inventory.error && <Alert type="warning" showIcon title={inventory.error} action={<Button onClick={() => void inventory.scan(true)}>重试扫描</Button>} />}
           {inventory.newCount > 0 && <Alert className="inventory-update" type="success" showIcon title={`发现 ${inventory.newCount} 个新应用，已加入全部应用，联网方式沿用原有规则。`} action={<Button size="small" onClick={showAll}>查看全部</Button>} />}

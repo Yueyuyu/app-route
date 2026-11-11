@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AutomaticApplyResult, IntegrationStatus } from '../../shared/integration.ts'
 import type { Application, RouteMode } from '../../shared/application.ts'
 import { RoutingQueue, type PendingRoute } from '../../core/routingQueue.ts'
+import type { ProxyStrategy } from '../../shared/proxyStrategy.ts'
 
 let token: string | undefined
 export async function integrationRequest<T>(action: string, body?: unknown): Promise<T> {
@@ -75,12 +76,17 @@ export function useRoutingIntegration() {
     queue.current!.enqueue(applications, mode, target)
   }
   async function setProxyGroup(target: string) {
+    return setProxyStrategy({ mode: 'existing', group: target })
+  }
+  async function setProxyStrategy(strategy: ProxyStrategy, expectedRevision?: string) {
     if (strategyBusy.current || Object.keys(queue.current!.snapshot()).length) throw new Error('请等待当前应用操作结束。')
-    strategyBusy.current = true; setGroupBusy(true)
+    strategyBusy.current = true
+    setGroupBusy(true)
     try {
       const current = await refresh()
       if (!current?.connected || current.pending) throw new Error('尚未连接或上一轮操作未确认，请检查恢复状态。')
-      const result = await integrationRequest<AutomaticApplyResult>('proxy-group', { target, revision: current.revision })
+      if (expectedRevision !== undefined && expectedRevision !== current.revision) throw new Error('设置已经变化，请关闭后重新打开代理策略。')
+      const result = await integrationRequest<AutomaticApplyResult>('proxy-strategy', { strategy, revision: current.revision })
       requestSequence.current++; currentStatus.current = result.status; setStatus(result.status)
       if (result.outcome !== 'applied') throw new Error(result.message)
     } finally { await refresh(); strategyBusy.current = false; setGroupBusy(false) }
@@ -95,5 +101,5 @@ export function useRoutingIntegration() {
     // 只为已经选择了专属模式的应用补充身份；仍经同一后端校验、网络检查和恢复事务。
     apply([{ ...managed, path: managed.processPaths![0], source: 'scan', category: '已管理应用' }], managed.mode, managed.target)
   }, [status, groupBusy])
-  return { status, error, refresh, apply, setProxyGroup, groupBusy, busyIds: Object.keys(pendingRoutes), pendingRoutes, failures, notice }
+  return { status, error, refresh, apply, setProxyGroup, setProxyStrategy, groupBusy, busyIds: Object.keys(pendingRoutes), pendingRoutes, failures, notice }
 }

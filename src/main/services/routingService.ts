@@ -13,6 +13,8 @@ import { installRecoveryKit, startGuardian } from '../recovery/recoveryKit.ts'
 import { isDedicatedApplicationDirectory, resolveProcessFamily } from '../platform/windows/processFamily.ts'
 import { normalizeProcessPath } from '../../core/processFamily.ts'
 import { isFollowGroup, resolveProxyOutlet } from '../../core/proxyGroups.ts'
+import type { ProxyStrategy, ProxyStrategyRequest } from '../../shared/proxyStrategy.ts'
+import { strategyOwnership, strategyTestUrl, validateProxyStrategy } from '../../core/proxyStrategy.ts'
 
 export interface RoutingState {
   revision: string
@@ -21,6 +23,7 @@ export interface RoutingState {
   pendingId?: string
   lastRecovery?: string
   proxyGroup?: string
+  proxyStrategy?: ProxyStrategy
 }
 export interface Transaction {
   id: string
@@ -84,7 +87,15 @@ export class RoutingService {
     if (!this.options.kitBundle) throw new Error('恢复工具尚未构建，请先运行 npm run recovery:build。')
     await installRecoveryKit(this.root, this.options.kitBundle)
   }
-  async matches(runtime: MihomoRuntime, managed: ManagedApplication[]): Promise<boolean> {
+  async strategyMatches(runtime: MihomoRuntime, strategy?: ProxyStrategy): Promise<boolean> {
+    if (!strategy || strategy.mode === 'existing') return true
+    const { proxies } = await runtime.proxies()
+    const group = proxies[strategyOwnership.name]
+    const nodes = strategy.nodes.filter(name => proxies[name] && !proxies[name].all && isProxyOnly(name, proxies))
+    return group?.type === (strategy.mode === 'fallback' ? 'Fallback' : 'URLTest') && JSON.stringify(group.all) === JSON.stringify(nodes.length ? nodes : ['REJECT'])
+  }
+  async matches(runtime: MihomoRuntime, managed: ManagedApplication[], strategy?: ProxyStrategy): Promise<boolean> {
+    if (!await this.strategyMatches(runtime, strategy)) return false
     const { rules } = await runtime.rules()
     const expected = ruleStrings(managed)
     return expected.every((text, i) => {
@@ -95,17 +106,25 @@ export class RoutingService {
   }
   async status(): Promise<IntegrationStatus> {
     const state = await this.state()
-    const base: IntegrationStatus = { connected: false, revision: state.revision, proxyGroup: state.proxyGroup, choices: [], managed: state.managed, rulesLoaded: false, evidence: [], recoveryReady: await fs.access(this.recoveryPath).then(() => true, () => false), recoveryPath: this.recoveryPath, lastRecovery: state.lastRecovery }
+    const base: IntegrationStatus = { connected: false, revision: state.revision, proxyGroup: state.proxyGroup, proxyStrategy: state.proxyStrategy, choices: [], managed: state.managed, rulesLoaded: false, evidence: [], recoveryReady: await fs.access(this.recoveryPath).then(() => true, () => false), recoveryPath: this.recoveryPath, lastRecovery: state.lastRecovery }
     if (state.pendingId) {
       const tx = await this.transaction(state.pendingId)
       base.pending = { id: tx.id, deadline: tx.deadline }
     }
     try {
       const runtime = await this.runtime()
-      const [version, config, proxies, connections, rulesLoaded] = await Promise.all([runtime.version(), runtime.config(), runtime.proxies(), runtime.connections(), this.matches(runtime, state.managed)])
+      const [version, config, proxies, connections, rulesLoaded] = await Promise.all([runtime.version(), runtime.config(), runtime.proxies(), runtime.connections(), this.matches(runtime, state.managed, state.proxyStrategy)])
       const snapshot = await this.party.snapshot()
       const persistenceObserved = Boolean(snapshot.config[markerKey])
       const declared = new Set([...(snapshot.config.proxies ?? []), ...(snapshot.config['proxy-groups'] ?? [])].map(p => p.name))
+      if (state.proxyStrategy && state.proxyStrategy.mode !== 'existing') declared.add(strategyOwnership.name)
+      const strategyNodes = (snapshot.config.proxies ?? []).filter((p: any) => typeof p.name === 'string' && !/[,\r\n\x00-\x1f]/.test(p.name) && !proxies.proxies[p.name]?.all && resolveProxyOutlet(p.name, proxies.proxies).kind === 'proxy')
+        .map((p: any) => { const outlet = resolveProxyOutlet(p.name, proxies.proxies); return { name: p.name as string, type: proxies.proxies[p.name].type, health: outlet.health, delay: outlet.health === 'unknown' ? undefined : outlet.delay } })
+      const strategyLoaded = await this.strategyMatches(runtime, state.proxyStrategy)
+      const custom = state.proxyStrategy?.mode !== 'existing' ? state.proxyStrategy : undefined
+      const missing = custom?.nodes.filter(name => !strategyNodes.some((node: { name: string }) => node.name === name)) ?? []
+      const strategyWarning = !strategyLoaded ? '专用代理策略未确认加载，请重新应用或恢复。' : missing.length ? `订阅中有 ${missing.length} 个候选节点已消失，请重新选择；全部消失时拒绝连接，不改为直连。`
+        : custom?.nodes.every(name => resolveProxyOutlet(name, proxies.proxies).health === 'unhealthy') ? '所有候选节点最近探测均失败；等待内核重试或更换节点，不自动直连。' : undefined
       const choices = Object.values(proxies.proxies).filter(p => declared.has(p.name) && (isFollowGroup(p) || isProxyOnly(p.name, proxies.proxies)))
         .sort((a, b) => Number(Boolean(b.all)) - Number(Boolean(a.all)))
         .map(p => ({ name: p.name, type: p.type, current: p.now ?? p.name, udp: p.udp === true }))
@@ -134,7 +153,7 @@ export class RoutingService {
         return [{ applicationId: app.id, process: path.win32.basename(connection.metadata.processPath) }]
       }).filter((item, index, items) => items.findIndex(other => other.applicationId === item.applicationId && other.process === item.process) === index)
       return { ...base, connected: true, version: version.version, mode: config.mode, tun: config.tun?.enable ?? false, processMode: config['find-process-mode'], choices, rulesLoaded: rulesLoaded && config.mode === 'rule', evidence,
-        uncoveredProcesses, groupChoices, outlets,
+        uncoveredProcesses, groupChoices, outlets, strategyNodes, strategyLoaded, strategyWarning,
         // 只有唯一组时才推荐；多个独立选择不能猜成同一个“当前代理”。已保存组失效时也不静默换组。
         suggestedTarget: state.proxyGroup ?? (groupChoices.length === 1 ? groupChoices[0].name : undefined),
         persistenceObserved,
@@ -148,10 +167,10 @@ export class RoutingService {
       const cfg = await runtime.config()
       checks.push({ name: 'Clash Party 控制连接', ok: true, detail: `已连接，当前模式 ${cfg.mode}` })
       const state = await this.state()
-      checks.push({ name: '应用规则加载', ok: cfg.mode === 'rule' && await this.matches(runtime, state.managed), detail: state.managed.length ? '核对已管理应用的前置规则' : '当前没有 AppRoute 专属规则' })
+      checks.push({ name: '应用规则与代理策略加载', ok: cfg.mode === 'rule' && await this.matches(runtime, state.managed, state.proxyStrategy), detail: '核对专属规则和已保存的代理策略' })
       const probes = await Promise.allSettled([
         runtime.delay('DIRECT', 'https://www.baidu.com/'),
-        runtime.delay(state.managed.find(app => app.target)?.target ?? 'GLOBAL', 'https://www.gstatic.com/generate_204'),
+        runtime.delay(state.proxyGroup ?? state.managed.find(app => app.target)?.target ?? 'GLOBAL', strategyTestUrl),
       ])
       probes.forEach((probe, i) => checks.push({ name: i ? '当前出口 HTTPS 探测' : '国内直连 HTTPS 探测', ok: probe.status === 'fulfilled', detail: probe.status === 'fulfilled' ? `收到目标响应，${probe.value.delay} ms；不等同于所有应用均正常` : '探测失败：可能是网络、目标站点或出口异常' }))
     } catch (e) { checks.push({ name: 'Clash Party 控制连接', ok: false, detail: (e as Error).message }) }
@@ -162,6 +181,7 @@ export class RoutingService {
     const previous = await this.state()
     let transactionId: string | undefined
     try {
+      const nextStrategy = request.proxyStrategy === undefined ? undefined : validateProxyStrategy(request.proxyStrategy)
       // 先校验请求，再从操作系统重建进程身份；页面不能自行扩大辅助进程范围。
       if (!Array.isArray(request.applications) || (!request.applications.length && !request.proxyGroup) || request.applications.length > 100) throw new Error('一次请选择 1 至 100 个应用。')
       if (new Set(request.applications.map(app => app?.id)).size !== request.applications.length) throw new Error('请求包含重复应用。')
@@ -175,19 +195,27 @@ export class RoutingService {
       const runtime = await this.runtime()
       const baseline = await runtime.proxies()
       const probes = [{ target: 'DIRECT', url: 'https://www.baidu.com/' }, { target: 'GLOBAL', url: 'https://www.gstatic.com/generate_204' }]
-      if (request.proxyGroup || request.applications.some(app => app.mode === 'proxy')) probes.push({ target: request.target!, url: 'https://www.gstatic.com/generate_204' })
+      const customStrategy = nextStrategy && nextStrategy.mode !== 'existing' ? nextStrategy : undefined
+      if (!customStrategy && (request.proxyGroup || request.applications.some(app => app.mode === 'proxy'))) probes.push({ target: request.target!, url: strategyTestUrl })
       const probe = (p: typeof probes[number]) => this.options.probe ? this.options.probe(runtime, p.target, p.url) : runtime.delay(p.target, p.url).then(() => true, () => false)
       // 进程读取与基线探测相互独立；两者都成功后才进入写入事务。
       const [applications, before] = await Promise.all([resolveApplications(), Promise.all(probes.map(probe))])
-      if (!before.some(Boolean)) throw new Error('网络基线检查未通过，暂未修改设置。')
+      const candidateAvailable = customStrategy ? (await Promise.all(customStrategy.nodes.map(target => probe({ target, url: strategyTestUrl })))).some(Boolean) : false
+      if (!before.some(Boolean) && !candidateAvailable) throw new Error('网络基线检查未通过，暂未修改设置。')
+      if (customStrategy && !candidateAvailable) throw new Error('候选节点探测均未通过，原策略保留。')
       if (applications.some(app => app.mode === 'direct') && !before[0]) throw new Error('当前直连出口不可用，暂未修改设置。')
-      if ((request.proxyGroup || applications.some(app => app.mode === 'proxy')) && !before.at(-1)) throw new Error('所选代理出口不可用，请更换出口。')
+      if (!customStrategy && (request.proxyGroup || applications.some(app => app.mode === 'proxy')) && !before.at(-1)) throw new Error('所选代理出口不可用，请更换出口。')
       const pending = await this.apply({ ...request, applications })
       transactionId = pending.pending?.id
       if (!transactionId) throw new Error('未取得恢复事务，不能确认应用。')
+      if (customStrategy) {
+        await runtime.checkGroup(strategyOwnership.name)
+        if (!await probe({ target: strategyOwnership.name, url: strategyTestUrl })) throw new Error('新代理策略的出口检查未通过。')
+      }
       const after = await Promise.all(probes.map(probe))
       if (before.some((ok, i) => ok && !after[i])) throw new Error('应用后网络检查未通过。')
-      if (configuredProxySelections(baseline.proxies) !== configuredProxySelections((await runtime.proxies()).proxies)) throw new Error('原有代理出口选择发生变化。')
+      const originalSelections = (entries: typeof baseline.proxies) => configuredProxySelections(Object.fromEntries(Object.entries(entries).filter(([name]) => name !== strategyOwnership.name)))
+      if (originalSelections(baseline.proxies) !== originalSelections((await runtime.proxies()).proxies)) throw new Error('原有代理出口选择发生变化。')
       const observed = await this.status()
       if (observed.evidence.some(item => applications.some(app => app.id === item.applicationId) && !item.matched)) throw new Error('发现不符合设置的新连接。')
       const status = await this.confirm(transactionId)
@@ -198,7 +226,7 @@ export class RoutingService {
       }
       const state = await this.state()
       const status = await this.status()
-      const unchanged = JSON.stringify(state.managed) === JSON.stringify(previous.managed) && !state.pendingId
+      const unchanged = JSON.stringify(state.managed) === JSON.stringify(previous.managed) && JSON.stringify(state.proxyStrategy) === JSON.stringify(previous.proxyStrategy) && state.proxyGroup === previous.proxyGroup && !state.pendingId
       const restored = unchanged && status.connected && status.rulesLoaded && state.lastRecovery !== previous.lastRecovery
       const outcome = restored ? 'restored' : unchanged && state.lastRecovery === previous.lastRecovery ? 'unchanged' : 'recovery-required'
       return { outcome, message: `${error instanceof Error ? error.message : '操作失败。'}${restored ? '已自动恢复上一次设置。' : outcome === 'unchanged' ? '原设置保留。' : '请检查恢复状态。'}`, status }
@@ -206,13 +234,20 @@ export class RoutingService {
   }
   /** 一个组供所有代理应用共用；更换组走完整事务，节点切换本身完全由 Mihomo 执行。 */
   async setProxyGroup(request: { target: string; revision: string }): Promise<AutomaticApplyResult> {
+    return this.setProxyStrategy({ revision: request.revision, strategy: { mode: 'existing', group: request.target } })
+  }
+  async setProxyStrategy(request: ProxyStrategyRequest): Promise<AutomaticApplyResult> {
+    const strategy = validateProxyStrategy(request?.strategy)
     const state = await this.state()
-    return this.applyAutomatically({ revision: request.revision, target: request.target, proxyGroup: request.target,
+    const target = strategy.mode === 'existing' ? strategy.group : strategyOwnership.name
+    return this.applyAutomatically({ revision: request.revision, target, proxyGroup: target, proxyStrategy: strategy,
       applications: state.managed.filter(app => app.mode === 'proxy').map(app => ({ ...app, path: app.processPaths?.[0], source: 'manual', category: '已管理应用' })) })
   }
   async apply(request: ApplyRequest): Promise<IntegrationStatus> {
     await withLock(this.root, async () => {
       const previous = await this.state()
+      const strategy = request.proxyStrategy === undefined ? previous.proxyStrategy : validateProxyStrategy(request.proxyStrategy)
+      if (request.proxyStrategy !== undefined && (!request.proxyGroup || request.target !== (strategy!.mode === 'existing' ? strategy!.group : strategyOwnership.name))) throw new Error('代理策略必须同时更新全部代理应用。')
       if (previous.pendingId) throw new Error('请先保留或恢复上一轮试运行设置。')
       if (request.revision !== previous.revision) throw new Error('页面状态已过期，请刷新后重试。')
       if (!Array.isArray(request.applications) || (!request.applications.length && !request.proxyGroup)) throw new Error('请先选择应用。')
@@ -224,23 +259,39 @@ export class RoutingService {
       const runtime = await this.runtime()
       const [cfg, proxies, snapshot] = await Promise.all([runtime.config(), runtime.proxies(), this.party.snapshot()])
       const rulesBefore = runtimeRuleSignature((await runtime.rules()).rules)
-      const expectedBefore = configRuleSignature(addManagedRules(snapshot.config, previous.managed).rules ?? [])
+      const expectedBefore = configRuleSignature(addManagedRules(snapshot.config, previous.managed, previous.proxyStrategy).rules ?? [])
       if (rulesBefore !== expectedBefore) throw new Error('磁盘与运行中的规则不一致，已停止修改。请先在 Clash Party 重新加载配置，再重试。')
-      const runtimeBefore = digest(JSON.stringify({ cfg, rules: rulesBefore }))
+      // 新增策略会重载组定义：核对静态组，并阻止校验期间的外部改组被候选配置覆盖。
+      const expectedGroups = addManagedRules(snapshot.config, previous.managed, previous.proxyStrategy)['proxy-groups'] ?? []
+      const types: Record<string, string> = { select: 'Selector', fallback: 'Fallback', 'url-test': 'URLTest', 'load-balance': 'LoadBalance' }
+      for (const group of expectedGroups) {
+        if (!types[group.type] || group.use?.length || group['include-all'] || group['include-all-proxies'] || group['include-all-providers'] || !Array.isArray(group.proxies)) continue
+        const actual = proxies.proxies[group.name]
+        if (actual?.type !== types[group.type] || JSON.stringify(actual.all) !== JSON.stringify(group.proxies)) throw new Error('磁盘与运行中的代理组不一致，已停止修改。请先在 Clash Party 重新加载配置。')
+      }
+      const groupSignature = (entries: typeof proxies.proxies) => JSON.stringify(Object.values(entries).filter(entry => entry.all).map(entry => [entry.name, entry.type, entry.all]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))))
+      const runtimeBefore = digest(JSON.stringify({ cfg, rules: rulesBefore, groups: groupSignature(proxies.proxies) }))
       if (cfg.mode !== 'rule' || cfg['find-process-mode'] === 'off') throw new Error('需要 Clash Party 的规则模式及进程识别；AppRoute 不会自动切换全局网络设置。')
       if (snapshot.config.mode !== cfg.mode || snapshot.config['mixed-port'] !== cfg['mixed-port']) throw new Error('磁盘配置与内核模式或代理端口不同，请先在 Clash Party 重新加载配置。')
       const declared = new Set([...(snapshot.config.proxies ?? []), ...(snapshot.config['proxy-groups'] ?? [])].map(p => p.name))
-      if (request.proxyGroup !== undefined && (typeof request.proxyGroup !== 'string' || request.proxyGroup !== request.target || !declared.has(request.proxyGroup) || !isFollowGroup(proxies.proxies[request.proxyGroup]) ||
+      const custom = strategy && strategy.mode !== 'existing' ? strategy : undefined
+      if (custom) {
+        const nodeNames = new Set((snapshot.config.proxies ?? []).map((node: any) => node.name))
+        if (request.proxyStrategy !== undefined && custom.nodes.some(name => !nodeNames.has(name) || proxies.proxies[name]?.all || resolveProxyOutlet(name, proxies.proxies).kind !== 'proxy')) throw new Error('候选节点已经变化或不是远端节点，请刷新列表后重选。')
+        declared.add(strategyOwnership.name)
+      }
+      const validGroup = (name: string) => custom && name === strategyOwnership.name || isFollowGroup(proxies.proxies[name])
+      if (request.proxyGroup !== undefined && (typeof request.proxyGroup !== 'string' || request.proxyGroup !== request.target || !declared.has(request.proxyGroup) || !validGroup(request.proxyGroup) ||
           managed.some(app => app.mode === 'proxy' && app.target !== request.proxyGroup))) throw new Error('请选择有效代理组，并统一更新已有代理应用。')
-      for (const app of managed) if (app.mode === 'proxy' && (!declared.has(app.target!) || !(isFollowGroup(proxies.proxies[app.target!]) || isProxyOnly(app.target!, proxies.proxies)))) throw new Error('代理出口不存在或类型不支持，请重新选择。')
-      const candidate = YAML.stringify(addManagedRules(snapshot.config, managed))
+      for (const app of managed) if (app.mode === 'proxy' && (!declared.has(app.target!) || !(validGroup(app.target!) || isProxyOnly(app.target!, proxies.proxies)))) throw new Error('代理出口不存在或类型不支持，请重新选择。')
+      const candidate = YAML.stringify(addManagedRules(snapshot.config, managed, strategy))
       // 校验配置与准备离线恢复互不依赖，但必须等两者结束才能写配置或释放锁。
       const preparation = await Promise.allSettled([this.validate(candidate, snapshot.workDir), this.ensureRecovery()])
       for (const result of preparation) if (result.status === 'rejected') throw result.reason
       await this.party.assertSnapshot(snapshot)
-      if (digest(JSON.stringify({ cfg: await runtime.config(), rules: runtimeRuleSignature((await runtime.rules()).rules) })) !== runtimeBefore) throw new Error('内核运行配置发生变化，已取消本次应用。')
+      if (digest(JSON.stringify({ cfg: await runtime.config(), rules: runtimeRuleSignature((await runtime.rules()).rules), groups: groupSignature((await runtime.proxies()).proxies) })) !== runtimeBefore) throw new Error('内核运行配置发生变化，已取消本次应用。')
       const id = randomUUID()
-      const tx: Transaction = { id, phase: 'prepared', deadline: Date.now() + (this.options.trialMs ?? 120000), previous, beforeScript: snapshot.script, nextScript: overrideScript(managed) }
+      const tx: Transaction = { id, phase: 'prepared', deadline: Date.now() + (this.options.trialMs ?? 120000), previous, beforeScript: snapshot.script, nextScript: overrideScript(managed, strategy) }
       await atomicWrite(path.join(this.root, 'transactions', `${id}.baseline.yaml`), snapshot.workText)
       await atomicWrite(path.join(this.root, 'transactions', `${id}.registry.yaml`), snapshot.registry ?? 'items: []\n')
       await this.saveTransaction(tx)
@@ -251,11 +302,11 @@ export class RoutingService {
         await writeIfUnchanged(this.party.scriptPath, snapshot.script, tx.nextScript)
         await this.party.register(snapshot)
         await runtime.reload(candidate)
-        if (!await this.matches(runtime, managed)) throw new Error('内核未加载预期规则。')
-        if (runtimeRuleSignature((await runtime.rules()).rules) !== configRuleSignature(addManagedRules(snapshot.config, managed).rules ?? [])) throw new Error('原有规则未完整保留，正在恢复。')
+        if (!await this.matches(runtime, managed, strategy)) throw new Error('内核未加载预期规则或代理策略。')
+        if (runtimeRuleSignature((await runtime.rules()).rules) !== configRuleSignature(addManagedRules(snapshot.config, managed, strategy).rules ?? [])) throw new Error('原有规则未完整保留，正在恢复。')
         for (const app of selected) app.appliedAt = new Date().toISOString()
         tx.phase = 'pending'; await this.saveTransaction(tx)
-        await this.save({ revision: id, managed, proxyGroup: request.proxyGroup ?? previous.proxyGroup, appliedAt: new Date().toISOString(), pendingId: id })
+        await this.save({ revision: id, managed, proxyGroup: request.proxyGroup ?? previous.proxyGroup, proxyStrategy: strategy, appliedAt: new Date().toISOString(), pendingId: id })
       } catch (e) {
         try { await this.rollbackInternal(tx) } catch { throw new Error('应用失败且内核恢复未确认，请立即运行独立恢复工具。') }
         throw e
@@ -269,7 +320,7 @@ export class RoutingService {
       if (state.pendingId !== id || tx.phase !== 'pending') throw new Error('这次试运行已结束。')
       if (Date.now() >= tx.deadline) { await this.rollbackInternal(tx); throw new Error('试运行已超时，设置已恢复。') }
       const runtime = await this.runtime()
-      if ((await runtime.config()).mode !== 'rule' || !await this.matches(runtime, state.managed)) throw new Error('规则状态异常，不能确认保留。')
+      if ((await runtime.config()).mode !== 'rule' || !await this.matches(runtime, state.managed, state.proxyStrategy)) throw new Error('规则或策略状态异常，不能确认保留。')
       tx.phase = 'confirmed'; await this.saveTransaction(tx)
       await this.save({ ...state, revision: randomUUID(), pendingId: undefined })
     })
@@ -282,10 +333,10 @@ export class RoutingService {
     // 按当前订阅重新组合旧的应用策略，避免将过期完整快照覆盖到新订阅。
     try {
       const snapshot = await this.party.snapshot()
-      const candidate = YAML.stringify(addManagedRules(snapshot.config, tx.previous.managed))
+      const candidate = YAML.stringify(addManagedRules(snapshot.config, tx.previous.managed, tx.previous.proxyStrategy))
       const runtime = await this.runtime()
       await runtime.reload(candidate)
-      if (!await this.matches(runtime, tx.previous.managed)) throw new Error('旧规则未确认')
+      if (!await this.matches(runtime, tx.previous.managed, tx.previous.proxyStrategy)) throw new Error('旧规则或代理策略未确认')
       tx.phase = 'rolled-back'; await this.saveTransaction(tx)
       await this.save({ ...tx.previous, revision: randomUUID(), pendingId: undefined, lastRecovery: new Date().toISOString() })
     } catch {
@@ -312,7 +363,7 @@ export class RoutingService {
         try { const tx = await this.transaction(previous.pendingId); tx.phase = 'rolled-back'; await this.saveTransaction(tx) }
         catch { /* 离线全部恢复不依赖可解析的历史事务，先解除全部专属规则。 */ }
       }
-      await this.save({ revision: randomUUID(), managed: [], proxyGroup: previous.proxyGroup, lastRecovery: new Date().toISOString() })
+      await this.save({ revision: randomUUID(), managed: [], proxyGroup: previous.proxyStrategy?.mode === 'existing' || !previous.proxyStrategy ? previous.proxyGroup : undefined, lastRecovery: new Date().toISOString() })
       try {
         const snapshot = await this.party.snapshot()
         const runtime = await this.runtime()

@@ -3,6 +3,8 @@ import type { ManagedApplication } from '../shared/integration.ts'
 import { validProcessName } from './applicationRules.ts'
 import { normalizeProcessPath, validProcessPath } from './processFamily.ts'
 import path from 'node:path'
+import type { ProxyStrategy } from '../shared/proxyStrategy.ts'
+import { reconcileProxyStrategy, strategyOwnership, strategyTestUrl } from './proxyStrategy.ts'
 
 export const ownerId = 'approute-managed-v1'
 export const markerKey = 'x-approute-managed-v1'
@@ -68,18 +70,18 @@ export function assertNoProcessOverlap(apps: ManagedApplication[]) {
 export function removeManagedRules(config: Record<string, any>): Record<string, any> {
   const copy = structuredClone(config)
   const marker = copy[markerKey]
-  if (!marker) return copy
+  if (!marker) return reconcileProxyStrategy(copy, undefined, strategyOwnership, strategyTestUrl)
   if (marker.owner !== ownerId || !Array.isArray(marker.rules) || !Array.isArray(copy.rules) ||
       !marker.rules.every((rule: unknown, i: number) => typeof rule === 'string' && copy.rules[i] === rule)) {
     throw new Error('AppRoute 规则标记与配置不一致，已停止覆盖。请使用离线恢复工具查看诊断。')
   }
   copy.rules = copy.rules.slice(marker.rules.length)
   delete copy[markerKey]
-  return copy
+  return reconcileProxyStrategy(copy, undefined, strategyOwnership, strategyTestUrl)
 }
 
-export function addManagedRules(config: Record<string, any>, apps: ManagedApplication[]): Record<string, any> {
-  const clean = removeManagedRules(config)
+export function addManagedRules(config: Record<string, any>, apps: ManagedApplication[], strategy?: ProxyStrategy): Record<string, any> {
+  const clean = reconcileProxyStrategy(removeManagedRules(config), strategy, strategyOwnership, strategyTestUrl)
   const names = new Set(['DIRECT', ...(clean.proxies ?? []).map((p: any) => p.name), ...(clean['proxy-groups'] ?? []).map((p: any) => p.name)])
   const eligible = apps.filter(app => app.mode === 'direct' || names.has(app.target))
   const rules = ruleStrings(eligible)
@@ -88,8 +90,8 @@ export function addManagedRules(config: Record<string, any>, apps: ManagedApplic
 }
 
 /** 生成独立覆写；目标在订阅更新后消失时跳过该条，不能让整个代理配置失效。 */
-export function overrideScript(apps: ManagedApplication[]): string {
-  return `${scriptHeader}\nfunction main(config) {\n  var key = ${JSON.stringify(markerKey)};\n  var old = config[key];\n  if (old && old.owner === ${JSON.stringify(ownerId)} && Array.isArray(old.rules)) {\n    if (!Array.isArray(config.rules) || !old.rules.every(function(r,i){return config.rules[i] === r})) return config;\n    config.rules = config.rules.slice(old.rules.length);\n    delete config[key];\n  }\n  var apps = ${JSON.stringify(apps)};\n  var names = ['DIRECT'].concat((config.proxies || []).map(function(p){return p.name}), (config['proxy-groups'] || []).map(function(p){return p.name}));\n  var rules = [];\n  apps.forEach(function(app){\n    var target = app.mode === 'direct' ? 'DIRECT' : app.target;\n    if (names.indexOf(target) < 0) return;\n    (app.processPaths || app.processes).forEach(function(p){rules.push((app.processPaths ? 'PROCESS-PATH,' : 'PROCESS-NAME,') + p + ',' + target)});\n  });\n  if (rules.length) {\n    config.rules = rules.concat(config.rules || []);\n    config[key] = {owner:${JSON.stringify(ownerId)},rules:rules};\n  }\n  return config;\n}\n`
+export function overrideScript(apps: ManagedApplication[], strategy?: ProxyStrategy): string {
+  return `${scriptHeader}\nfunction main(input) {\n try {\n  var config = JSON.parse(JSON.stringify(input));\n  var key = ${JSON.stringify(markerKey)};\n  var old = config[key];\n  if (old && old.owner === ${JSON.stringify(ownerId)} && Array.isArray(old.rules)) {\n    if (!Array.isArray(config.rules) || !old.rules.every(function(r,i){return config.rules[i] === r})) return config;\n    config.rules = config.rules.slice(old.rules.length);\n    delete config[key];\n  }\n  config = (${reconcileProxyStrategy.toString()})(config, ${JSON.stringify(strategy) ?? 'undefined'}, ${JSON.stringify(strategyOwnership)}, ${JSON.stringify(strategyTestUrl)});\n  var apps = ${JSON.stringify(apps)};\n  var names = ['DIRECT'].concat((config.proxies || []).map(function(p){return p.name}), (config['proxy-groups'] || []).map(function(p){return p.name}));\n  var rules = [];\n  apps.forEach(function(app){\n    var target = app.mode === 'direct' ? 'DIRECT' : app.target;\n    if (names.indexOf(target) < 0) return;\n    (app.processPaths || app.processes).forEach(function(p){rules.push((app.processPaths ? 'PROCESS-PATH,' : 'PROCESS-NAME,') + p + ',' + target)});\n  });\n  if (rules.length) {\n    config.rules = rules.concat(config.rules || []);\n    config[key] = {owner:${JSON.stringify(ownerId)},rules:rules};\n  }\n  return config;\n } catch (_) { return input; }\n}\n`
 }
 
 export interface ProxyInfo { name: string; type: string; all?: string[]; now?: string; fixed?: string; udp?: boolean; alive?: boolean; history?: { time: string; delay: number }[] }

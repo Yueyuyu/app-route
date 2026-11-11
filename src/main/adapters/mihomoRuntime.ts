@@ -42,4 +42,5 @@ export class MihomoRuntime {
   connections() { return this.request<{ connections: RuntimeConnection[] }>('GET', '/connections') }
   reload(payload: string) { return this.request<void>('PUT', '/configs?force=true', { payload }) }
   delay(name: string, url: string) { return this.request<{ delay: number }>('GET', `/proxies/${encodeURIComponent(name)}/delay?timeout=5000&url=${encodeURIComponent(url)}`) }
+  checkGroup(name: string) { return this.request<Record<string, number>>('GET', `/group/${encodeURIComponent(name)}/delay?timeout=5000&url=${encodeURIComponent('https://www.gstatic.com/generate_204')}`) }
 }

@@ -12,6 +12,8 @@ import { markerKey, overrideScript, type ProxyInfo } from '../src/core/managedRo
 import { routingPresentation } from '../src/core/applicationInventory.ts'
 import type { Application } from '../src/shared/application.ts'
 import { identifyProcessFamily } from '../src/core/processFamily.ts'
+import { strategyOwnership } from '../src/core/proxyStrategy.ts'
+import type { ProxyStrategy } from '../src/shared/proxyStrategy.ts'
 
 class MockRuntime extends MihomoRuntime {
   current: any
@@ -23,7 +25,13 @@ class MockRuntime extends MihomoRuntime {
   constructor(config: any) { super('test'); this.current = structuredClone(config) }
   override async config(): Promise<RuntimeConfig> { if (!this.available) throw new Error('内核离线'); return this.current }
   override async version() { return { version: 'test' } }
-  override async proxies() { return { proxies: structuredClone(this.proxyEntries) } }
+  override async proxies() {
+    const proxies = structuredClone(this.proxyEntries)
+    const owned = this.current['proxy-groups']?.find((group: any) => group.name === strategyOwnership.name)
+    if (owned) proxies[owned.name] = { name: owned.name, type: owned.type === 'fallback' ? 'Fallback' : 'URLTest', all: owned.proxies, now: owned.proxies[0] }
+    return { proxies }
+  }
+  override async checkGroup() { return { Node: 10, Backup: 20 } }
   override async connections() { return { connections: this.activeConnections } }
   override async rules(): Promise<{ rules: RuntimeRule[] }> { return { rules: this.current.rules.map((r: string) => { const parts = r.split(','); const type = parts.shift()!; const proxy = parts.pop()!; return { type, payload: parts.join(','), proxy } }) } }
   override async reload(payload: string) { this.reloadCount++; if (!this.available || this.failNextReload) { this.failNextReload = false; throw new Error('模拟重载失败') }; this.current = YAML.parse(payload) }
@@ -205,6 +213,35 @@ test('辅助进程遗漏会提示；只验证应用后的精确路径、规则�
   assert.equal((await f.service.status()).evidence.at(-1)?.matched, false, '出口碰巧直连也不能冒充应用规则命中')
 })
 
+test('复用解析仍读取当前配置，外部修改及文件删除必须使缓存失效', async t => {
+  const f = await fixture(t)
+  const first = await f.service.party.snapshot()
+  first.config.rules.push('MATCH,REJECT')
+  assert.deepEqual((await f.service.party.snapshot()).config.rules, f.config.rules)
+  const stamp = await fileStamp([first.workPath])
+  await atomicWrite(first.workPath, YAML.stringify({ ...f.config, rules: ['MATCH,DIRECT'] }))
+  assert.notEqual(await fileStamp([first.workPath]), stamp)
+  assert.deepEqual((await f.service.party.snapshot()).config.rules, ['MATCH,DIRECT'])
+  await assert.rejects(f.service.party.assertSnapshot(first), /发生变化/)
+  await fs.rm(first.workPath)
+  assert.equal(await fileStamp([first.workPath]), undefined)
+})
+
+test('批量队列按路径区分同名程序；网络检查失败仍回退整批', async t => {
+  const f = await fixture(t, { resolveFamily: async application => identifyProcessFamily(application, []), probe: async () => true })
+  const second = { ...pathApp, id: 'second', path: 'C:\\Second\\Example.exe' }
+  const result = await f.service.applyAutomatically({ applications: [pathApp, second], revision: 'initial' })
+  assert.equal(result.outcome, 'applied')
+  assert.equal(result.status.managed.length, 2)
+  assert.equal(f.runtime.current.rules[1], 'PROCESS-PATH,C:\\Second\\Example.exe,DIRECT')
+  let checks = 0
+  f.service.options.probe = async () => ++checks <= 3
+  const failed = await f.service.applyAutomatically({ applications: [{ ...pathApp, mode: 'proxy' }, { ...second, mode: 'proxy' }], target: 'Group', revision: result.status.revision })
+  assert.equal(failed.outcome, 'restored')
+  assert.ok(failed.status.managed.every(app => app.mode === 'direct'))
+  assert.deepEqual(f.runtime.current.rules.slice(2), f.config.rules)
+})
+
 test('系统共享目录的新连接不会被当成应用辅助进程反复触发应用', async t => {
   const f = await fixture(t, { resolveFamily: async application => identifyProcessFamily(application, []), probe: async () => true })
   await f.service.applyAutomatically({ applications: [{ ...pathApp, path: 'C:\\Windows\\System32\\Example.exe' }], revision: 'initial' })
@@ -296,31 +333,100 @@ test('统一跟随不能只更新默认组而遗漏旧代理应用，也不能�
   assert.deepEqual((await f.service.state()).managed, fixed.status.managed)
 })
 
-test('复用解析仍读取当前配置，外部修改及文件删除必须使缓存失效', async t => {
-  const f = await fixture(t)
-  const first = await f.service.party.snapshot()
-  first.config.rules.push('MATCH,REJECT')
-  assert.deepEqual((await f.service.party.snapshot()).config.rules, f.config.rules)
-  const stamp = await fileStamp([first.workPath])
-  await atomicWrite(first.workPath, YAML.stringify({ ...f.config, rules: ['MATCH,DIRECT'] }))
-  assert.notEqual(await fileStamp([first.workPath]), stamp)
-  assert.deepEqual((await f.service.party.snapshot()).config.rules, ['MATCH,DIRECT'])
-  await assert.rejects(f.service.party.assertSnapshot(first), /发生变化/)
-  await fs.rm(first.workPath)
-  assert.equal(await fileStamp([first.workPath]), undefined)
+const automaticStrategy: ProxyStrategy = { mode: 'fallback', nodes: ['Node', 'NodeTwo'], interval: 60, timeout: 5000, tolerance: 100 }
+
+test('策略切换统一迁移代理应用，保留直连和原组；重建与独立恢复完整撤销', async t => {
+  const f = await groupFixture(t)
+  await f.service.applyAutomatically({ applications: [pathApp], revision: 'initial' })
+  const proxy = { ...pathApp, id: 'proxy', path: 'C:\\ProxyApp\\Example.exe', mode: 'proxy' as const }
+  await f.service.applyAutomatically({ applications: [proxy], target: 'Group', revision: (await f.service.state()).revision })
+  const before = await f.service.state()
+  for (const mode of ['fallback', 'url-test'] as const) {
+    const result = await f.service.setProxyStrategy({ revision: (await f.service.state()).revision, strategy: { ...automaticStrategy, mode } })
+    assert.equal(result.outcome, 'applied', result.message)
+    assert.equal(result.status.strategyLoaded, true)
+    assert.equal(result.status.proxyGroup, strategyOwnership.name)
+    assert.deepEqual(result.status.managed.find(item => item.id === pathApp.id), before.managed.find(item => item.id === pathApp.id))
+    assert.equal(result.status.managed.find(item => item.id === proxy.id)?.target, strategyOwnership.name)
+    assert.deepEqual(f.runtime.current['proxy-groups'][0], f.config['proxy-groups'][0])
+    const generated = vm.runInNewContext((await fs.readFile(f.service.party.scriptPath, 'utf8')) + '\nmain(config)', { config: structuredClone(f.config) })
+    assert.equal(generated['proxy-groups'][1].type, mode)
+    assert.ok(generated.rules.some((rule: string) => rule.endsWith(',' + strategyOwnership.name)))
+  }
+  const independent = new RoutingService(f.service.options)
+  assert.equal((await independent.state()).proxyStrategy?.mode, 'url-test')
+  const existing = await independent.setProxyStrategy({ revision: (await independent.state()).revision, strategy: { mode: 'existing', group: 'Group' } })
+  assert.equal(existing.outcome, 'applied', existing.message)
+  assert.deepEqual(f.runtime.current['proxy-groups'], f.config['proxy-groups'])
+  assert.equal(existing.status.managed.find(item => item.id === proxy.id)?.target, 'Group')
+  await independent.setProxyStrategy({ revision: existing.status.revision, strategy: automaticStrategy })
+  // 模拟客户端用当前脚本重新生成工作配置，再执行独立恢复。
+  const generated = vm.runInNewContext((await fs.readFile(independent.party.scriptPath, 'utf8')) + '\nmain(config)', { config: structuredClone(f.config) })
+  await atomicWrite(path.join(f.party, 'work/config.yaml'), YAML.stringify(generated))
+  assert.equal((await independent.recoverAll()).restored, true)
+  assert.deepEqual(f.runtime.current, f.config)
+  assert.equal((await independent.state()).proxyStrategy, undefined)
 })
 
-test('批量队列按路径区分同名程序；网络检查失败仍回退整批', async t => {
-  const f = await fixture(t, { resolveFamily: async application => identifyProcessFamily(application, []), probe: async () => true })
-  const second = { ...pathApp, id: 'second', path: 'C:\\Second\\Example.exe' }
-  const result = await f.service.applyAutomatically({ applications: [pathApp, second], revision: 'initial' })
-  assert.equal(result.outcome, 'applied')
-  assert.equal(result.status.managed.length, 2)
-  assert.equal(f.runtime.current.rules[1], 'PROCESS-PATH,C:\\Second\\Example.exe,DIRECT')
-  let checks = 0
-  f.service.options.probe = async () => ++checks <= 3
-  const failed = await f.service.applyAutomatically({ applications: [{ ...pathApp, mode: 'proxy' }, { ...second, mode: 'proxy' }], target: 'Group', revision: result.status.revision })
+test('新策略出口失败回退旧策略，过期提交与无效节点不修改配置', async t => {
+  const f = await groupFixture(t)
+  const first = await f.service.setProxyGroup({ target: 'Group', revision: 'initial' })
+  const before = await f.service.state()
+  const script = await readOptional(f.service.party.scriptPath)
+  f.service.options.probe = async (_runtime, target) => target !== strategyOwnership.name
+  const failed = await f.service.setProxyStrategy({ revision: before.revision, strategy: automaticStrategy })
+  assert.equal(failed.outcome, 'restored', failed.message)
+  assert.equal(failed.status.proxyGroup, 'Group')
+  assert.deepEqual(failed.status.proxyStrategy, before.proxyStrategy)
+  assert.equal(await readOptional(f.service.party.scriptPath), script)
+  assert.deepEqual(f.runtime.current, f.config)
+  assert.equal((await f.service.setProxyStrategy({ revision: first.status.revision, strategy: automaticStrategy })).outcome, 'unchanged')
+  f.service.options.probe = async () => true
+  const invalid = await f.service.setProxyStrategy({ revision: (await f.service.state()).revision, strategy: { ...automaticStrategy, nodes: ['Node', 'DIRECT'] } })
+  assert.equal(invalid.outcome, 'unchanged')
+  assert.equal(await readOptional(f.service.party.scriptPath), script)
+  assert.equal(f.runtime.proxyEntries.Group.now, 'Node')
+})
+
+test('专用组被同名配置占用或重载失败时保留原配置；守护到期恢复策略', async t => {
+  const f = await groupFixture(t)
+  f.runtime.failNextReload = true
+  const failed = await f.service.setProxyStrategy({ revision: 'initial', strategy: automaticStrategy })
   assert.equal(failed.outcome, 'restored')
-  assert.ok(failed.status.managed.every(app => app.mode === 'direct'))
-  assert.deepEqual(f.runtime.current.rules.slice(2), f.config.rules)
+  assert.deepEqual(f.runtime.current, f.config)
+  const pending = await f.service.apply({ revision: failed.status.revision, applications: [], target: strategyOwnership.name, proxyGroup: strategyOwnership.name, proxyStrategy: automaticStrategy })
+  assert.ok(pending.pending)
+  const independent = new RoutingService(f.service.options)
+  await independent.rollback(pending.pending!.id)
+  assert.deepEqual(f.runtime.current, f.config)
+  assert.equal((await independent.state()).proxyStrategy, undefined)
+  f.config['proxy-groups'].push({ name: strategyOwnership.name, type: 'select', proxies: ['Node'] })
+  f.runtime.current = structuredClone(f.config)
+  await atomicWrite(path.join(f.party, 'work/config.yaml'), YAML.stringify(f.config))
+  const collision = await f.service.setProxyStrategy({ revision: (await f.service.state()).revision, strategy: automaticStrategy })
+  assert.equal(collision.outcome, 'unchanged')
+  assert.deepEqual(f.runtime.current, f.config)
+})
+
+test('运行中的原有组已漂移或校验期间外部改组时不重载覆盖', async t => {
+  const f = await groupFixture(t)
+  f.runtime.proxyEntries.Group.all = ['NodeTwo', 'Node']
+  const drifted = await f.service.setProxyStrategy({ revision: 'initial', strategy: automaticStrategy })
+  assert.equal(drifted.outcome, 'unchanged')
+  assert.match(drifted.message, /代理组不一致/)
+  assert.equal(f.runtime.reloadCount, 0)
+  f.runtime.proxyEntries.Group.all = ['Node', 'NodeTwo', 'DIRECT']
+  f.service.options.validate = async () => { f.runtime.proxyEntries.Group.all = ['NodeTwo', 'Node'] }
+  const concurrent = await f.service.setProxyStrategy({ revision: 'initial', strategy: automaticStrategy })
+  assert.equal(concurrent.outcome, 'unchanged')
+  assert.match(concurrent.message, /配置发生变化/)
+  assert.equal(f.runtime.reloadCount, 0)
+})
+
+test('旧出口已故障但候选节点可用时，仍可应用备用策略', async t => {
+  const f = await groupFixture(t)
+  f.service.options.probe = async (_runtime, target) => target === 'NodeTwo' || target === strategyOwnership.name
+  const result = await f.service.setProxyStrategy({ revision: 'initial', strategy: automaticStrategy })
+  assert.equal(result.outcome, 'applied', result.message)
+  assert.equal(result.status.strategyLoaded, true)
 })
