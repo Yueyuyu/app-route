@@ -20,7 +20,7 @@ function LocalizedApp() {
   }, components: {
     Button: { primaryShadow: 'none', defaultShadow: '0 1px 2px rgba(20,35,70,.03)', fontWeight: 500 },
     Table: { headerBg: '#f5f7fb', headerColor: '#384252', headerSplitColor: 'transparent', rowHoverBg: '#fafbfe', cellPaddingBlock: 10, cellPaddingInline: 16 },
-    Menu: { itemBg: 'transparent', itemSelectedBg: '#e4edff', itemSelectedColor: '#3265ed', itemColor: '#4b5565', itemHeight: 44, itemBorderRadius: 7 },
+    Menu: { itemBg: 'transparent', itemSelectedBg: '#e7efff', itemSelectedColor: '#3265ed', itemColor: '#4b5565', itemHeight: 44, itemBorderRadius: 9 },
     Tabs: { horizontalItemGutter: 28, inkBarColor: '#3265ed', titleFontSize: 14 },
     Segmented: { trackBg: '#f5f6f8', itemSelectedBg: '#fff', itemSelectedColor: '#3265ed' },
   } }}><AntApp><App /></AntApp></ConfigProvider>

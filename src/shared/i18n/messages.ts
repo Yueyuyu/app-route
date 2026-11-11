@@ -1,6 +1,16 @@
 /** 中文原句作为 gettext 风格键；译文顺序为 English、日本語、Français。
  * 修改原句时同步更新三种译文，保留 {0} 等插值参数。用户数据不进入此目录。 */
 export const messages: Record<string, readonly [string, string, string]> = {
+  "连接方式": ["Connection", "接続方法", "Connexion"],
+  "代理组": ["Proxy group", "プロキシグループ", "Groupe proxy"],
+  "内核已连接": ["Core connected", "コアに接続済み", "Moteur connecté"],
+  "连接异常": ["Connection issue", "接続エラー", "Problème de connexion"],
+  "本机控制接口": ["Local control interface", "ローカル制御インターフェース", "Interface de contrôle locale"],
+  "自检通过 {0}/{1} 项": ["Checks passed: {0}/{1}", "チェック合格：{0}/{1}", "Vérifications réussies : {0}/{1}"],
+  "关于 AppRoute": ["About AppRoute", "AppRoute について", "À propos d’AppRoute"],
+  "预览版": ["Preview", "プレビュー版", "Aperçu"],
+  "关于": ["About", "このアプリについて", "À propos"],
+  "当前为集成测试版，尚未发布稳定版本。": ["This is an integration preview. A stable version has not been released.", "統合テスト版です。安定版はまだリリースされていません。", "Ceci est une version de test d’intégration. Aucune version stable n’a encore été publiée."],
   "系统共享进程不能设置专属分流，请选择具体应用；已有设置可切回按 Clash 规则。": [
     "Shared system processes cannot have dedicated routing. Select a specific app; existing settings can be returned to Clash rules.",
     "共有システムプロセスには専用ルールを設定できません。個別のアプリを選択してください。既存の設定は Clash ルールに戻せます。",

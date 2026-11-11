@@ -12,29 +12,46 @@ p { line-height: 1.75; }
 
 /* 主框架与导航：四个平级入口，连接状态常驻。 */
 .app-shell { min-height: 100vh; display: flex; }
-.sidebar { width: 216px; flex: 0 0 216px; background: #f3f6fc; border-right: 1px solid #e7ecf4; display: flex; flex-direction: column; padding: 28px 14px 18px; position: fixed; inset: 0 auto 0 0; z-index: 10; }
-.sidebar > .brand { margin-bottom: 38px; }
+.sidebar { width: 232px; flex: 0 0 232px; background: #f6f8fc; border-right: 1px solid #e9edf5; display: flex; flex-direction: column; padding: 16px 14px 14px; position: fixed; inset: 0 auto 0 0; z-index: 10; }
+.sidebar > .brand { min-height: 80px; padding-inline: 10px; margin-bottom: 16px; }
 .sidebar .ant-menu, .navigation-drawer .ant-menu { background: transparent; border-inline-end: none !important; }
-.sidebar .ant-menu-item { margin: 5px 0; width: 100%; padding-left: 14px !important; height: 46px; line-height: 46px; }
+.sidebar .ant-menu-item { margin: 5px 0; width: 100%; padding-left: 10px !important; height: 46px; line-height: 46px; }
 .sidebar .ant-menu-item-icon { font-size: 17px !important; }
 .sidebar .ant-menu-title-content { margin-inline-start: 12px !important; font-weight: 500; font-size: 14px; }
-.sidebar-bottom { margin-top: auto; padding-top: 24px; }
-.integration-status { display: flex; align-items: center; gap: 10px; width: 100%; padding: 15px 10px; border: 1px solid #e3e9f3; border-radius: 10px; background: #fff9; color: #344054; text-align: left; cursor: pointer; }
-.integration-status:hover { background: white; border-color: #c5d3ed; }
-.integration-status i { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: #9ba3af; }
-.integration-status i.connected { background: #27a56b; box-shadow: 0 0 0 3px #e4f5ec; }
-.integration-status i.disconnected { background: #d84e58; }
+.sidebar-bottom { margin-top: auto; padding-top: 12px; border-top: 1px solid #e8edf5; }
+.integration-status { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 10px; border: 0; border-radius: 9px; background: transparent; color: #344054; text-align: left; cursor: pointer; transition: background-color 140ms ease-out; }
+.integration-status:hover, .integration-status:focus-visible, .integration-status[aria-expanded="true"] { background: #eaf0f9; }
+.connection-dot { display: inline-block; width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: #929cac; }
+.connection-dot.connected { background: #239568; }
+.connection-dot.error { background: #ca8625; }
+.connection-dot.connecting { background: #5584d1; }
+.integration-status-copy { min-width: 0; flex: 1; }
 .integration-status strong { display: block; font-size: 13px; font-weight: 600; }
-.integration-status span:not(.anticon) { font-size: 12px; color: #667085; display: block; margin-top: 4px; }
-.integration-status > .anticon { margin-left: auto; color: #8b98ae; }
-.sidebar-bottom > small { display: flex; justify-content: center; align-items: center; font-size: 11px; margin-top: 10px; color: #7a879b; }
-.workspace { flex: 1; min-width: 0; margin-left: 216px; display: flex; flex-direction: column; }
+.integration-status-copy > span { font-size: 12px; color: #667085; display: block; margin-top: 4px; line-height: 1.4; overflow-wrap: anywhere; }
+.integration-status-chevron { color: #8b98ae; font-size: 10px; }
+.about-app-trigger { display: flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; background: transparent; color: #748197; font-size: 11px; padding: 6px 10px; margin-top: 2px; cursor: pointer; }
+.about-app-trigger:hover { color: #3265ed; }
+.connection-quick { width: 290px; max-width: calc(100vw - 64px); color: #344054; }
+.connection-quick-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 4px 0 12px; }
+.connection-quick-heading strong { display: block; font-size: 15px; }
+.connection-quick-heading div > span { display: flex; gap: 7px; align-items: center; margin-top: 5px; color: #667085; font-size: 12px; }
+.connection-quick dl { margin: 0; padding: 12px 0; display: grid; gap: 12px; border-block: 1px solid #edf0f5; }
+.connection-quick dl > div { display: grid; grid-template-columns: minmax(70px, 1fr) minmax(0, 1.7fr); gap: 12px; font-size: 12px; }
+.connection-quick dt { color: #748197; }
+.connection-quick dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.connection-quick-note { font-size: 12px; color: #748197; margin: 12px 0; line-height: 1.6; }
+.connection-quick-error { color: #a46713; font-size: 12px; overflow-wrap: anywhere; max-height: 110px; overflow-y: auto; }
+.connection-quick-actions { display: flex; gap: 8px; }
+.connection-quick-actions > button { flex: 1; font-size: 12px; }
+.diagnostic-summary { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 9px 0; margin-bottom: 8px; color: #3265ed; background: transparent; border: 0; cursor: pointer; font-size: 12px; }
+.about-app-content { padding: 12px 0 4px; }
+.about-app-content .brand { justify-content: flex-start; }
+.about-app-version { display: flex; gap: 12px; align-items: center; font-size: 12px; color: #748197; margin: 20px 0; }
+.workspace { flex: 1; min-width: 0; margin-left: 232px; display: flex; flex-direction: column; }
 .topbar { height: 52px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; background: #fff; border-bottom: 1px solid #edf0f5; }
 .topbar-left, .topbar-right { display: flex; gap: 14px; align-items: center; }
 .topbar .ant-breadcrumb { font-size: 12px; }
 .topbar .ant-breadcrumb li:last-child { font-weight: 550; }
-.topbar-right .ant-tag { color: #758196; font-size: 11px; background: #f3f5f9; }
-.topbar-app-icon { width: 28px; height: 28px; object-fit: contain; }
 .main-content { padding: 26px 28px 30px; flex: 1; width: 100%; max-width: 1680px; margin-inline: auto; }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
 .page-heading p { font-size: 13px; color: #68768b; margin: 5px 0 0; }
@@ -43,9 +60,11 @@ p { line-height: 1.75; }
 
 /* 一体组合标志保留笔画连接，白底通过叠底融入浅色导航。 */
 .brand { display: flex; align-items: center; justify-content: center; min-height: 52px; }
-.brand-lockup { display: block; width: 100%; max-width: 186px; height: auto; aspect-ratio: 1971 / 494; overflow: hidden; mix-blend-mode: multiply; }
+.brand-lockup { display: block; width: 100%; max-width: 184px; height: auto; aspect-ratio: 1971 / 494; overflow: hidden; mix-blend-mode: multiply; }
 .navigation-drawer .brand { justify-content: flex-start; }
-.navigation-drawer .brand-lockup { max-width: 208px; }
+.navigation-drawer .brand-lockup { max-width: 184px; }
+.navigation-drawer .ant-drawer-container { background: #f6f8fc; }
+.navigation-drawer .ant-drawer-body { display: flex; flex-direction: column; }
 
 /* 正常状态保持一张摘要卡，解释与诊断进入详情。 */
 .routing-panel { border: 1px solid #dce5f4; border-radius: 12px; padding: 18px 20px; background: #fff; margin-bottom: 24px; }
@@ -240,9 +259,9 @@ p { line-height: 1.75; }
   .list-search { flex-basis: 100%; padding-bottom: 12px; }
 }
 @media (max-width: 1050px) {
-  .sidebar { width: 190px; flex-basis: 190px; padding-inline: 10px; }
-  .workspace { margin-left: 190px; }
-  .sidebar .brand-lockup { max-width: 168px; }
+  .sidebar { width: 208px; flex-basis: 208px; }
+  .workspace { margin-left: 208px; }
+  .sidebar .brand-lockup { max-width: 160px; }
   .main-content { padding: 22px 20px; }
   .topbar { padding-inline: 20px; }
   .routing-summary { align-items: flex-start; flex-direction: column; gap: 14px; }

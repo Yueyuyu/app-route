@@ -3,7 +3,8 @@ import { t } from '../i18n'
 import { Alert, App, Button, Drawer } from 'antd'
 import { ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { useState } from 'react'
-import type { DiagnosticCheck, IntegrationStatus } from '../../shared/integration'
+import type { IntegrationStatus } from '../../shared/integration'
+import type { NetworkDiagnostics } from '../hooks/useNetworkDiagnostics'
 import { integrationRequest } from '../hooks/useRoutingIntegration'
 import { outletLabel } from '../i18n'
 import { ProxyStrategyDrawer } from './ProxyStrategyDrawer'
@@ -14,12 +15,12 @@ interface Props {
   status?: IntegrationStatus; error: string; refresh: () => Promise<unknown>; busy: boolean
   setProxyStrategy: (value: ProxyStrategy, revision: string, missingTargetAction?: 'block' | 'original') => Promise<void>
   inspectionOpen: boolean; setInspectionOpen: (open: boolean) => void
+  tab: string; setTab: (tab: string) => void; diagnostics: NetworkDiagnostics
 }
-export function RoutingPanel({ status, error, refresh, busy, setProxyStrategy, inspectionOpen, setInspectionOpen }: Props) {
+export function RoutingPanel({ status, error, refresh, busy: applying, setProxyStrategy, inspectionOpen, setInspectionOpen, tab, setTab, diagnostics }: Props) {
   const { modal, message } = App.useApp()
-  const [tab, setTab] = useState('overview')
   const [working, setWorking] = useState('')
-  const [checks, setChecks] = useState<DiagnosticCheck[]>([])
+  const busy = applying || diagnostics.busy
   const outlet = status?.proxyGroup ? status.outlets?.[status.proxyGroup] : undefined
   const currentNode = !status?.connected ? t("等待连接") : !status.proxyGroup ? t("尚未选择代理组") : outletLabel(outlet)
   const legacy = status?.managed.some(app => app.mode === 'proxy' && app.target !== status.proxyGroup)
@@ -27,10 +28,10 @@ export function RoutingPanel({ status, error, refresh, busy, setProxyStrategy, i
   async function run(action: string) {
     setWorking(action)
     try {
-      if (action === 'diagnose') { setChecks(await integrationRequest<DiagnosticCheck[]>(action, {})); setTab('recovery'); setInspectionOpen(true) }
+      if (action === 'diagnose') { if (await diagnostics.run()) { setTab('recovery'); setInspectionOpen(true) } }
       else { const result = await integrationRequest<{ restored: boolean; message: string }>(action, {}); void (result.restored ? message.success(t(result.message)) : message.warning(t(result.message))) }
     } catch (e) { void message.error(t(e instanceof Error ? e.message : "操作失败")) }
-    finally { await refresh(); setWorking('') }
+    finally { if (action !== 'diagnose') await refresh(); setWorking('') }
   }
   function recover() {
     modal.confirm({ title: t("恢复到 AppRoute 接管前的规则？"), content: <div className="confirmation-copy"><p>{t("停用所有 AppRoute 专属分流和自动策略，应用重新沿用 Clash Party 原有规则。")}</p><p>{t("保留原有订阅、代理组、系统代理和 TUN 设置。")}</p></div>, okText: t("恢复原有规则"), cancelText: t("取消"), okButtonProps: { danger: true }, onOk: () => run('recover') })
@@ -53,8 +54,8 @@ export function RoutingPanel({ status, error, refresh, busy, setProxyStrategy, i
       {status?.pending && !status.pending.recoveryRequired && <div className="transaction-progress" role="status">{t("正在自动检查 · 失败将恢复上一版设置")}</div>}
     </section>
     <Drawer title={t("连接详情与恢复")} open={inspectionOpen} onClose={() => setInspectionOpen(false)} size={580}
-      footer={<div className="drawer-footer"><Button onClick={() => setInspectionOpen(false)}>{t("关闭")}</Button><Button icon={<ReloadOutlined />} loading={working === 'diagnose'} disabled={busy || Boolean(working)} onClick={() => void run('diagnose')}>{t("网络自检")}</Button><Button danger disabled={busy || Boolean(working)} onClick={recover}>{t("恢复网络")}</Button></div>}>
-      <ConnectionInspector status={status} error={error} checks={checks} tab={tab} setTab={setTab} refresh={refresh} busy={busy || Boolean(working)} />
+      footer={<div className="drawer-footer"><Button onClick={() => setInspectionOpen(false)}>{t("关闭")}</Button><Button icon={<ReloadOutlined />} loading={diagnostics.busy} disabled={busy || Boolean(working)} onClick={() => void run('diagnose')}>{t("网络自检")}</Button><Button danger disabled={busy || Boolean(working)} onClick={recover}>{t("恢复网络")}</Button></div>}>
+      <ConnectionInspector status={status} error={error} checks={diagnostics.checks} tab={tab} setTab={setTab} refresh={refresh} busy={busy || Boolean(working)} />
     </Drawer>
   </>
 }

@@ -1,6 +1,6 @@
 import { t, formatTime } from './i18n'
 import { useEffect, useMemo, useState, type Key } from 'react'
-import { Alert, App as AntApp, Breadcrumb, Button, Collapse, Drawer, Dropdown, Input, Menu, Select, Tabs, Tag } from 'antd'
+import { Alert, App as AntApp, Breadcrumb, Button, Collapse, Drawer, Dropdown, Input, Menu, Select, Tabs } from 'antd'
 import { AppstoreOutlined, BookOutlined, CloseOutlined, FileTextOutlined, InfoCircleOutlined, MenuOutlined, PlusOutlined, ScanOutlined, SearchOutlined, PictureOutlined, StarOutlined } from '@ant-design/icons'
 import { ApplicationTable } from './components/ApplicationTable'
 import { ApplicationEditor } from './components/ApplicationEditor'
@@ -16,6 +16,9 @@ import { ApplicationIconsProvider } from './hooks/useApplicationIcons'
 import { ApplicationDetails } from './components/ApplicationDetails'
 import { HelpTip } from './components/HelpTip'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
+import { ConnectionStatus } from './components/ConnectionStatus'
+import { AboutApp } from './components/AboutApp'
+import { useNetworkDiagnostics } from './hooks/useNetworkDiagnostics'
 import { routeLabels, type Application, type Page, type RouteMode } from './types'
 
 const pageLabels: Record<Page, string> = { apps: '应用管理', drafts: '分流规则', help: '使用帮助', icons: '图标管理' }
@@ -23,6 +26,7 @@ const pageLabels: Record<Page, string> = { apps: '应用管理', drafts: '分流
 export default function App() {
   const inventory = useApplicationInventory()
   const routing = useRoutingIntegration()
+  const diagnostics = useNetworkDiagnostics(routing.refresh)
   const applications = useMemo(() => inventoryWithRouting(inventory.applications, routing.status), [inventory.applications, routing.status])
   const target = routing.status?.proxyGroup
   const applying = routing.busyIds.length > 0 || routing.groupBusy
@@ -41,6 +45,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [detailId, setDetailId] = useState<string>()
   const [inspectionOpen, setInspectionOpen] = useState(false)
+  const [inspectionTab, setInspectionTab] = useState('overview')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const detailApplication = applications.find(app => app.id === detailId)
   const searching = Boolean(search.trim())
@@ -82,13 +87,13 @@ export default function App() {
   return <ApplicationIconsProvider applications={inventory.applications} onResolved={inventory.syncIcons}><div className={`app-shell${window.appRoute ? ' desktop-shell' : ''}`}>
     <aside className="sidebar"><Brand />
       {navigation}
-      <div className="sidebar-bottom"><button className="integration-status" onClick={() => { setPage('apps'); setInspectionOpen(true) }} aria-label={t("查看 Clash Party 连接状态")}><i className={routing.status?.connected ? 'connected' : routing.error ? 'disconnected' : ''} /><div><strong>Clash Party</strong><span>{routing.status?.connected ? t("已连接") : routing.error ? t("连接中断") : routing.status ? t("未连接") : t("正在连接…")}</span></div><InfoCircleOutlined /></button><small>{t("AppRoute · 预览版")}<HelpTip title={t("桌面应用")}>{window.appRoute ? t("关闭窗口会收至托盘。右键托盘图标可退出；离线恢复入口独立运行。") : t("当前为开发预览。正式桌面入口从本地程序启动。")}</HelpTip></small></div>
+      <div className="sidebar-bottom"><ConnectionStatus status={routing.status} error={routing.error} busy={applying} diagnostics={diagnostics} onDetails={tab => { setPage('apps'); setInspectionTab(tab ?? 'overview'); setInspectionOpen(true) }} /><AboutApp /></div>
     </aside>
-    <div className="workspace"><header className="topbar"><div className="topbar-left"><Button type="text" className="mobile-menu-button" icon={<MenuOutlined />} aria-label={t("打开导航")} onClick={() => setMenuOpen(true)} /><Breadcrumb items={[{ title: t("工作空间") }, { title: t(pageLabels[page]) }]} /></div><div className="topbar-right"><LanguageSwitcher /><Tag variant="filled">{window.appRoute ? t("桌面应用") : t("开发预览")}</Tag><img className="topbar-app-icon" src="/brand/app-route-inline.svg" width={34} height={34} alt="AppRoute" /></div></header>
+    <div className="workspace"><header className="topbar"><div className="topbar-left"><Button type="text" className="mobile-menu-button" icon={<MenuOutlined />} aria-label={t("打开导航")} onClick={() => setMenuOpen(true)} /><Breadcrumb items={[{ title: t("工作空间") }, { title: t(pageLabels[page]) }]} /></div><div className="topbar-right"><LanguageSwitcher /></div></header>
       <main className="main-content">
         {page === 'apps' ? <section aria-label={t("应用管理")}>
           <div className="page-heading"><div><h1>{t("应用管理")}</h1><p>{t("为常用应用选择联网方式。")}</p></div><div className="heading-actions"><Button icon={<PlusOutlined />} onClick={() => { setEditing(undefined); setEditorOpen(true) }}>{t("添加应用")}</Button><Button icon={<ScanOutlined />} loading={inventory.loading} disabled={applying} onClick={() => void inventory.scan(true)}>{t("扫描应用")}</Button></div></div>
-          <RoutingPanel status={routing.status} error={routing.error} refresh={routing.refresh} busy={applying} setProxyStrategy={routing.setProxyStrategy} inspectionOpen={inspectionOpen} setInspectionOpen={setInspectionOpen} />
+          <RoutingPanel status={routing.status} error={routing.error} refresh={routing.refresh} busy={applying} setProxyStrategy={routing.setProxyStrategy} inspectionOpen={inspectionOpen} setInspectionOpen={setInspectionOpen} tab={inspectionTab} setTab={setInspectionTab} diagnostics={diagnostics} />
           {inventory.error && <Alert type="warning" showIcon title={t(inventory.error)} action={<Button onClick={() => void inventory.scan(true)}>{t("重试扫描")}</Button>} />}
           {inventory.newCount > 0 && <Alert className="inventory-update" type="success" showIcon title={t("发现 {0} 个新应用，已加入全部应用，联网方式沿用原有规则。", [inventory.newCount])} action={<Button size="small" onClick={showAll}>{t("查看全部")}</Button>} />}
           <div className="list-toolbar"><Tabs activeKey={searching ? 'search' : view} onChange={key => { if (key === 'search') return; setSearch(''); setView(key as ApplicationView); setSelected([]); void inventory.refreshRunning() }} items={[
@@ -115,6 +120,6 @@ export default function App() {
     </div>
     <ApplicationEditor open={editorOpen} application={editing} applications={applications} onClose={() => setEditorOpen(false)} onSave={(app) => { inventory.saveApplication(app); if (!editing) inventory.addFavorites([app]); void message.success(t("应用资料已保存，请在列表中选择联网方式")) }} />
     <ApplicationDetails application={detailApplication} status={routing.status} favorite={Boolean(detailApplication && inventory.favorites.includes(applicationKey(detailApplication)))} pending={detailId ? routing.pendingRoutes[detailId] : undefined} failure={detailId ? routing.failures[detailId] : undefined} close={() => setDetailId(undefined)} edit={app => { setDetailId(undefined); setEditing(app); setEditorOpen(true) }} toggleFavorite={inventory.toggleFavorite} />
-    <Drawer title={<Brand />} className="navigation-drawer" placement="left" open={menuOpen} onClose={() => setMenuOpen(false)} size={280}>{navigation}</Drawer>
+    <Drawer title={<Brand />} className="navigation-drawer" placement="left" open={menuOpen} onClose={() => setMenuOpen(false)} size={280}>{navigation}<div className="sidebar-bottom"><ConnectionStatus status={routing.status} error={routing.error} busy={applying} diagnostics={diagnostics} onDetails={tab => { setMenuOpen(false); setPage('apps'); setInspectionTab(tab ?? 'overview'); setInspectionOpen(true) }} /><AboutApp /></div></Drawer>
   </div></ApplicationIconsProvider>
 }
