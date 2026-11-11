@@ -8,6 +8,9 @@
 | --- | --- |
 | src/renderer | 真实应用列表、资料编辑和扫描、点击即应用、连接状态、自检与恢复 |
 | src/shared | 跨界面/本机边界的数据结构 |
+| src/shared/i18n | 中文源句及英日法文案、语言解析和安全插值；不翻译应用与节点身份 |
+| src/renderer/i18n.tsx | 显示语言订阅及 Ant Design/时间格式联动，不触发分流事务 |
+| src/main/desktop/languagePreferences.ts | 独立保存 preferences.json，受限 IPC 与原生菜单使用同一语言 |
 | resources/application-icons/catalog.json | 公共图标的单一目录：进程、别名、来源、许可及图标集键名 |
 | public/icons/apps、public/icons/fallbacks、public/icons/licenses | 生成的公共应用图标、项目默认图标、素材许可全文 |
 | src/core/applicationIcons.ts | 精确公共匹配、本机显示关联和默认图标选择，不修改分流身份 |
@@ -62,6 +65,7 @@ Clash Party 2.0.4 缓存覆写登记；首次登记后需要重新打开客户�
 
 - 浏览器应用资料：approute.inventory.v1，与实际应用状态分开；旧草稿只迁移真实资料。
 - %LOCALAPPDATA%\AppRoute\state.json：已管理应用、修订号、待确认事务。
+- %LOCALAPPDATA%\AppRoute\preferences.json：界面语言，首次跟随系统；不与分流状态共用存储或锁。维护方法见 [多语言维护](LOCALIZATION.md)。
 - transactions：事务、原始运行配置和登记快照、守护就绪记录，含敏感数据，仅本机使用。
 - recovery：复制当前 Node.exe、自包含 recovery.cjs、Restore-Network.cmd。
 - icons/index.json、icons/cache、icons/custom：独立图标索引、自动提取和用户替换。采用内容哈希文件名、原子写入及目录内独立锁；不与网络事务共用锁。

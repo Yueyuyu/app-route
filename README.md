@@ -1,100 +1,102 @@
-# AppRoute 应用分流
+<p align="center"><img src="public/brand/app-route-lockup.png" width="440" alt="AppRoute" /></p>
+<p align="center"><strong>为每个应用选择联网方式，无需手写代理规则。</strong></p>
+<p align="center">简体中文 · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a> · <a href="README.fr.md">Français</a></p>
+<p align="center"><a href="https://github.com/Yueyuyu/app-route/actions/workflows/ci.yml"><img src="https://github.com/Yueyuyu/app-route/actions/workflows/ci.yml/badge.svg?branch=codex%2Fclash-party-recovery" alt="CI" /></a> <img src="https://img.shields.io/badge/platform-Windows-0078D4" alt="Windows" /> <img src="https://img.shields.io/badge/status-preview-orange" alt="Preview" /> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" /></a></p>
 
-<img src="public/brand/app-route-128.png" width="80" height="80" alt="AppRoute 图标" />
+AppRoute 是一个 Windows 桌面应用：扫描本机软件，为应用选择 **按 Clash 规则、直接联网或跟随代理组**，并显示规则加载与实际连接的验证状态。当前配合已有的 Clash Party / Mihomo 使用。
 
-为每个应用选择联网方式：按 Clash Party 原有规则、直接联网或跟随 Clash Party 的代理组。
+> **0.2.0-preview.1 · 集成测试版。** 已有本机桌面打包与安装流程，尚未发布签名安装器或自动更新。真实客户端重启、订阅切换、休眠及完整兼容矩阵仍待验收。公开源码不等于稳定发行版。
 
-**当前版本：0.2.0-preview.1，Windows 集成测试版。** Ant Design 页面已接入 Clash Party / Mihomo，支持真实规则应用、连接生效检查、120 秒试运行回退和独立离线恢复。已提供可本机打包安装的 Electron 桌面版，仍不属于稳定发行版。开发预览保留为辅助入口。
+## 看看界面
 
-## 桌面使用
+![应用管理：选择应用、联网方式和代理策略](docs/images/zh-CN-applications.png)
 
-本机开发打包：`npm ci` → `npm run desktop:build` → `npm run desktop:install`（Windows / Node.js 24）。安装到 `%LOCALAPPDATA%\Programs\AppRoute`，创建桌面及开始菜单的 AppRoute 快捷方式；双击即打开独立窗口，无需浏览器、开发服务器或额外安装 Node。完整便携目录为 `release/AppRoute-win32-x64`，其中的运行时及资源必须一起保留。
+截图来自真实 Electron 界面，使用虚构的应用路径、代理组与连接记录，**仅展示交互，不作为真实网络生效证据**。
 
-关闭窗口收至托盘。托盘提供打开、检查新应用、恢复网络和退出；退出保留已有分流，独立恢复仍可用。桌面菜单可按 Alt 打开，Ctrl+Q 正常退出。开机自启未启用。打包、更新与数据说明见 [桌面版使用](docs/DESKTOP.md)。
+<details>
+<summary>代理策略、分流规则、图标管理与使用帮助</summary>
 
-应用列表默认打开“我的应用”（收藏 + 已设置专属分流），另有“正在运行”和“全部应用”。在行末“更多”或应用详情中加入/取消收藏，只影响收录和排序，不改变网络；列表不再常驻显示星标。系统工具与维护程序默认折叠，已收藏或已设置分流的条目保持展开。
+![代理策略](docs/images/zh-CN-strategy.png)
+![分流规则](docs/images/zh-CN-rules.png)
+![图标管理](docs/images/zh-CN-icons.png)
+![使用帮助](docs/images/zh-CN-help.png)
 
-搜索覆盖全部应用的名称、进程和路径，不受当前视图或系统工具折叠限制；手动选择的分类、联网方式和收藏筛选仍然有效。应用行只显示摘要，点击状态问号查看解释，点击名称查看应用详情。蓝色“规则已加载”表示内核已加载规则，绿色“已验证新连接”才表示观察到符合设置的新连接。
+</details>
 
-新装应用会在启动、返回窗口时自动检查（至少间隔 60 秒），窗口可见时每 5 分钟补查；运行进程每 15 秒更新。立即检查可点击“扫描应用”。有主窗口的便携应用可在运行后被发现，也可在“添加应用”中选取 exe。新发现的软件默认沿用 Clash Party 原有规则，收藏或设置专属分流后加入“我的应用”；不把扫描当成网络授权。
+## 可以做什么
+
+| 功能 | 使用方式 |
+| --- | --- |
+| 按应用分流 | 点击联网方式自动应用；连续选择可排队、合并，失败自动回退。 |
+| 自动发现软件 | 启动、返回窗口及定时检查新应用；支持手动选择 exe、运行中筛选和系统工具折叠。 |
+| 我的应用 | 收录收藏或已设置专属分流的应用，不根据使用频率猜测；搜索覆盖全部应用。 |
+| 跟随代理组 | 统一绑定 Clash Party 中常用的组；组内换节点后，新连接自动跟随。 |
+| 三种代理策略 | 沿用已有组、按优先级故障备用、按探测延迟选择；自动策略由 Mihomo 执行。 |
+| 状态可核对 | 蓝色表示规则已加载，绿色表示已观察到符合设置的新连接；组当前选择与实际连接分别显示。 |
+| 桌面与托盘 | 双击快捷方式打开；关闭窗口收至托盘，退出后已确认规则继续保留。 |
+| 图标管理 | 本机提取、50 个公共图标、默认图标与自定义替换；素材留在本机。 |
+| 四种显示语言 | 简体中文、English、日本語、Français；右上角切换，自动保存。 |
 
 ## 三种联网方式
 
-| 选项 | 谁决定出口 | 含义 |
-| --- | --- | --- |
-| 按 Clash 规则 | Clash Party 当前配置与订阅规则 | 每条连接按域名、IP 等条件决定直连或代理；不同网站可能使用不同出口。 |
-| 直接联网 | AppRoute 为此应用指定 DIRECT | 被识别并进入 Clash 的新连接优先直连；仍可能经过本机内核，不会关闭其他 VPN。 |
-| 跟随代理组 | 已绑定组的当前选择或自动策略 | 被识别并进入 Clash 的新连接交给该组，不再按原规则逐个网站分流；在 Clash Party 切换该组成员即可。 |
+| 选项 | 新连接如何处理 |
+| --- | --- |
+| 按 Clash 规则 | 沿用 Clash Party 的原有规则，可能直连，也可能代理。 |
+| 直接联网 | 被识别并进入 Clash 的连接使用 DIRECT，不经过远端代理节点。 |
+| 跟随代理组 | 交给已绑定组的当前选择或自动策略；组选择 DIRECT / REJECT 时也会相应直连或拒绝。 |
 
-首次打开顶部“代理策略”，选择“沿用现有策略”及常用代理组，点击“应用策略”，统一迁移已设置代理的应用并保存默认组。之后点击应用行的“跟随代理组”即使用它。日常在 Clash Party 切换该组成员，Mihomo 自动让新连接使用新的选择，无需 AppRoute 重写规则，也无需逐个应用重选。多个组彼此独立，AppRoute 不猜测 `GLOBAL` 就是你操作的那个组；绑定组消失时提示重新绑定，不擅自换组。
+AppRoute 不提供代理节点或订阅。未进入 Clash 的流量无法保证按这些设置分流；已有连接不会强制切换。默认保留原有规则，不自行启用 TUN、修改系统代理或关闭其他 VPN。[详细边界](docs/COMPATIBILITY.md)
 
-页面每 5 秒读取组的当前选择，支持嵌套手动、自动选择和故障转移组。分别显示“组当前选择”和“实际连接节点”；没有实际连接时显示尚未观测，已有连接可能仍使用旧节点。节点已选中不等于网络健康，最近测速也只证明该次探测。组选择 DIRECT / REJECT 会明确提示直连或拒绝连接。
+## 开始使用
 
-“代理策略”还支持“故障备用”和“延迟优先”：勾选 2 至 32 个候选节点，故障备用可拖动或用上下按钮调整顺序；高级设置提供探测间隔、超时与切换容差。AppRoute 创建独立专用组，不改变用户原有组。所有候选不可用时不自动直连；订阅移除全部候选时拒绝连接并提示重选。打开、勾选与排序不会立即改网络，点击“应用策略”才执行完整检查，失败恢复上一版。
+当前验证组合为 **Windows + Clash Party 2.0.4 + Mihomo v1.19.32**，使用规则模式与稳定内核。其他客户端尚未接入。
 
-手动选择组不自动避开故障节点；自动策略由 Mihomo 执行，AppRoute 关闭后仍有效。当前候选仅含配置明确声明的远端节点，动态代理集合请沿用已有组。原有订阅、系统代理与 TUN 保留。未被接管/识别的流量不保证符合设置，规则模式仍是前提。详见 [代理策略](docs/PROXY-STRATEGIES.md)、[代理组跟随](docs/PROXY-GROUPS.md)。
+目前从源码构建，需要 Node.js 24 LTS（24.11 或更新的 24.x）：
 
-## 开发预览使用
-
-需要 Node.js 24 LTS、Windows，以及正在运行的 Clash Party 标准模式与 Mihomo 稳定内核。已实测 Clash Party 2.0.4 / Mihomo v1.19.32；其他版本尚未验证。
-
-~~~sh
+~~~powershell
 git clone https://github.com/Yueyuyu/app-route.git
 cd app-route
+git switch codex/clash-party-recovery
 npm ci
-npm run dev
+npm run desktop:build
+npm run desktop:install
 ~~~
 
-打开 http://127.0.0.1:4318/。
+1. 启动 Clash Party，再双击桌面的 AppRoute。
+2. 在“代理策略”中选择常用组，点击“应用策略”。
+3. 搜索应用，选择“直接联网”或“跟随代理组”，查看该行状态。
+4. 首次登记覆写后，正常退出并重新打开一次 Clash Party，再核对规则是否保留。
 
-1. 打开页面即扫描本机真实应用；也可重新扫描或提供主程序路径手动添加。历史示例和未应用草稿不会自动写入网络。
-2. 在应用行点击“直接联网”或“跟随代理组”，立即自动识别进程、应用规则并检查网络。走代理时使用顶部明确显示的出口；复选框只用于批量操作。
-3. 后端按主程序的精确路径识别运行中的子进程，并在可确认的独立安装目录内预识别组件。共享目录、目录外程序不会直接扩大接管。页面开启时继续检测进入 Clash 的新辅助进程。
-4. 行内区分“正在应用与检查”“规则已加载”“已验证新连接”和失败原因。网络检查通过后自动保留，无需再次确认；检查失败撤销本次修改，请求中断时由 120 秒独立守护兜底。
-5. 点击“按 Clash 规则”只移除该应用的专属规则。“恢复网络”停用全部 AppRoute 专属规则。原有连接不会自动切换；需由应用建立新连接才能验证。
-
-可以连续点击不同应用，也可以改选同一应用。选项立即显示待应用状态，约 180 毫秒内的兼容修改合并提交；尚未发送的同一应用只保留最后一次选择。后台串行写入，检查期间不锁住其他应用的选择器。蓝色等待状态不代表已经生效；请求中断或恢复未确认时停止后续队列，检查后再重新选择。关闭或刷新页面会取消尚未发送的操作，已经开始的事务仍由独立恢复保护。
-
-左侧的 **图标管理** 可检查并补齐本机图标，按来源或待完善状态筛选，上传替换图片、选择公共图标或恢复自动选择。内置 50 个公共应用图标；本机提取、用户替换和索引保存在 `%LOCALAPPDATA%\AppRoute\icons`，不会上传。图标替换立即同步到列表，不改变联网方式。详见 [图标库与缓存](docs/design/application-icons.md)。
-
-首次登记的覆写列表可能被 Clash Party 缓存：需要正常退出并重新打开一次 Clash Party，再检查规则是否仍已加载。界面分别显示运行加载、连接观测、客户端持久化观测，不能互相代替。客户端完整重启和真实订阅切换仍是稳定版发布前的人工验收项。
-
-当前不主动启用 TUN、切换系统代理或关闭已有连接。未进入 Clash 的流量无法按进程分流；已有连接可能需要重新连接。直连是 DIRECT 出口，仍可经过本机内核。跟随组可包含 DIRECT / REJECT，界面按当前选择明确说明。
+安装后的桌面版自带运行时，不需要浏览器、开发服务器或另装 Node。首次语言跟随系统；不支持时使用简体中文。右上角可随时改为固定语言或恢复跟随系统。[桌面使用与数据位置](docs/DESKTOP.md)
 
 ## 断网也能恢复
 
-首次应用前自动准备独立恢复工具，并创建桌面快捷方式 **AppRoute - Restore Network**；准备失败就不应用规则。
+- **应用失败**：撤销本次修改；未完成确认的事务由独立的 120 秒守护兜底。
+- **应用仍可打开**：点击“恢复网络”，停用 AppRoute 专属规则与专用自动代理组。
+- **应用打不开**：双击桌面的 **AppRoute - Restore Network**，无需网络、ChatGPT 或项目目录。
 
-- 应用检查未完成：独立守护进程到期恢复，关闭页面和 AppRoute 服务不会取消倒计时。检查成功自动确认后不再倒计时；后续故障可用页面或离线入口恢复。
-- 页面仍可用：点击“恢复网络”。
-- 页面打不开：双击桌面快捷方式，或运行 %LOCALAPPDATA%\AppRoute\recovery\Restore-Network.cmd。
+恢复保留原有订阅、规则和系统网络设置。它撤销 AppRoute 引入的改动，不承诺修复外部网络故障；关机、休眠和守护自身退出仍是待验收场景。[恢复范围与限制](docs/RECOVERY.md)
 
-工具自带本机 Node 运行时与打包代码，不需要网络、ChatGPT、npm 或项目目录。恢复先停用本工具覆写，再重新加载当前 Clash Party 配置，随后自检；保留用户订阅、原有规则、代理组、系统代理和 TUN 设置。无法连接内核时会明确报告尚未确认恢复，并提示重新启动 Clash Party。它不能修复运营商、网卡或代理服务商故障。
+## 品牌与设计
 
-详见 [离线恢复说明](docs/RECOVERY.md) 和 [验证记录](docs/VERIFICATION.md)。
+| 应用内组合标志 | 桌面、窗口与托盘图标 |
+| :---: | :---: |
+| <img src="public/brand/app-route-lockup.png" width="340" alt="一体式分流箭头与 AppRoute 连笔字标" /> | <img src="public/brand/app-route-128.png" width="88" alt="02 深灰蓝桌面图标" /> |
 
-## 开发与架构
+应用内采用青蓝渐变的同笔连接标志：分叉箭头与 A 自然相接，保留左低右高的非对称造型，不再显示中文副标题。桌面采用 02 深灰蓝圆角底，保证独立辨识度。页面使用 Ant Design，摘要与详细说明分层展示。
 
-~~~sh
-npm run check    # 自动测试、类型检查、恢复程序打包、页面构建
-npm run preview  # 构建后的本机预览，端口仍为 4318
+[组合标志](docs/design/brand-lockup.md) · [图标规范](docs/design/app-icon.md) · [字标沿革](docs/design/wordmark.md) · [界面约定](docs/design/README.md) · [公共素材许可](THIRD_PARTY_NOTICES.md)
+
+## 开发与参与
+
+~~~powershell
+npm run dev          # 仅开发预览
+npm run check        # 自动测试、类型检查和构建
+npm run check:i18n   # Windows：隔离桌面四语验收及演示截图
 ~~~
 
-开发和预览服务只能启动一个；仅监听本机。纯静态部署没有扫描和分流能力。写入接口校验 Host、Origin 和会话令牌。
+语言切换不改变分流设置、应用身份或节点名称。翻译、界面截图的更新方式见 [多语言维护](docs/LOCALIZATION.md)；未知的技术诊断保留原文，独立离线恢复命令行暂保留中文。
 
-| 接入路线 | 状态 |
-| --- | --- |
-| Mihomo + Clash Party | Windows 实际接入与恢复，集成测试阶段 |
-| 其他 Mihomo 客户端 / 独立内核 | 规划；运行控制可复用，配置适配需单独实现 |
-| sing-box | 候选路线，未实现 |
-| HTTP / SOCKS5 端口 + 流量接管 | 预研；端口本身不能自动接管应用 |
+[项目定位](docs/PROJECT.md) · [架构](docs/ARCHITECTURE.md) · [路线图](docs/ROADMAP.md) · [验证记录](docs/VERIFICATION.md) · [贡献指南](CONTRIBUTING.md) · [报告问题](https://github.com/Yueyuyu/app-route/issues)
 
-[项目定位](docs/PROJECT.md) · [架构和目录](docs/ARCHITECTURE.md) · [兼容边界](docs/COMPATIBILITY.md) · [功能规划](docs/ROADMAP.md) · [开发规则](AGENTS.md) · [贡献指南](CONTRIBUTING.md)
-
-## 数据与许可
-
-桌面应用资料及收藏保存在 `%LOCALAPPDATA%\AppRoute\inventory.json`；开发预览资料缓存在浏览器 localStorage（approute.inventory.v1）；旧 approute.draft.v1 仅迁移真实应用资料，不重放联网选项。联网方式以本机服务的已管理状态为准。导出的设置记录标记 verified: false，不代表规则或连接已经验证。扫描和设置记录可能包含个人程序路径，不要直接公开。
-
-应用状态、事务备份和离线工具保存在 %LOCALAPPDATA%\AppRoute，Clash Party 只增加独立的 AppRoute 覆写及登记项。事务快照可能含订阅凭据，禁止提交或上传；当前尚未实现备份保留限额。代码没有遥测或云上传功能。
-
-自有代码采用 [MIT License](LICENSE)，第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。源码仓库不存放代理内核、Node 二进制或驱动；桌面包包含 Electron 及打包机的 Node 24，并附许可。离线恢复从桌面后台使用的 Node 复制独立运行时。
+应用清单、收藏、图标和管理记录保存在本机。提交问题时请移除订阅、密钥、个人路径和原始诊断。自有代码使用 [MIT](LICENSE)；第三方素材许可与商标权分别保留。
