@@ -163,9 +163,11 @@ export class RoutingService {
     let transactionId: string | undefined
     try {
       // 先校验请求，再从操作系统重建进程身份；页面不能自行扩大辅助进程范围。
-      managedApplications(request.applications, request.target)
+      if (!Array.isArray(request.applications) || (!request.applications.length && !request.proxyGroup) || request.applications.length > 100) throw new Error('一次请选择 1 至 100 个应用。')
+      if (new Set(request.applications.map(app => app?.id)).size !== request.applications.length) throw new Error('请求包含重复应用。')
+      request.applications.forEach(app => managedApplications([app], request.target))
       if (request.revision !== previous.revision || previous.pendingId) throw new Error('状态已变化或仍有恢复检查，请稍后重试。')
-      const applications = await Promise.all(request.applications.map(async app => {
+      const resolveApplications = () => Promise.all(request.applications.map(async app => {
         const clean = { ...app, processPaths: undefined, processWarnings: undefined }
         if (app.mode === 'rule') return clean
         return (this.options.resolveFamily ?? resolveProcessFamily)(clean, previous.managed.find(old => old.id === app.id)?.processPaths)
@@ -173,9 +175,10 @@ export class RoutingService {
       const runtime = await this.runtime()
       const baseline = await runtime.proxies()
       const probes = [{ target: 'DIRECT', url: 'https://www.baidu.com/' }, { target: 'GLOBAL', url: 'https://www.gstatic.com/generate_204' }]
-      if (request.proxyGroup || applications.some(app => app.mode === 'proxy')) probes.push({ target: request.target!, url: 'https://www.gstatic.com/generate_204' })
+      if (request.proxyGroup || request.applications.some(app => app.mode === 'proxy')) probes.push({ target: request.target!, url: 'https://www.gstatic.com/generate_204' })
       const probe = (p: typeof probes[number]) => this.options.probe ? this.options.probe(runtime, p.target, p.url) : runtime.delay(p.target, p.url).then(() => true, () => false)
-      const before = await Promise.all(probes.map(probe))
+      // 进程读取与基线探测相互独立；两者都成功后才进入写入事务。
+      const [applications, before] = await Promise.all([resolveApplications(), Promise.all(probes.map(probe))])
       if (!before.some(Boolean)) throw new Error('网络基线检查未通过，暂未修改设置。')
       if (applications.some(app => app.mode === 'direct') && !before[0]) throw new Error('当前直连出口不可用，暂未修改设置。')
       if ((request.proxyGroup || applications.some(app => app.mode === 'proxy')) && !before.at(-1)) throw new Error('所选代理出口不可用，请更换出口。')
@@ -231,8 +234,9 @@ export class RoutingService {
           managed.some(app => app.mode === 'proxy' && app.target !== request.proxyGroup))) throw new Error('请选择有效代理组，并统一更新已有代理应用。')
       for (const app of managed) if (app.mode === 'proxy' && (!declared.has(app.target!) || !(isFollowGroup(proxies.proxies[app.target!]) || isProxyOnly(app.target!, proxies.proxies)))) throw new Error('代理出口不存在或类型不支持，请重新选择。')
       const candidate = YAML.stringify(addManagedRules(snapshot.config, managed))
-      await this.validate(candidate, snapshot.workDir)
-      await this.ensureRecovery()
+      // 校验配置与准备离线恢复互不依赖，但必须等两者结束才能写配置或释放锁。
+      const preparation = await Promise.allSettled([this.validate(candidate, snapshot.workDir), this.ensureRecovery()])
+      for (const result of preparation) if (result.status === 'rejected') throw result.reason
       await this.party.assertSnapshot(snapshot)
       if (digest(JSON.stringify({ cfg: await runtime.config(), rules: runtimeRuleSignature((await runtime.rules()).rules) })) !== runtimeBefore) throw new Error('内核运行配置发生变化，已取消本次应用。')
       const id = randomUUID()

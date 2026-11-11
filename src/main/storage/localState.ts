@@ -3,6 +3,13 @@ import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 
 export const digest = (text: string | Buffer) => createHash('sha256').update(text).digest('hex')
+/** 缓存只复用已验证且未变化的本机文件；丢失、替换或修改都使缓存失效。 */
+export async function fileStamp(files: string[]): Promise<string | undefined> {
+  try { return JSON.stringify(await Promise.all(files.map(async file => {
+    const stat = await fs.stat(file)
+    return [file, stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs]
+  }))) } catch { return undefined }
+}
 export async function readOptional(file: string): Promise<string | null> {
   try { return await fs.readFile(file, 'utf8') } catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null; throw e }
 }

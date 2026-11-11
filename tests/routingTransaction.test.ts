@@ -7,7 +7,7 @@ import YAML from 'yaml'
 import vm from 'node:vm'
 import { RoutingService, type ServiceOptions } from '../src/main/services/routingService.ts'
 import { MihomoRuntime, type RuntimeConfig, type RuntimeConnection, type RuntimeRule } from '../src/main/adapters/mihomoRuntime.ts'
-import { atomicWrite, readOptional, writeIfUnchanged } from '../src/main/storage/localState.ts'
+import { atomicWrite, fileStamp, readOptional, writeIfUnchanged } from '../src/main/storage/localState.ts'
 import { markerKey, overrideScript, type ProxyInfo } from '../src/core/managedRouting.ts'
 import { routingPresentation } from '../src/core/applicationInventory.ts'
 import type { Application } from '../src/shared/application.ts'
@@ -294,4 +294,33 @@ test('统一跟随不能只更新默认组而遗漏旧代理应用，也不能�
   await assert.rejects(f.service.apply({ applications: [], target: 'Group', proxyGroup: 'Group', revision: fixed.status.revision }), /统一更新/)
   await assert.rejects(f.service.apply({ applications: [], target: 'Node', proxyGroup: 'Node', revision: fixed.status.revision }), /有效代理组/)
   assert.deepEqual((await f.service.state()).managed, fixed.status.managed)
+})
+
+test('复用解析仍读取当前配置，外部修改及文件删除必须使缓存失效', async t => {
+  const f = await fixture(t)
+  const first = await f.service.party.snapshot()
+  first.config.rules.push('MATCH,REJECT')
+  assert.deepEqual((await f.service.party.snapshot()).config.rules, f.config.rules)
+  const stamp = await fileStamp([first.workPath])
+  await atomicWrite(first.workPath, YAML.stringify({ ...f.config, rules: ['MATCH,DIRECT'] }))
+  assert.notEqual(await fileStamp([first.workPath]), stamp)
+  assert.deepEqual((await f.service.party.snapshot()).config.rules, ['MATCH,DIRECT'])
+  await assert.rejects(f.service.party.assertSnapshot(first), /发生变化/)
+  await fs.rm(first.workPath)
+  assert.equal(await fileStamp([first.workPath]), undefined)
+})
+
+test('批量队列按路径区分同名程序；网络检查失败仍回退整批', async t => {
+  const f = await fixture(t, { resolveFamily: async application => identifyProcessFamily(application, []), probe: async () => true })
+  const second = { ...pathApp, id: 'second', path: 'C:\\Second\\Example.exe' }
+  const result = await f.service.applyAutomatically({ applications: [pathApp, second], revision: 'initial' })
+  assert.equal(result.outcome, 'applied')
+  assert.equal(result.status.managed.length, 2)
+  assert.equal(f.runtime.current.rules[1], 'PROCESS-PATH,C:\\Second\\Example.exe,DIRECT')
+  let checks = 0
+  f.service.options.probe = async () => ++checks <= 3
+  const failed = await f.service.applyAutomatically({ applications: [{ ...pathApp, mode: 'proxy' }, { ...second, mode: 'proxy' }], target: 'Group', revision: result.status.revision })
+  assert.equal(failed.outcome, 'restored')
+  assert.ok(failed.status.managed.every(app => app.mode === 'direct'))
+  assert.deepEqual(f.runtime.current.rules.slice(2), f.config.rules)
 })

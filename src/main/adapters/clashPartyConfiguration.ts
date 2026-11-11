@@ -4,7 +4,7 @@ import YAML from 'yaml'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { ownerId, scriptHeader } from '../../core/managedRouting.ts'
-import { readOptional, writeIfUnchanged } from '../storage/localState.ts'
+import { fileStamp, readOptional, writeIfUnchanged } from '../storage/localState.ts'
 
 export const parseConfig = (text: string): Record<string, any> => {
   const doc = YAML.parseDocument(text)
@@ -14,6 +14,7 @@ export const parseConfig = (text: string): Record<string, any> => {
   return value
 }
 export class ClashPartyConfiguration {
+  private parsedWork?: { text: string; config: Record<string, any> }
   readonly scriptPath: string
   readonly registryPath: string
   readonly root: string
@@ -35,7 +36,9 @@ export class ClashPartyConfiguration {
     const workPath = path.join(workDir, 'config.yaml')
     const workText = await fs.readFile(workPath, 'utf8')
     if (script !== null && !script.startsWith(scriptHeader)) throw new Error('AppRoute 覆写文件名已被占用，已停止覆盖。')
-    return { appText, profileText, profileId: profile.current as string, registry, script, workDir, workPath, workText, config: parseConfig(workText) }
+    if (this.parsedWork?.text !== workText) this.parsedWork = { text: workText, config: parseConfig(workText) }
+    // 每次仍读取当前文件；仅复用完全相同内容的解析结果，返回副本防止调用方污染。
+    return { appText, profileText, profileId: profile.current as string, registry, script, workDir, workPath, workText, config: structuredClone(this.parsedWork.config) }
   }
   async register(snapshot: Awaited<ReturnType<ClashPartyConfiguration['snapshot']>>) {
     const doc = YAML.parseDocument(snapshot.registry ?? 'items: []\n')
@@ -58,7 +61,18 @@ export class ClashPartyConfiguration {
   }
 }
 
+let coreCache: { file: string; stamp: string; expires: number } | undefined
+let coreLookup: Promise<string> | undefined
 export async function findInstalledCore(): Promise<string> {
+  if (coreCache && coreCache.expires > Date.now() && await fileStamp([coreCache.file]) === coreCache.stamp) return coreCache.file
+  coreLookup ??= discoverInstalledCore().then(async file => {
+    const stamp = await fileStamp([file])
+    if (stamp) coreCache = { file, stamp, expires: Date.now() + 60000 }
+    return file
+  }).finally(() => { coreLookup = undefined })
+  return coreLookup
+}
+async function discoverInstalledCore(): Promise<string> {
   const command = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); $r=@('HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'); Get-ItemProperty $r -ErrorAction SilentlyContinue | Where-Object {$_.DisplayName -eq 'Clash Party'} | Select-Object -ExpandProperty DisplayIcon | ConvertTo-Json -Compress"
   const { stdout } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { windowsHide: true, timeout: 8000, encoding: 'utf8' })
   const item = JSON.parse(stdout.trim())
