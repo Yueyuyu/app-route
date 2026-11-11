@@ -12,10 +12,10 @@ const output = path.join(root, 'output/playwright/localization')
 await fs.mkdir(fixture, { recursive: true }); await fs.mkdir(output, { recursive: true })
 for (const file of ['main.cjs', 'preload.cjs', 'package.json']) await fs.copyFile(path.join(stage, file), path.join(fixture, file))
 await fs.cp(path.join(stage, 'ui'), path.join(fixture, 'ui'), { recursive: true })
-await fs.mkdir(path.join(fixture, 'runtime')); await fs.copyFile(process.execPath, path.join(fixture, 'runtime/node.exe'))
+await fs.mkdir(path.join(fixture, 'runtime')); await fs.copyFile(process.execPath, path.join(fixture, process.platform === 'win32' ? 'runtime/node.exe' : 'runtime/node'))
 await fs.copyFile(path.join(root, 'tests/fixtures/documentationBackend.mjs'), path.join(fixture, 'backend.mjs'))
 await fs.copyFile(path.join(root, 'resources/application-icons/catalog.json'), path.join(fixture, 'catalog.json'))
-const env = { ...process.env, LOCALAPPDATA: path.join(fixture, 'profile'), APPDATA: path.join(fixture, 'roaming'), ELECTRON_RUN_AS_NODE: undefined }
+const env = { ...process.env, APPROUTE_DATA_DIR: path.join(fixture, 'profile/AppRoute'), LOCALAPPDATA: path.join(fixture, 'profile'), APPDATA: path.join(fixture, 'roaming'), ELECTRON_RUN_AS_NODE: undefined }
 const results = [], errors = []
 const translations = {
  'zh-CN': ['简体中文', '应用管理', '分流规则', '图标管理', '使用帮助', '连接详情', '代理策略', '恢复网络', '取消', '添加应用'],
@@ -61,7 +61,7 @@ try {
    for (const button of await page.locator('.about-app-links button').all()) await button.click()
    const aboutActions = await desktop.evaluate(() => ({ links: globalThis.appRouteTestLinks, copied: globalThis.appRouteTestCopy }))
    assert.deepEqual(aboutActions.links.slice(-2), ['https://github.com/Yueyuyu/app-route', 'https://github.com/Yueyuyu/app-route/issues/new/choose'])
-   assert.match(aboutActions.copied, /^AppRoute 0\.2\.0-preview\.1\nBuild: .+\nRevision: /)
+   assert.match(aboutActions.copied, /^AppRoute \d+\.\d+\.\d+-preview\.\d+\nBuild: .+\nRevision: /)
    assert.equal(aboutActions.copied.includes('Demo group'), false)
    await layout(locale + '-about'); await screenshot(locale + '-about')
    await page.keyboard.press('Escape'); await page.locator('.about-app-content').waitFor({ state: 'hidden' })

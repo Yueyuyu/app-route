@@ -23,3 +23,12 @@ nsis:
   shortcutName: AppRoute
   artifactName: AppRoute-${version}-setup-${arch}.exe
   uninstallDisplayName: AppRoute
+
+mac:
+  category: public.app-category.utilities
+  identity: null
+  hardenedRuntime: false
+  notarize: false
+  artifactName: AppRoute-${version}-mac-${arch}.${ext}
+dmg:
+  sign: false
