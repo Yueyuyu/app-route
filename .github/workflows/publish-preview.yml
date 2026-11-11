@@ -1,0 +1,28 @@
+name: 发布已验收的预览包
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 三平台预览构建的成功运行编号
+        required: true
+        type: string
+      publish:
+        description: 校验后公开为预发布（否则仅创建草稿）
+        type: boolean
+        default: false
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+      - run: node scripts/publish-preview.mjs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPROUTE_RELEASE_RUN: ${{ inputs.run_id }}
+          APPROUTE_RELEASE_PUBLIC: ${{ inputs.publish }}

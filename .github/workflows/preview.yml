@@ -1,0 +1,63 @@
+name: 桌面预览版构建
+on:
+  push:
+    branches: [main, codex/clash-party-recovery]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows-x64
+          - os: macos-15
+            artifact: mac-arm64
+          - os: macos-15-intel
+            artifact: mac-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: node scripts/prepare-test-core.mjs
+      - run: npm run check:recovery-faults
+      - run: npm run check:i18n
+      - run: npm run installer:build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: node scripts/verify-packaged.mjs
+      - name: Check Windows install, upgrade and uninstall
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -LiteralPath release/installer -Filter '*-setup-x64.exe'
+          if (@($installer).Count -ne 1) { throw 'Expected one installer.' }
+          & ./scripts/verify-clean-install.ps1 -InstallerPath $installer.FullName
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AppRoute-${{ matrix.artifact }}
+          path: |
+            release/installer/*.exe
+            release/installer/*.dmg
+            release/installer/*.zip
+            release/installer/*.sha256
+            dist/build-info.json
+            output/packaged-check.json
+            output/clean-install-check.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: verification-${{ matrix.artifact }}
+          path: output/

@@ -1,12 +1,13 @@
 import type { Connect, Plugin } from 'vite'
-import type { ApplicationScanResult } from '../../src/shared/application.ts'
-import { scanApplications } from '../../src/main/platform/windows/scanApplications.ts'
+import { runningApplications } from '../../src/main/platform/applications.ts'
+import { scanApplications } from '../../src/main/platform/applications.ts'
 
 export const previewPort = 4318
 
 export function createScanMiddleware(scan = scanApplications, platform = process.platform): Connect.NextHandleFunction {
   return async (request, response, next) => {
-    if (request.url?.split('?')[0] !== '/api/applications') return next()
+    const route = request.url?.split('?')[0]
+    if (!['/api/applications', '/api/applications/running'].includes(route ?? '')) return next()
     response.setHeader('Content-Type', 'application/json; charset=utf-8')
     response.setHeader('Cache-Control', 'no-store')
     const host = request.headers.host ?? ''
@@ -17,13 +18,13 @@ export function createScanMiddleware(scan = scanApplications, platform = process
       response.end(JSON.stringify({ error: '只允许本机界面发起扫描。' }))
       return
     }
-    if (platform !== 'win32') {
+    if (!['win32', 'darwin'].includes(platform)) {
       response.statusCode = 501
-      response.end(JSON.stringify({ error: '扫描应用需要在 Windows 本机运行，可先使用手动添加。' }))
+      response.end(JSON.stringify({ error: '扫描应用需要在 Windows 或 macOS 本机运行。' }))
       return
     }
     try {
-      const result: ApplicationScanResult = await scan()
+      const result = route === '/api/applications/running' ? await runningApplications() : await scan()
       response.end(JSON.stringify(result))
     } catch {
       response.statusCode = 500

@@ -11,10 +11,16 @@ export interface Application {
   source: ApplicationSource
   icon?: string
   path?: string
+  processPaths?: string[]
+  processWarnings?: string[]
   publisher?: string
+  discoveredAt?: string
+  discovery?: 'installed' | 'running'
+  iconMethod?: import('./applicationIcon.ts').LocalIconMethod
 }
 
 export interface ApplicationScanResult {
   applications: Application[]
   scannedAt: string
+  warnings?: string[]
 }

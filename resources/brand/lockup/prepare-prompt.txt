@@ -1,0 +1,6 @@
+工具：内置 image_gen.imagegen
+输入：resources/brand/lockup/approved-preview.png（唯一编辑目标）
+transparent_background: false
+输出：public/brand/app-route-lockup.png
+
+Production logo extraction from the provided APPROVED concept sheet, not redesign. Isolate ONLY the large upper joined fork-arrow + 'AppRoute' wordmark and put it on a perfectly SOLID PURE WHITE (#FFFFFF) background. Remove the heading and smaller repeated logo. ONE logo only, no subtitle. Keep EXACTLY the approved proportions, silhouettes, smooth rounded brush shapes, asymmetric left-lower/right-higher arrows, long rounded tail ending close to p-descender height, the flowing connector into A, all letterforms, exact spelling and cyan-to-royal-blue colors. Do not change weight, slant, letter spacing, flourish or color. Preserve its actual width-to-height ratio of about 4.2 to 1. Output a wide horizontal logo strip, centered, clean edges and modest white safety margins. Absolutely no texture, gradients in background, paper, shadows, effects, distressed flecks or other decoration. The entire background including letter counters must be clean pure white. This is the final single app-header asset; retain the accepted artwork rather than inventing a new version.

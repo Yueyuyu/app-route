@@ -1,0 +1,29 @@
+{
+  "id": "brush-routing-context-pairing",
+  "approvedOn": "2026-11-11",
+  "status": "user-approved",
+  "userDecision": "去掉应用内箭头外围像阴影的浅蓝包边，直接展示透明箭头；桌面沿用02深灰蓝底，艺术字体保持不变",
+  "glyph": "route-glyph.png",
+  "glyphSha256": "32be3f19f21db15f3296e1135f9bc9adbf42c85ee74dc00bdedfce901d9e1cee",
+  "original": "brush-routing-source.png",
+  "originalSha256": "8e50fb7c77492f22b06ad0ce924cefc694c607ca77d3b18d54262b5b323c01c0",
+  "sourceViewport": { "x": 160, "y": 165, "width": 1000, "height": 920, "squareContentWidthRatio": 0.92 },
+  "glyphInsetRatio": 0.08,
+  "inline": {
+    "label": "透明箭头，无包边或阴影"
+  },
+  "desktop": {
+    "label": "02 适中提亮",
+    "cornerRadiusRatio": 0.28,
+    "gradientAngleDegrees": 145,
+    "gradientStops": [
+      { "position": 0, "color": "#3f526b" },
+      { "position": 0.6, "color": "#334157" },
+      { "position": 1, "color": "#2e3b4f" }
+    ],
+    "insetRimColor": "#435266"
+  },
+  "wordmarkSha256": "1291a1e1d59062d91d9b367288bf2b9136228e2ecceecd48050b92504c0dfb34",
+  "source": "GPT 生成的手写分流箭头；应用内 SVG 直接展示原图，桌面组合已确认的深灰蓝底板",
+  "unchanged": ["原始箭头轮廓", "青蓝渐变", "左短右长的非对称分叉", "原始艺术字"]
+}

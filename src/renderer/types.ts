@@ -2,16 +2,22 @@ import type { RouteMode } from '../shared/application'
 export type { Application, ApplicationSource, RouteMode } from '../shared/application'
 export { validProcessName } from '../core/applicationRules'
 
-export type Page = 'apps' | 'drafts' | 'help'
+export type Page = 'apps' | 'drafts' | 'help' | 'icons'
 
 export const routeLabels: Record<RouteMode, string> = {
-  rule: '按 Clash 规则', direct: '直接联网', proxy: '强制走代理',
+  rule: '按 Clash 规则', direct: '直接联网', proxy: '跟随代理组',
+}
+
+export const routeHints: Record<RouteMode, string> = {
+  rule: '继续由 Clash Party 的原有规则决定出口。',
+  direct: '进入 Clash 的新连接不经远端代理节点。',
+  proxy: '新连接跟随顶部代理策略，已有连接保持原状。',
 }
 
 export const routeDescriptions: Record<RouteMode, string> = {
-  rule: '遵循 Clash Party 当前的分流规则，按访问的网站决定直连或使用代理节点。',
-  direct: '使用本地网络，不经过远端代理节点。实现时仍可能由 Clash 接管后直连。',
-  proxy: '被识别并接管的连接统一交给 Clash Party 的指定代理组。代理组将在接入后选择。',
+  rule: '沿用 Clash Party 当前配置与订阅规则，每条连接按域名、IP 等条件决定直连或使用哪个代理。AppRoute 不为该应用增加专属规则。',
+  direct: '该应用被识别并进入 Clash 的新连接优先使用 DIRECT，不经过远端代理节点；仍可能经过本机 Clash 内核，不会关闭其他 VPN 或修改系统网络。',
+  proxy: '该应用被识别并进入 Clash 的新连接交给已保存的代理策略：沿用已有组，或由 Mihomo 执行故障备用、延迟优先。沿用的组选择 DIRECT 时也会直连。已有连接可能继续使用原节点。',
 }
 
 export const categories = ['音乐娱乐', '社交通讯', '浏览器', '开发工具', '游戏平台', '办公效率', '其他应用']

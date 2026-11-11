@@ -1,0 +1,34 @@
+appId: com.approute.desktop
+productName: AppRoute
+directories:
+  output: release/installer
+electronVersion: 45.2.3
+publish: null
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: public/favicon.ico
+  signAndEditExecutable: false
+nsis:
+  include: scripts/installer.nsh
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  packElevateHelper: false
+  runAfterFinish: false
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: AppRoute
+  artifactName: AppRoute-${version}-setup-${arch}.exe
+  uninstallDisplayName: AppRoute
+
+mac:
+  category: public.app-category.utilities
+  identity: null
+  hardenedRuntime: false
+  notarize: false
+  artifactName: AppRoute-${version}-mac-${arch}.${ext}
+dmg:
+  sign: false

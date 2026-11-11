@@ -1,0 +1,83 @@
+import type { Application, RouteMode } from './application.ts'
+import type { ProxyStrategy, StrategyNode } from './proxyStrategy.ts'
+
+export interface ManagedApplication {
+  id: string
+  name: string
+  processes: string[]
+  processPaths?: string[]
+  processWarnings?: string[]
+  appliedAt?: string
+  mode: RouteMode
+  target?: string
+  missingTargetAction?: 'block' | 'original'
+}
+export interface ApplyRequest {
+  applications: Application[]; target?: string; revision: string
+  /** 保存默认跟随组时，必须同时迁移全部已设置代理的应用。 */
+  proxyGroup?: string
+  proxyStrategy?: ProxyStrategy
+  missingTargetAction?: 'block' | 'original'
+}
+export interface AutomaticApplyResult {
+  outcome: 'applied' | 'restored' | 'unchanged' | 'recovery-required'
+  message: string
+  status: IntegrationStatus
+}
+export interface ProxyChoice { name: string; type: string; current: string; udp: boolean }
+export interface ProxyOutlet {
+  target: string
+  type?: string
+  chain: string[]
+  node?: string
+  kind: 'proxy' | 'direct' | 'reject' | 'distributed' | 'missing' | 'unknown'
+  health: 'healthy' | 'unhealthy' | 'unknown'
+  checkedAt?: string
+  delay?: number
+}
+export interface ConnectionEvidence {
+  applicationId: string
+  process: string
+  destination: string
+  outbound: string
+  matched: boolean
+  startedAt: string
+  currentRuleMatched?: boolean
+  node?: string
+  usesCurrentNode?: boolean
+}
+export interface IntegrationStatus {
+  /** 当前客户端配置的指纹；用于识别同名组/节点下的订阅变化，不含配置原文。 */
+  configurationFingerprint?: string
+  dataIssue?: boolean
+  missingTargetAction?: 'block' | 'original'
+  timings?: { phase: string; durationMs: number; ok: boolean; at: string }[]
+  /** 内核仍加载自有规则，但本机管理记录为空；只能提示核对，不能当成默认路由。 */
+  untrackedRuleCount?: number
+  persistenceObserved?: boolean
+  connected: boolean
+  version?: string
+  mode?: string
+  tun?: boolean
+  processMode?: string
+  revision: string
+  choices: ProxyChoice[]
+  suggestedTarget?: string
+  proxyGroup?: string
+  groupChoices?: ProxyChoice[]
+  proxyStrategy?: ProxyStrategy
+  strategyNodes?: StrategyNode[]
+  strategyLoaded?: boolean
+  strategyWarning?: string
+  outlets?: Record<string, ProxyOutlet>
+  managed: ManagedApplication[]
+  rulesLoaded: boolean
+  evidence: ConnectionEvidence[]
+  uncoveredProcesses?: { applicationId: string; process: string }[]
+  pending?: { id: string; deadline: number; recoveryRequired?: boolean }
+  recoveryReady: boolean
+  recoveryPath: string
+  warning?: string
+  lastRecovery?: string
+}
+export interface DiagnosticCheck { name: string; ok: boolean; detail: string }

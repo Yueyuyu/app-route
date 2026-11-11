@@ -1,8 +1,3 @@
-# 桌面桥接边界（规划）
+# 桌面桥接
 
-当前运行形态是 Vite 开发预览，尚未包含 Electron 主进程入口或 preload 实现。
-
-桌面化时在此提供带类型的有限接口，例如 `applications.scan()`；调用固定 IPC 通道。
-界面不得获得任意文件读写、任意 shell、任意 URL 请求或代理控制凭据。
-扫描实现复用 `../main/platform/windows/scanApplications.ts`，不在界面重新实现。
-Electron 的 contextIsolation 和 sandbox 应开启，nodeIntegration 应关闭。
+`index.ts` 通过 contextBridge 暴露固定业务请求和刷新事件。主进程核对主框架及本地协议来源，再转发至独立 Node 后台。不得暴露 ipcRenderer、任意文件访问或 shell 执行。

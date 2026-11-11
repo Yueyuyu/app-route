@@ -1,0 +1,656 @@
+{
+  "version": 1,
+  "collections": {
+    "logos": {
+      "name": "SVG Logos",
+      "author": "Gil Barbara and contributors",
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/gilbarbara/logos",
+      "licenseUrl": "https://github.com/gilbarbara/logos/blob/master/LICENSE.txt"
+    },
+    "simple-icons": {
+      "name": "Simple Icons",
+      "author": "Simple Icons contributors",
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/simple-icons/simple-icons",
+      "licenseUrl": "https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md"
+    },
+    "icon-park": {
+      "name": "IconPark",
+      "author": "ByteDance",
+      "license": "Apache-2.0",
+      "sourceUrl": "https://github.com/bytedance/IconPark",
+      "licenseUrl": "https://github.com/bytedance/IconPark/blob/master/LICENSE"
+    }
+  },
+  "applications": [
+    {
+      "id": "chrome",
+      "name": "Google Chrome",
+      "category": "浏览器",
+      "collection": "logos",
+      "icon": "chrome",
+      "processes": [
+        "chrome.exe"
+      ],
+      "aliases": [
+        "Chrome"
+      ]
+    },
+    {
+      "id": "edge",
+      "name": "Microsoft Edge",
+      "category": "浏览器",
+      "collection": "logos",
+      "icon": "microsoft-edge",
+      "processes": [
+        "msedge.exe"
+      ],
+      "aliases": [
+        "Edge"
+      ]
+    },
+    {
+      "id": "firefox",
+      "name": "Mozilla Firefox",
+      "category": "浏览器",
+      "collection": "logos",
+      "icon": "firefox",
+      "processes": [
+        "firefox.exe"
+      ],
+      "aliases": [
+        "Firefox"
+      ]
+    },
+    {
+      "id": "brave",
+      "name": "Brave",
+      "category": "浏览器",
+      "collection": "logos",
+      "icon": "brave",
+      "processes": [
+        "brave.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "opera",
+      "name": "Opera",
+      "category": "浏览器",
+      "collection": "logos",
+      "icon": "opera",
+      "processes": [
+        "opera.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "wechat",
+      "name": "微信",
+      "category": "社交通讯",
+      "collection": "simple-icons",
+      "icon": "wechat",
+      "processes": [
+        "WeChat.exe",
+        "Weixin.exe"
+      ],
+      "aliases": [
+        "WeChat",
+        "Weixin"
+      ],
+      "color": "#07c160"
+    },
+    {
+      "id": "qq",
+      "name": "QQ",
+      "category": "社交通讯",
+      "collection": "simple-icons",
+      "icon": "qq",
+      "processes": [
+        "QQ.exe"
+      ],
+      "aliases": [],
+      "color": "#202938"
+    },
+    {
+      "id": "feishu",
+      "name": "飞书",
+      "category": "社交通讯",
+      "collection": "icon-park",
+      "icon": "lark",
+      "processes": [
+        "Feishu.exe",
+        "Lark.exe"
+      ],
+      "aliases": [
+        "Lark"
+      ]
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram",
+      "category": "社交通讯",
+      "collection": "logos",
+      "icon": "telegram",
+      "processes": [
+        "Telegram.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "category": "社交通讯",
+      "collection": "logos",
+      "icon": "discord-icon",
+      "processes": [
+        "Discord.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "category": "社交通讯",
+      "collection": "logos",
+      "icon": "slack-icon",
+      "processes": [
+        "slack.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "teams",
+      "name": "Microsoft Teams",
+      "category": "社交通讯",
+      "collection": "logos",
+      "icon": "microsoft-teams",
+      "processes": [
+        "ms-teams.exe",
+        "Teams.exe"
+      ],
+      "aliases": [
+        "Teams"
+      ]
+    },
+    {
+      "id": "zoom",
+      "name": "Zoom",
+      "category": "社交通讯",
+      "collection": "logos",
+      "icon": "zoom-icon",
+      "processes": [
+        "Zoom.exe"
+      ],
+      "aliases": [
+        "Zoom Workplace"
+      ]
+    },
+    {
+      "id": "skype",
+      "name": "Skype",
+      "category": "社交通讯",
+      "collection": "logos",
+      "icon": "skype",
+      "processes": [
+        "Skype.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "netease-music",
+      "name": "网易云音乐",
+      "category": "音乐娱乐",
+      "collection": "simple-icons",
+      "icon": "neteasecloudmusic",
+      "processes": [
+        "cloudmusic.exe"
+      ],
+      "aliases": [
+        "NetEase Cloud Music"
+      ],
+      "color": "#d43c33"
+    },
+    {
+      "id": "spotify",
+      "name": "Spotify",
+      "category": "音乐娱乐",
+      "collection": "logos",
+      "icon": "spotify-icon",
+      "processes": [
+        "Spotify.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "vlc",
+      "name": "VLC",
+      "category": "音乐娱乐",
+      "collection": "simple-icons",
+      "icon": "vlcmediaplayer",
+      "processes": [
+        "vlc.exe"
+      ],
+      "aliases": [
+        "VLC media player"
+      ],
+      "color": "#ee8613"
+    },
+    {
+      "id": "bilibili",
+      "name": "哔哩哔哩",
+      "category": "音乐娱乐",
+      "collection": "simple-icons",
+      "icon": "bilibili",
+      "processes": [
+        "bilibili.exe"
+      ],
+      "aliases": [
+        "bilibili"
+      ],
+      "color": "#fb7299"
+    },
+    {
+      "id": "steam",
+      "name": "Steam",
+      "category": "游戏平台",
+      "collection": "logos",
+      "icon": "steam",
+      "processes": [
+        "steam.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "epic-games",
+      "name": "Epic Games Launcher",
+      "category": "游戏平台",
+      "collection": "simple-icons",
+      "icon": "epicgames",
+      "processes": [
+        "EpicGamesLauncher.exe"
+      ],
+      "aliases": [
+        "Epic Games"
+      ],
+      "color": "#222222"
+    },
+    {
+      "id": "battle-net",
+      "name": "Battle.net",
+      "category": "游戏平台",
+      "collection": "simple-icons",
+      "icon": "battledotnet",
+      "processes": [
+        "Battle.net.exe"
+      ],
+      "aliases": [
+        "战网"
+      ],
+      "color": "#148eff"
+    },
+    {
+      "id": "vscode",
+      "name": "Visual Studio Code",
+      "category": "开发工具",
+      "collection": "logos",
+      "icon": "visual-studio-code",
+      "processes": [
+        "Code.exe"
+      ],
+      "aliases": [
+        "VS Code"
+      ],
+      "requireIdentity": true,
+      "publishers": [
+        "Microsoft Corporation"
+      ]
+    },
+    {
+      "id": "visual-studio",
+      "name": "Visual Studio",
+      "category": "开发工具",
+      "collection": "logos",
+      "icon": "visual-studio",
+      "processes": [
+        "devenv.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "idea",
+      "name": "IntelliJ IDEA",
+      "category": "开发工具",
+      "collection": "logos",
+      "icon": "intellij-idea",
+      "processes": [
+        "idea64.exe",
+        "idea.exe"
+      ],
+      "aliases": [
+        "IDEA"
+      ]
+    },
+    {
+      "id": "pycharm",
+      "name": "PyCharm",
+      "category": "开发工具",
+      "collection": "logos",
+      "icon": "pycharm",
+      "processes": [
+        "pycharm64.exe",
+        "pycharm.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "category": "开发工具",
+      "collection": "logos",
+      "icon": "cursor-icon",
+      "processes": [
+        "Cursor.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "sublime",
+      "name": "Sublime Text",
+      "category": "开发工具",
+      "collection": "logos",
+      "icon": "sublimetext-icon",
+      "processes": [
+        "sublime_text.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "postman",
+      "name": "Postman",
+      "category": "开发工具",
+      "collection": "logos",
+      "icon": "postman-icon",
+      "processes": [
+        "Postman.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "docker",
+      "name": "Docker Desktop",
+      "category": "开发工具",
+      "collection": "logos",
+      "icon": "docker-icon",
+      "processes": [
+        "Docker Desktop.exe"
+      ],
+      "aliases": [
+        "Docker"
+      ]
+    },
+    {
+      "id": "github-desktop",
+      "name": "GitHub Desktop",
+      "category": "开发工具",
+      "collection": "logos",
+      "icon": "github-icon",
+      "processes": [
+        "GitHubDesktop.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "gitkraken",
+      "name": "GitKraken",
+      "category": "开发工具",
+      "collection": "logos",
+      "icon": "gitkraken",
+      "processes": [
+        "gitkraken.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "category": "办公效率",
+      "collection": "logos",
+      "icon": "openai-icon",
+      "processes": [
+        "ChatGPT.exe"
+      ],
+      "aliases": [],
+      "requireIdentity": true
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "category": "办公效率",
+      "collection": "logos",
+      "icon": "claude-icon",
+      "processes": [
+        "claude.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "category": "办公效率",
+      "collection": "logos",
+      "icon": "notion-icon",
+      "processes": [
+        "Notion.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "obsidian",
+      "name": "Obsidian",
+      "category": "办公效率",
+      "collection": "logos",
+      "icon": "obsidian-icon",
+      "processes": [
+        "Obsidian.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "libreoffice",
+      "name": "LibreOffice",
+      "category": "办公效率",
+      "collection": "simple-icons",
+      "icon": "libreoffice",
+      "processes": [
+        "soffice.exe",
+        "soffice.bin"
+      ],
+      "aliases": [],
+      "color": "#18a303"
+    },
+    {
+      "id": "onlyoffice",
+      "name": "ONLYOFFICE",
+      "category": "办公效率",
+      "collection": "simple-icons",
+      "icon": "onlyoffice",
+      "processes": [
+        "DesktopEditors.exe"
+      ],
+      "aliases": [
+        "ONLYOFFICE Desktop Editors"
+      ],
+      "color": "#ff6f3d"
+    },
+    {
+      "id": "dropbox",
+      "name": "Dropbox",
+      "category": "办公效率",
+      "collection": "logos",
+      "icon": "dropbox",
+      "processes": [
+        "Dropbox.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "onedrive",
+      "name": "Microsoft OneDrive",
+      "category": "办公效率",
+      "collection": "logos",
+      "icon": "microsoft-onedrive",
+      "processes": [
+        "OneDrive.exe"
+      ],
+      "aliases": [
+        "OneDrive"
+      ]
+    },
+    {
+      "id": "qbittorrent",
+      "name": "qBittorrent",
+      "category": "其他应用",
+      "collection": "simple-icons",
+      "icon": "qbittorrent",
+      "processes": [
+        "qbittorrent.exe"
+      ],
+      "aliases": [],
+      "color": "#2f67ba"
+    },
+    {
+      "id": "bitcomet",
+      "name": "BitComet",
+      "category": "其他应用",
+      "collection": "simple-icons",
+      "icon": "bitcomet",
+      "processes": [
+        "BitComet.exe",
+        "BitComet_x64.exe"
+      ],
+      "aliases": [
+        "比特彗星"
+      ],
+      "color": "#f49923"
+    },
+    {
+      "id": "obs",
+      "name": "OBS Studio",
+      "category": "其他应用",
+      "collection": "simple-icons",
+      "icon": "obsstudio",
+      "processes": [
+        "obs64.exe",
+        "obs32.exe"
+      ],
+      "aliases": [
+        "OBS"
+      ],
+      "color": "#302e31"
+    },
+    {
+      "id": "blender",
+      "name": "Blender",
+      "category": "其他应用",
+      "collection": "logos",
+      "icon": "blender",
+      "processes": [
+        "blender.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "figma",
+      "name": "Figma",
+      "category": "办公效率",
+      "collection": "logos",
+      "icon": "figma",
+      "processes": [
+        "Figma.exe"
+      ],
+      "aliases": []
+    },
+    {
+      "id": "photoshop",
+      "name": "Adobe Photoshop",
+      "category": "其他应用",
+      "collection": "logos",
+      "icon": "adobe-photoshop",
+      "processes": [
+        "Photoshop.exe"
+      ],
+      "aliases": [
+        "Photoshop"
+      ]
+    },
+    {
+      "id": "illustrator",
+      "name": "Adobe Illustrator",
+      "category": "其他应用",
+      "collection": "logos",
+      "icon": "adobe-illustrator",
+      "processes": [
+        "Illustrator.exe"
+      ],
+      "aliases": [
+        "Illustrator"
+      ]
+    },
+    {
+      "id": "premiere",
+      "name": "Adobe Premiere Pro",
+      "category": "其他应用",
+      "collection": "logos",
+      "icon": "adobe-premiere",
+      "processes": [
+        "Adobe Premiere Pro.exe"
+      ],
+      "aliases": [
+        "Premiere Pro"
+      ]
+    },
+    {
+      "id": "after-effects",
+      "name": "Adobe After Effects",
+      "category": "其他应用",
+      "collection": "logos",
+      "icon": "adobe-after-effects",
+      "processes": [
+        "AfterFX.exe"
+      ],
+      "aliases": [
+        "After Effects"
+      ]
+    },
+    {
+      "id": "7zip",
+      "name": "7-Zip",
+      "category": "其他应用",
+      "collection": "simple-icons",
+      "icon": "7zip",
+      "processes": [
+        "7zFM.exe"
+      ],
+      "aliases": [
+        "7-Zip File Manager"
+      ],
+      "color": "#202938"
+    },
+    {
+      "id": "thunderbird",
+      "name": "Thunderbird",
+      "category": "办公效率",
+      "collection": "simple-icons",
+      "icon": "thunderbird",
+      "processes": [
+        "thunderbird.exe"
+      ],
+      "aliases": [
+        "Mozilla Thunderbird"
+      ],
+      "color": "#0a84ff"
+    }
+  ]
+}
