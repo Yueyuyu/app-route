@@ -1,0 +1,17 @@
+:root {
+  --vp-c-brand-1: #285ad9;
+  --vp-c-brand-2: #3265ed;
+  --vp-c-brand-3: #4776ee;
+  --vp-c-brand-soft: #edf2ff;
+  --vp-c-text-1: #202938;
+  --vp-c-text-2: #596579;
+  --vp-c-bg-alt: #f5f7fc;
+  --vp-font-family-base: "Segoe UI", "Microsoft YaHei", "Hiragino Sans", system-ui, sans-serif;
+}
+.VPNavBarTitle .logo { height: 44px; width: 156px; object-fit: contain; mix-blend-mode: multiply; }
+.vp-doc img { border: 1px solid #e5eaf4; border-radius: 10px; margin: 20px 0; }
+.vp-doc table { font-size: 14px; }
+.VPSidebar { background: var(--vp-c-bg-alt); }
+@media (max-width: 640px) {
+  .VPNavBarTitle .logo { width: 134px; height: 40px; }
+}
