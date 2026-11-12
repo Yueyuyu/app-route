@@ -23,6 +23,7 @@
     "check:startup": "npm run build && node scripts/build-desktop.mjs --stage-only && node scripts/verify-startup.mjs",
     "check:recovery-faults": "npm run recovery:build && node scripts/verify-recovery-faults.mjs",
     "check:regression-proof": "node scripts/verify-regression-proof.mjs",
+    "check:ui-preview": "npm run check:i18n && node scripts/verify-settings-ui.mjs && node scripts/verify-startup.mjs && node scripts/build-ui-report.mjs",
     "preview": "vite preview",
     "icons": "node scripts/prepare-icons.mjs",
     "icons:app": "powershell.exe -NoProfile -NonInteractive -File scripts/render-app-icon.ps1 && powershell.exe -NoProfile -NonInteractive -File scripts/export-app-icon.ps1",

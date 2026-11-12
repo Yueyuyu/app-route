@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
 import { createDesktopSandbox } from './lib/testSandbox.mjs'
+import { startUiEvidence } from './lib/uiEvidence.mjs'
 import { resolveLocale, translate } from '../src/shared/i18n/index.ts'
 import { setDesktopViewport } from './lib/desktopViewport.mjs'
 
@@ -12,7 +13,8 @@ const root = process.cwd()
 const sandbox = await createDesktopSandbox('localization')
 const { fixture, env } = sandbox
 const output = path.join(root, 'output/playwright/localization')
-await fs.mkdir(output, { recursive: true })
+const finishEvidence = await startUiEvidence('localization')
+let passed = false
 const results = [], errors = []
 const translations = {
  'zh-CN': ['简体中文', '应用管理', '分流规则', '图标管理', '使用帮助', '连接详情', '代理策略', '恢复网络', '取消', '添加应用'],
@@ -177,8 +179,12 @@ try {
  assert.deepEqual(errors, [])
  await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'synthetic data; real desktop UI, IPC and language persistence; controlled content viewport, not native window sizing; no real routing changes', results, errors }, null, 2))
  console.log(JSON.stringify({ checks: results.length, output, errors }))
+ passed = true
 } catch (error) {
   const page = desktop?.windows()[0]
   if (page) { await page.screenshot({ path: path.join(output, 'failure.png') }); await fs.writeFile(path.join(output, 'failure.html'), await page.content()) }
   throw error
-} finally { await sandbox.dispose() }
+} finally {
+  try { await sandbox.dispose() } catch (error) { passed = false; throw error }
+  finally { await finishEvidence(passed) }
+}

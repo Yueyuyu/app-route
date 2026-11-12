@@ -72,6 +72,9 @@ jobs:
       - name: 首屏加载与局部故障验收（隔离数据）
         if: needs.scope.outputs.ui == 'true'
         run: node scripts/verify-startup.mjs
+      - name: 生成当前版本界面预览
+        if: needs.scope.outputs.ui == 'true'
+        run: node scripts/build-ui-report.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

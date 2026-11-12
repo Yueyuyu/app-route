@@ -4,12 +4,14 @@ import assert from 'node:assert/strict'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
 import { createDesktopSandbox } from './lib/testSandbox.mjs'
+import { startUiEvidence } from './lib/uiEvidence.mjs'
 
 const root = process.cwd(), stage = path.join(root, '.runtime/desktop-stage')
 const sandbox = await createDesktopSandbox('startup')
 const { fixture, env } = sandbox
 const output = path.join(root, 'output/playwright/startup')
-await fs.mkdir(output, { recursive: true })
+const finishEvidence = await startUiEvidence('startup')
+let passed = false
 await fs.mkdir(env.APPROUTE_DATA_DIR, { recursive: true })
 await fs.writeFile(path.join(env.APPROUTE_DATA_DIR, 'preferences.json'), JSON.stringify({ version: 1, language: 'zh-CN' }))
 await fs.writeFile(path.join(fixture, 'hold-scan'), 'fixture only')
@@ -60,7 +62,11 @@ try {
   assert.deepEqual(errors, [], 'chunk failures are handled locally')
   await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'isolated desktop with synthetic inventory and deliberately delayed scan; controlled reload, not a cold-start benchmark; no user proxy access', cachedListMs, checks, errors }, null, 2))
   console.log(JSON.stringify({ cachedListMs, checks, output }))
+  passed = true
 } catch (error) {
   if (desktop) await desktop.firstWindow().then(page => page.screenshot({ path: path.join(output, 'failure.png') })).catch(() => {})
   throw error
-} finally { await sandbox.dispose() }
+} finally {
+  try { await sandbox.dispose() } catch (error) { passed = false; throw error }
+  finally { await finishEvidence(passed) }
+}

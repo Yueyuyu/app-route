@@ -6,6 +6,7 @@ release/
 output/playwright/
 output/startup/
 output/regression-proof/
+output/ui-review/
 output/*-check.json
 coverage/
 *.log

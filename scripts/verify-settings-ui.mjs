@@ -5,6 +5,7 @@ import { build } from 'rolldown'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
 import { createDesktopSandbox } from './lib/testSandbox.mjs'
+import { startUiEvidence } from './lib/uiEvidence.mjs'
 import { translate } from '../src/shared/i18n/index.ts'
 import { setDesktopViewport } from './lib/desktopViewport.mjs'
 
@@ -13,7 +14,8 @@ const root = process.cwd()
 const sandbox = await createDesktopSandbox('settings-ui')
 const { fixture, env } = sandbox
 const output = path.join(root, 'output/playwright/settings')
-await fs.mkdir(output, { recursive: true })
+const finishEvidence = await startUiEvidence('settings')
+let passed = false
 await build({ input: 'tests/fixtures/settingsFixture.ts', platform: 'node', output: { file: path.join(fixture, 'settings-fixture.mjs'), format: 'esm' } })
 const importedFile = path.join(fixture, 'import.json'), exportedFile = path.join(fixture, 'export.json')
 const errors = [], checks = []
@@ -109,7 +111,11 @@ try {
   assert.deepEqual(errors, [])
   await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'real desktop and storage; synthetic routing; controlled content viewport, not native window sizing; no user proxy changes', checks, errors }, null, 2))
   console.log(JSON.stringify({ checks, output }))
+  passed = true
 } catch (error) {
   if (desktop) await desktop.firstWindow().then(page => page.screenshot({ path: path.join(output, 'failure.png') })).catch(() => {})
   throw error
-} finally { await sandbox.dispose() }
+} finally {
+  try { await sandbox.dispose() } catch (error) { passed = false; throw error }
+  finally { await finishEvidence(passed) }
+}
