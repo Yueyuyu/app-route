@@ -3,7 +3,7 @@ import path from 'node:path'
 import assert from 'node:assert/strict'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
-import { resolveLocale } from '../src/shared/i18n/index.ts'
+import { resolveLocale, translate } from '../src/shared/i18n/index.ts'
 
 // 使用真实的桌面主进程/preload/UI 与独立演示后台，不接触用户配置或真实代理。
 const root = process.cwd(), stage = path.join(root, '.runtime/desktop-stage')
@@ -30,7 +30,8 @@ try {
  await desktop.evaluate(({ shell, clipboard }) => {
    globalThis.appRouteTestLinks = []; globalThis.appRouteTestCopy = ''
    shell.openExternal = async url => { globalThis.appRouteTestLinks.push(url) }
-   clipboard.writeText = async value => { globalThis.appRouteTestCopy = value }
+   // 人为延迟回执，持续覆盖“点击返回但复制还没完成”的跨平台时序。
+   clipboard.writeText = async value => { await new Promise(resolve => setTimeout(resolve, 120)); globalThis.appRouteTestCopy = value }
  })
  await page.locator('.language-switcher').waitFor(); await page.locator('.application-table button.application-name').first().waitFor()
  await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1440, 1000))
@@ -58,7 +59,9 @@ try {
    await about.click()
    await page.locator('.about-app-content').waitFor()
    assert.ok((await page.locator('.about-build-date').innerText()).match(/\d{4}/))
+   await desktop.evaluate(() => { globalThis.appRouteTestCopy = ''; globalThis.appRouteTestLinks = [] })
    for (const button of await page.locator('.about-app-links button').all()) await button.click()
+   await page.getByText(translate(locale, '版本信息已复制'), { exact: true }).waitFor()
    const aboutActions = await desktop.evaluate(() => ({ links: globalThis.appRouteTestLinks, copied: globalThis.appRouteTestCopy }))
    assert.deepEqual(aboutActions.links.slice(-2), ['https://github.com/Yueyuyu/app-route', 'https://github.com/Yueyuyu/app-route/issues/new/choose'])
    assert.match(aboutActions.copied, /^AppRoute \d+\.\d+\.\d+-preview\.\d+\nBuild: .+\nRevision: /)
