@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
 import { resolveLocale, translate } from '../src/shared/i18n/index.ts'
+import { setDesktopViewport } from './lib/desktopViewport.mjs'
 
 // 使用真实的桌面主进程/preload/UI 与独立演示后台，不接触用户配置或真实代理。
 const root = process.cwd(), stage = path.join(root, '.runtime/desktop-stage')
@@ -34,10 +35,10 @@ try {
    clipboard.writeText = async value => { await new Promise(resolve => setTimeout(resolve, 120)); globalThis.appRouteTestCopy = value }
  })
  await page.locator('.language-switcher').waitFor(); await page.locator('.application-table button.application-name').first().waitFor()
- await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1440, 1000))
+ await setDesktopViewport(page, { width: 1440, height: 1000 })
  async function screenshot(name) { await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: path.join(output, name + '.png'), animations: 'disabled' }) }
  async function layout(label) {
-   const state = await page.evaluate(() => ({ width: innerWidth, overflow: document.documentElement.scrollWidth > innerWidth + 1,
+   const state = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth > innerWidth + 1,
      missingImages: [...document.images].filter(image => !image.complete || !image.naturalWidth).map(image => image.getAttribute('src')) }))
    assert.equal(state.overflow, false, label + ' horizontal overflow'); assert.deepEqual(state.missingImages, [], label + ' images'); results.push({ label, ...state })
  }
@@ -54,7 +55,7 @@ try {
    await layout(locale + '-apps'); await screenshot(locale + '-applications')
    assert.equal(await page.locator('.ant-breadcrumb').count(), 0)
    const tableTop = await page.locator('.application-table').evaluate(element => element.getBoundingClientRect().top)
-   assert.ok(tableTop < 390, locale + ' compact application header')
+   assert.ok(tableTop < 390, `${locale} compact application header: table top ${tableTop}, viewport ${JSON.stringify(page.viewportSize())}`)
    const about = page.locator('.sidebar .about-app-trigger')
    await about.click()
    await page.locator('.about-app-content').waitFor()
@@ -158,9 +159,9 @@ try {
    await page.locator('.heading-actions button').filter({ hasText: labels[9] }).click()
    await page.locator('.ant-drawer-body:visible').waitFor(); await screenshot(locale + '-add')
    await page.keyboard.press('Escape'); await page.locator('.ant-drawer-body:visible').waitFor({ state: 'hidden' })
-   await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1000, 760))
+   await setDesktopViewport(page, { width: 1000, height: 760 })
    await layout(locale + '-narrow'); await screenshot(locale + '-narrow')
-   await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1440, 1000))
+   await setDesktopViewport(page, { width: 1440, height: 1000 })
  }
  await desktop.close(); desktop = undefined
  desktop = await electron.launch({ executablePath, args: [fixture], env, timeout: 30000 })
@@ -178,7 +179,7 @@ try {
  const requests = (await fs.readFile(path.join(fixture, 'requests.jsonl'), 'utf8')).trim().split('\n').map(line => JSON.parse(line).action)
  assert.deepEqual(requests.filter(action => action.startsWith('integration.') && !['integration.status', 'integration.diagnose', 'integration.reconcile'].includes(action)), [])
  assert.deepEqual(errors, [])
- await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'synthetic data; real desktop UI, IPC and language persistence; no real routing changes', results, errors }, null, 2))
+ await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'synthetic data; real desktop UI, IPC and language persistence; controlled content viewport, not native window sizing; no real routing changes', results, errors }, null, 2))
  console.log(JSON.stringify({ checks: results.length, output, errors }))
 } catch (error) {
   const page = desktop?.windows()[0]

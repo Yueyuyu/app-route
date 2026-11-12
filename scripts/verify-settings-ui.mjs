@@ -5,6 +5,7 @@ import { build } from 'rolldown'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
 import { translate } from '../src/shared/i18n/index.ts'
+import { setDesktopViewport } from './lib/desktopViewport.mjs'
 
 // 真实 Electron 主进程、文件对话框调用、IPC、设置存储；路由只记录到隔离夹具。
 const root = process.cwd(), stage = path.join(root, '.runtime/desktop-stage')
@@ -26,8 +27,8 @@ try {
   const page = await desktop.firstWindow()
   page.on('pageerror', error => errors.push(error.message))
   await page.locator('.application-table button.application-name').first().waitFor()
-  await desktop.evaluate(({ dialog, BrowserWindow }, files) => {
-    BrowserWindow.getAllWindows()[0].setContentSize(1440, 1000)
+  await setDesktopViewport(page, { width: 1440, height: 1000 })
+  await desktop.evaluate(({ dialog }, files) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [files.importedFile] })
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: files.exportedFile })
   }, { importedFile, exportedFile })
@@ -56,7 +57,7 @@ try {
     await drawer.locator('.settings-preview-table').waitFor()
     assert.equal(await drawer.locator('tbody input[type=checkbox]:checked').count(), 1, 'configured apps remain unchecked')
     assert.equal(await drawer.locator('tbody input[type=checkbox]:disabled').count(), 1, 'missing path cannot be selected')
-    await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1000, 760))
+    await setDesktopViewport(page, { width: 1000, height: 760 })
     await page.waitForFunction(() => innerWidth === 1000 && [...document.querySelectorAll('.settings-import-footer button')].every(button => button.getBoundingClientRect().right <= innerWidth))
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false)
     const clippedButtons = await drawer.locator('.ant-drawer-footer button').evaluateAll(buttons => buttons.some(button => { const rect = button.getBoundingClientRect(); return rect.right > innerWidth || rect.left < 0 }))
@@ -91,7 +92,7 @@ try {
     assert.equal(await fs.stat(path.join(env.APPROUTE_DATA_DIR, 'backups', backupId)).then(() => true, () => false), false)
     assert.equal(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'inventory.json'), 'utf8'), beforeDelete)
     checks.push(locale + ': backup create, preview, export, confirmed deletion without changing current settings')
-    await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1440, 1000))
+    await setDesktopViewport(page, { width: 1440, height: 1000 })
   }
   const tr = source => translate('fr', source)
   await page.getByRole('button', { name: new RegExp(tr('导入设置')) }).click()
@@ -110,7 +111,7 @@ try {
   assert.equal(await page.locator('.ant-drawer-content-wrapper:visible').count(), 0)
   checks.push('invalid JSON is visible without opening preview')
   assert.deepEqual(errors, [])
-  await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'real desktop and storage; synthetic routing; no user proxy changes', checks, errors }, null, 2))
+  await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'real desktop and storage; synthetic routing; controlled content viewport, not native window sizing; no user proxy changes', checks, errors }, null, 2))
   console.log(JSON.stringify({ checks, output }))
 } catch (error) {
   if (desktop) await desktop.firstWindow().then(page => page.screenshot({ path: path.join(output, 'failure.png') })).catch(() => {})
