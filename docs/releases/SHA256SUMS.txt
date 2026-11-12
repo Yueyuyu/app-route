@@ -1,0 +1,5 @@
+495a2e8f317b0d5044366b1644b74977d8ba3c69fff421a2ce3ff0f04f09fc7e  AppRoute-0.2.0-preview.2-setup-x64.exe
+9a93b015daa2402c5952776d48fbb5092a8ae57992d8dae171c043b3dd49323a  AppRoute-0.2.0-preview.2-mac-arm64.dmg
+794eed07efdcab53331a83b6ac042cfafc3ab31d16a3a51bcbc84d2c2d83bef8  AppRoute-0.2.0-preview.2-mac-x64.dmg
+577507741c5faf0866a34d69a5d9f61df329cd317860d0fea625d9dab3095e4a  AppRoute-0.2.0-preview.2-mac-arm64.zip
+c05973ed7add5cd5f224de274f3f1ee4c53dc82c4903e8ff822ec32bd7a138f0  AppRoute-0.2.0-preview.2-mac-x64.zip

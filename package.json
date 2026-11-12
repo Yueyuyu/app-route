@@ -28,7 +28,10 @@
     "prepreview": "npm run recovery:build",
     "desktop:build": "npm run build && node scripts/build-desktop.mjs",
     "desktop:install": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/install-desktop.ps1",
-    "installer:build": "npm run desktop:build && node scripts/build-installer.mjs"
+    "installer:build": "npm run desktop:build && node scripts/build-installer.mjs",
+    "docs:sync-release": "node scripts/sync-release-docs.mjs",
+    "docs:generate": "node scripts/generate-docs.mjs",
+    "docs:check": "node scripts/generate-docs.mjs --check && node scripts/check-docs.mjs && node --test tests/release-docs.test.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "6.3.4",
