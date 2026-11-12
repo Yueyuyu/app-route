@@ -4,7 +4,7 @@ dist-electron/
 release/
 .runtime/
 output/playwright/
-output/runtime-selection-check.json
+output/*-check.json
 coverage/
 *.log
 *.local

@@ -4,12 +4,12 @@ import path from 'node:path'
 import http from 'node:http'
 import net from 'node:net'
 import { spawn } from 'node:child_process'
-import { setTimeout as wait } from 'node:timers/promises'
 import YAML from 'yaml'
 import { MihomoRuntime } from '../src/main/adapters/mihomoRuntime.ts'
 import { findInstalledCore } from '../src/main/adapters/clashPartyConfiguration.ts'
 import { appRouteDataDirectory, clashPartyDataDirectory } from '../src/main/platform/paths.ts'
 import { digest } from '../src/main/storage/localState.ts'
+import { waitForCoreRules } from './lib/core-readiness.ts'
 
 // 使用独立内核、回环探测和虚构节点复现缓存回读；不发现或重载日常内核。
 const folder = path.resolve('.runtime/selection-checks', String(Date.now()))
@@ -43,7 +43,7 @@ async function failSelectedNode() {
 }
 try {
   child = spawn(process.env.APPROUTE_TEST_CORE ?? await findInstalledCore(), ['-d', folder, '-f', file, process.platform === 'win32' ? '-ext-ctl-pipe' : '-ext-ctl-unix', pipe], { windowsHide: true, stdio: 'ignore' })
-  for (let attempt = 0; attempt < 80; attempt++) { try { await runtime.version(); break } catch { await wait(100) } }
+  await waitForCoreRules(() => runtime.rules(), config.rules, { exited: () => child.exitCode !== null || Boolean(child.signalCode) })
   await runtime.request('PUT', '/proxies/Fixture%20manual', { name: 'Node B' })
   await setFixed(); await failSelectedNode()
   // 裸 API 是问题对照，只在独立内核运行。

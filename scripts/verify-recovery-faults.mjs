@@ -14,6 +14,7 @@ import { findInstalledCore, validateWithCore } from '../src/main/adapters/clashP
 import { installRecoveryKit } from '../src/main/recovery/recoveryKit.ts'
 import { watchTransaction } from '../src/main/recovery/watchTransaction.ts'
 import { atomicWrite, digest, readOptional } from '../src/main/storage/localState.ts'
+import { waitForCoreRules } from './lib/core-readiness.ts'
 
 // 子进程只接受本脚本在仓库隔离目录中生成的清单，绝不使用日常客户端的自动发现。
 const workspace = path.resolve('.runtime/recovery-faults')
@@ -47,9 +48,9 @@ async function verify() {
     const exited = new Promise(resolve => child.once('exit', resolve)); child.kill(); await exited
   }
   async function startCore() {
+    const expected = YAML.parse(await fs.readFile(path.join(party, 'work/config.yaml'), 'utf8')).rules
     core = spawn(corePath, ['-d', path.join(party, 'work'), '-f', path.join(party, 'work/config.yaml'), process.platform === 'win32' ? '-ext-ctl-pipe' : '-ext-ctl-unix', pipe], { windowsHide: true, stdio: 'ignore' }); children.add(core)
-    for (let i = 0; i < 80; i++) { try { await runtime.version(); return } catch { await wait(100) } }
-    throw new Error('Isolated core did not start')
+    await waitForCoreRules(() => runtime.rules(), expected, { exited: () => core.exitCode !== null || Boolean(core.signalCode) })
   }
   async function waitUntil(predicate) {
     for (let i = 0; i < 100; i++) { if (await predicate()) return; await wait(100) }
@@ -110,8 +111,10 @@ async function verify() {
   } finally {
     for (const child of children) await stop(child)
     const unchanged = JSON.stringify(await hashProtected()) === JSON.stringify(before)
-    const report = { checkedAt: new Date().toISOString(), results, originalConfigurationUnchanged: unchanged, physicalSleepTested: false }
+    const report = { checkedAt: new Date().toISOString(), platform: process.platform, arch: process.arch, results, originalConfigurationUnchanged: unchanged, physicalSleepTested: false }
     await fs.writeFile(path.join(folder, 'result.json'), JSON.stringify(report, null, 2))
+    await fs.mkdir('output', { recursive: true })
+    await fs.writeFile('output/recovery-fault-check.json', JSON.stringify(report, null, 2))
     console.log(JSON.stringify(report)); assert.ok(unchanged, 'Daily configuration changed during isolated acceptance')
   }
 }
