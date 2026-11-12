@@ -13,7 +13,7 @@
 | `scripts/check-docs.mjs` | 本地链接/锚点、语言覆盖及过时入门内容检查 |
 | `docs/site/.vitepress/` | 导航、四语搜索与品牌样式 |
 | `scripts/prepare-docs-site.mjs` | 从教程及白名单素材生成忽略的站点输入；不维护另一套正文 |
-| `.github/workflows/docs.yml` | PR 构建检查；main 验证后部署 GitHub Pages |
+| `.github/workflows/ci.yml` | 按改动执行文档检查；main 验证后部署 GitHub Pages，纯文档不触发程序检查 |
 
 ## 维护步骤
 
@@ -22,6 +22,8 @@
 3. 运行 `npm run docs:generate`、`npm run docs:check`、`npm run docs:build`。
 4. 预览检查搜索、四语切换、下载、图片及窄窗口；提交前仍运行 `npm run check`。
 5. 推送 main 后检查工作流和公开地址。构建成功不等于已经部署。
+
+日常检查与发布前完整打包分开，触发范围、产物期限和发布步骤见 [构建与验收](CI.md)。
 
 下载表位于 downloads 标记内，不手改生成结果。current.json 指实际公开版本，不直接沿用尚未发布的 package.json 版本。预览版使用精确 tag 链接，不依赖 releases/latest。
 
