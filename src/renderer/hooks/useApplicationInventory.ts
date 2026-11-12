@@ -27,11 +27,22 @@ export function useApplicationInventory() {
   const [newCount, setNewCount] = useState(0)
   const pending = useRef<Promise<void> | undefined>(undefined)
   const lastScan = useRef(0), saveChain = useRef(Promise.resolve())
+  const revision = useRef<string | undefined>(undefined), generation = useRef(0)
+  const reload = useCallback(async () => {
+    if (!window.appRoute) return
+    generation.current++; setWritable(false)
+    await saveChain.current
+    try {
+      const value = await window.appRoute.request<InventoryPreferences>('inventory.read')
+      revision.current = value.revision
+      setApplications(migrateInventory(value)); setFavorites(value.favorites); setWritable(true); setSaveError(false)
+    } catch { setError('本机应用资料无法读取，已保留原文件；本次收藏暂时不能保存。'); setSaveError(true) }
+  }, [])
   useEffect(() => {
     if (!window.appRoute) return
     let active = true
     void window.appRoute.request<InventoryPreferences>('inventory.read').then(value => {
-      if (active) { setApplications(migrateInventory(value)); setFavorites(value.favorites); setWritable(true) }
+      if (active) { revision.current = value.revision; setApplications(migrateInventory(value)); setFavorites(value.favorites); setWritable(true) }
     }).catch(() => { if (active) { setError('本机应用资料无法读取，已保留原文件；本次收藏暂时不能保存。'); setSaveError(true) } })
       .finally(() => { if (active) setReady(true) })
     return () => { active = false }
@@ -81,10 +92,15 @@ export function useApplicationInventory() {
   useEffect(() => {
     if (!ready || !writable) return
     const preferences: InventoryPreferences = { version: 1, applications, favorites }
+    const expectedGeneration = generation.current
     const timer = window.setTimeout(() => {
       saveChain.current = saveChain.current.then(async () => {
+        if (expectedGeneration !== generation.current) return
         try {
-          if (window.appRoute) await window.appRoute.request('inventory.write', preferences)
+          if (window.appRoute) {
+            const result = await window.appRoute.request<{ revision?: string }>('inventory.write', { ...preferences, revision: revision.current })
+            if (expectedGeneration === generation.current) revision.current = result.revision
+          }
           else { localStorage.setItem(storageKey, JSON.stringify(preferences)); localStorage.setItem('approute.favorites.v1', JSON.stringify(favorites)) }
           setSaveError(false)
         } catch { setSaveError(true) }
@@ -100,7 +116,7 @@ export function useApplicationInventory() {
       return changed ? next : current
     })
   }, [])
-  return { applications, favorites, running, runningError, loading, ready, error, saveError, scannedAt, newCount, scan, refreshRunning, syncIcons,
+  return { applications, favorites, running, runningError, loading, ready, error, saveError, scannedAt, newCount, scan, refreshRunning, syncIcons, reload,
     toggleFavorite: (app: Application) => setFavorites(current => current.includes(applicationKey(app)) ? current.filter(key => key !== applicationKey(app)) : [...current, applicationKey(app)]),
     addFavorites: (apps: Application[]) => setFavorites(current => [...new Set([...current, ...apps.map(applicationKey)])]),
     saveApplication: (app: Application) => setApplications(current => [...current.filter(item => item.id !== app.id), { ...app, mode: 'rule' }]),

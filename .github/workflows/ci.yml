@@ -60,6 +60,9 @@ jobs:
       - name: 桌面交互与四语检查（不生成安装器）
         if: needs.scope.outputs.ui == 'true'
         run: npm run check:i18n
+      - name: 设置导入桌面验收（隔离数据）
+        if: needs.scope.outputs.ui == 'true'
+        run: node scripts/verify-settings-ui.mjs
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

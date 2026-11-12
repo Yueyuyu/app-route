@@ -2,7 +2,7 @@ import type { RouteMode } from '../shared/application'
 export type { Application, ApplicationSource, RouteMode } from '../shared/application'
 export { validProcessName } from '../core/applicationRules'
 
-export type Page = 'apps' | 'drafts' | 'help' | 'icons'
+export type Page = 'apps' | 'drafts' | 'help' | 'icons' | 'settings'
 
 export const routeLabels: Record<RouteMode, string> = {
   rule: '按 Clash 规则', direct: '直接联网', proxy: '跟随代理组',

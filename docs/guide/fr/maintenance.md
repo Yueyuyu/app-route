@@ -26,6 +26,12 @@ Un diagnostic décrit un instant donné. Après un changement ou un réveil, rec
 
 L’entrée indépendante s’appelle AppRoute - Restore Network (.cmd sous Windows, .command sur Mac). Ses messages en ligne de commande restent en chinois. Son exécution désactive tout le routage AppRoute ; ce n’est pas un diagnostic en lecture seule.
 
+## Transférer les paramètres (version de développement source)
+
+Ces ajouts ne figurent pas dans l’installateur publié 0.2.0-preview.2. Exportez un JSON dans Paramètres et sauvegardes, puis prévisualisez l’import et sélectionnez les applications. Les routages existants sont décochés par défaut ; les chemins sans correspondance ne sont pas importables.
+
+L’import des informations seules fusionne les informations et les favoris. L’import avec application demande une confirmation et utilise la protection de restauration existante. Le groupe proxy actuel reste utilisé sauf restauration explicite de la stratégie enregistrée, qui migre aussi les applications proxy existantes. La langue est facultative. Une sauvegarde précède chaque import. Le fichier contient des chemins locaux et des noms de nœuds : gardez-le privé.
+
 ## Désinstallation
 
 Si vous ne voulez plus du routage AppRoute, restaurez et vérifiez avant de quitter puis de désinstaller. Quitter ou désinstaller ne retire pas à lui seul les règles Clash persistantes. Windows conserve les données par défaut ; supprimer l’application Mac ne supprime pas les préférences. Le retour sécurisé en un clic à une ancienne version et la restauration de données entre versions ne sont pas fournis.

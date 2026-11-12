@@ -9,6 +9,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { desktopAssetPath, desktopOrigin, isTrustedDesktopSender, validateDesktopRequest } from './boundary.ts'
 import type { DesktopAction } from '../../shared/desktop.ts'
+import type { SettingsImportResult } from '../../shared/settings.ts'
+import { settingsFileLimit } from '../../core/settingsTransfer.ts'
 
 app.setName('AppRoute')
 app.setPath('userData', path.join(appRouteDataDirectory(), 'desktop'))
@@ -104,6 +106,26 @@ else {
     ipcMain.handle('approute:request', async (event, action: unknown, body?: unknown) => {
       if (event.sender !== window?.webContents || !isTrustedDesktopSender(event.senderFrame?.url ?? '', event.senderFrame === event.sender.mainFrame)) throw new Error(tr("桌面请求来源无效。"))
       validateDesktopRequest(action, body)
+      if (action === 'settings.pick-import') {
+        const chosen = await dialog.showOpenDialog(window!, { title: tr('导入设置'), filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] })
+        if (chosen.canceled || !chosen.filePaths[0]) return null
+        const stat = await fs.stat(chosen.filePaths[0])
+        if (!stat.isFile() || stat.size > settingsFileLimit) throw new Error(tr('设置文件过大，最多支持 2 MB。'))
+        return request('settings.preview', { text: await fs.readFile(chosen.filePaths[0], 'utf8') })
+      }
+      if (action === 'settings.export' || action === 'settings.backup-export') {
+        const snapshot = await request(action === 'settings.export' ? 'settings.snapshot' : action, body)
+        const chosen = await dialog.showSaveDialog(window!, { title: tr('导出设置'), defaultPath: 'AppRoute-settings.json', filters: [{ name: 'JSON', extensions: ['json'] }] })
+        if (chosen.canceled || !chosen.filePath) return { saved: false }
+        await fs.writeFile(chosen.filePath, JSON.stringify(snapshot, null, 2), { mode: 0o600 })
+        return { saved: true }
+      }
+      if (action === 'settings.import') {
+        const result = await request<SettingsImportResult>(action, body)
+        try { language = await languageStore.read(); updateNativeLanguage() }
+        catch { result.warnings.push('显示语言未能恢复，请在语言菜单重新选择。') }
+        return result
+      }
       if (action === 'app.open-link') {
         await shell.openExternal(projectLink((body as { target?: unknown } | undefined)?.target))
         return { opened: true }

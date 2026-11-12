@@ -67,6 +67,8 @@ Mihomo 重载可能读回自动组失效前的旧固定节点缓存。统一的 
 
 ## 状态与本机存储
 
+设置迁移由 `SettingsTransferService` 统一编排：预览令牌与设置指纹绑定，只用本机确认的路径和身份，分流通过原有安全事务；资料使用独立锁和修订校验防止旧缓存覆盖。`SettingsBackupStore` 只导出白名单设置，拒绝目录链接及越界编号。格式、失败边界及验证入口见 [设置导入与备份](SETTINGS-TRANSFER.md)。
+
 - 浏览器应用资料：approute.inventory.v1，与实际应用状态分开；旧草稿只迁移真实资料。
 - %LOCALAPPDATA%\AppRoute\state.json：已管理应用、修订号、待确认事务。
 - %LOCALAPPDATA%\AppRoute\preferences.json：界面语言，首次跟随系统；不与分流状态共用存储或锁。维护方法见 [多语言维护](LOCALIZATION.md)。

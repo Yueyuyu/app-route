@@ -44,6 +44,7 @@ jobs:
       - run: node scripts/verify-runtime-selections.mjs
       - run: npm run check:recovery-faults
       - run: npm run check:i18n
+      - run: node scripts/verify-settings-ui.mjs
       - run: npm run installer:build
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

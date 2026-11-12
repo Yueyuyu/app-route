@@ -15,11 +15,12 @@ export class LanguagePreferencesStore {
     if (value.version !== 1 || !isLanguagePreference(value.language)) throw new Error('语言设置无法读取，请保留原文件后重试。')
     return value.language
   }
-  async write(language: unknown): Promise<LanguagePreference> {
+  async write(language: unknown, expected?: LanguagePreference): Promise<LanguagePreference> {
     if (!isLanguagePreference(language)) throw new Error('不支持的显示语言。')
     // 同一实例按用户选择顺序保存；独立偏好锁协调其他实例，不占用分流事务锁。
     const operation = this.pending.then(() => withLock(path.join(this.directory, 'preferences-lock'), async () => {
-      await this.read()
+      const current = await this.read()
+      if (expected !== undefined && current !== expected) throw new Error('设置已变化，请重新预览。')
       await atomicWrite(path.join(this.directory, 'preferences.json'), JSON.stringify({ version: 1, language }) + '\n')
       return language
     }))

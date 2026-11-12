@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { ApplicationIconService } from '../services/applicationIconService.ts'
 import { InventoryPreferencesStore } from '../services/inventoryPreferences.ts'
 import { RoutingService } from '../services/routingService.ts'
+import { SettingsTransferService } from '../services/settingsTransfer.ts'
 import { scanApplications } from '../platform/applications.ts'
 import { runningApplications } from '../platform/applications.ts'
 import { validateDesktopRequest } from './boundary.ts'
@@ -16,6 +17,7 @@ const resources = path.dirname(fileURLToPath(import.meta.url))
 const service = new RoutingService({ kitBundle: path.join(resources, 'recovery.cjs') })
 const icons = new ApplicationIconService({ scan: () => scanApplications(path.join(resources, 'windows', 'scan-applications.ps1')) })
 const inventory = new InventoryPreferencesStore(service.root)
+const settings = new SettingsTransferService(service, async () => (await scan(true)).applications)
 let cachedScan: ApplicationScanResult | undefined
 let lastScan = 0, mutations = 0, disconnected = false
 const attempts = new Set<string>()
@@ -29,6 +31,18 @@ async function dispatch(action: DesktopAction, body: any = {}) {
     case 'applications.running': return runningApplications()
     case 'inventory.read': return inventory.read()
     case 'inventory.write': return inventory.write(body)
+    case 'settings.snapshot': return settings.snapshot()
+    case 'settings.preview': return settings.previewText(body.text)
+    case 'settings.import': return settings.import(body)
+    case 'settings.backups': return settings.backups.list()
+    case 'settings.backup-create': return { id: await settings.backups.create(await settings.snapshot(), 'manual') }
+    case 'settings.backup-preview': {
+      const backup = await settings.backups.read(body.id)
+      if (!backup.restorable || backup.fingerprint !== body.fingerprint) throw new Error('备份已变化或属于未完成事务，请刷新列表。')
+      return settings.preview(backup.snapshot)
+    }
+    case 'settings.backup-delete': return settings.backups.remove(body.id, body.fingerprint)
+    case 'settings.backup-export': return (await settings.backups.read(body.id)).snapshot
     case 'integration.reconcile': await service.reconcileInterrupted(); return service.status()
     case 'integration.repair-preview': { const { state: _state, ...preview } = await inspectManagementRepair(service); return preview }
     case 'integration.repair-records': return repairManagementRecords(service, body.fingerprint)
@@ -56,7 +70,7 @@ export function safeDesktopError(error: unknown) {
 }
 process.on('message', async (request: { id: number; action: DesktopAction; body?: unknown }) => {
   if (!request || !Number.isSafeInteger(request.id)) return
-  const mutation = request.action?.startsWith('integration.') && !['integration.status', 'integration.diagnose'].includes(request.action)
+  const mutation = request.action?.startsWith('settings.') || request.action?.startsWith('integration.') && !['integration.status', 'integration.diagnose'].includes(request.action)
   if (mutation) mutations++
   try { validateDesktopRequest(request.action, request.body); const value = await dispatch(request.action, request.body); if (process.connected) process.send?.({ id: request.id, value }) }
   catch (error) { if (process.connected) process.send?.({ id: request.id, error: safeDesktopError(error) }) }

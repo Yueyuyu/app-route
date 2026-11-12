@@ -21,8 +21,16 @@ const status = { connected: true, version: 'v1.19.32', mode: 'rule', tun: false,
   warning: '当前规则已加载，持久化尚未验证。首次登记后请正常退出并重新打开 Clash Party，再检查规则是否仍已加载。' }
 const icons = { applications: applications.map(app => ({ key: app.id, applicationId: app.id, name: app.name, processes: app.processes, category: app.category, origin: 'scan', available: true, source: 'builtin', icon: app.icon, hasCustom: false, needsAttention: false, detail: '使用随软件附带的公共图标' })), scannedAt: '2026-11-11T04:00:00Z', scanWarnings: [] }
 let inventory = { version: 1, applications, favorites: [applications[0].path.toLowerCase()] }
-process.on('message', ({ id, action, body }) => {
+// 设置验收可注入真实资料/备份服务；注入模块只使用内存路由替身，禁止连接用户内核。
+const settingsFixture = fs.existsSync(path.join(root, 'settings-fixture.mjs'))
+  ? await import('./settings-fixture.mjs').then(module => module.createSettingsFixture(root, applications, status)) : undefined
+process.on('message', async ({ id, action, body }) => {
   fs.appendFileSync(path.join(root, 'requests.jsonl'), JSON.stringify({ action }) + '\n')
+  if (settingsFixture && (action.startsWith('settings.') || action.startsWith('inventory.'))) {
+    try { process.send?.({ id, value: await settingsFixture(action, body) }) }
+    catch (error) { process.send?.({ id, error: error.message }) }
+    return
+  }
   let value
   if (action === 'integration.status') {
     value = structuredClone(status)

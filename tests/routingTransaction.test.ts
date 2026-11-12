@@ -17,6 +17,7 @@ import type { ProxyStrategy } from '../src/shared/proxyStrategy.ts'
 import { inspectManagementRepair, repairManagementRecords } from '../src/main/services/managementRepair.ts'
 import { parseRoutingState, pruneCompletedTransactions } from '../src/main/storage/routingStateStore.ts'
 import { diagnosticExport } from '../src/main/services/diagnosticExport.ts'
+import { SettingsTransferService } from '../src/main/services/settingsTransfer.ts'
 
 class MockRuntime extends MihomoRuntime {
   current: any
@@ -52,6 +53,35 @@ async function fixture(t: TestContext, overrides: ServiceOptions = {}) {
   const service = new RoutingService({ root, partyRoot: party, runtime: async () => runtime, validate: async () => {}, installKit: async () => {}, guardian: async () => { guardianStarted = true }, ...overrides })
   return { service, runtime, config, party, guardianStarted: () => guardianStarted }
 }
+
+test('设置导入复用安全事务，保留未选应用与原规则；重载失败不导入资料', async t => {
+  const f = await fixture(t, { resolveFamily: async app => ({ ...app, processPaths: [app.path!] }), probe: async () => true })
+  const existing = { ...app, id: 'existing', name: '已有应用', path: 'C:\\Apps\\Existing\\Existing.exe', processes: ['Existing.exe'], mode: 'proxy' as const }
+  const incoming = { ...app, id: 'incoming', path: 'C:\\Apps\\New\\New.exe', processes: ['New.exe'], mode: 'direct' as const }
+  await f.service.applyAutomatically({ revision: 'initial', applications: [existing], target: 'Group', proxyGroup: 'Group' })
+  const transfer = new SettingsTransferService(f.service, async () => [existing, incoming], async () => true)
+  await transfer.inventory.write({ version: 1, applications: [existing, incoming], favorites: [] })
+  const originalScript = await fs.readFile(path.join(f.party, 'override/original.js'), 'utf8')
+  const preview = await transfer.preview({ app: 'AppRoute', kind: 'approute-settings', version: 1, createdAt: new Date().toISOString(), applications: [
+    { name: '不要自动覆盖', path: existing.path, mode: 'direct', category: '其他应用', favorite: false },
+    { name: '新导入', path: incoming.path, mode: 'direct', category: '其他应用', favorite: true },
+  ] })
+  assert.equal(preview.rows[0].configured, true)
+  const imported = await transfer.import({ token: preview.token, keys: ['1'], applyRouting: true, restoreStrategy: false, restoreLanguage: false })
+  assert.equal(imported.routingApplied, true)
+  assert.equal((await f.service.state()).managed.find(item => item.id === existing.id)?.target, 'Group')
+  assert.equal((await f.service.state()).managed.find(item => item.id === incoming.id)?.mode, 'direct')
+  assert.deepEqual(f.runtime.current.rules.slice(-f.config.rules.length), f.config.rules)
+  assert.equal(await fs.readFile(path.join(f.party, 'override/original.js'), 'utf8'), originalScript)
+  const beforeInventory = await fs.readFile(path.join(f.service.root, 'inventory.json'), 'utf8')
+  const next = await transfer.preview({ app: 'AppRoute', kind: 'approute-settings', version: 1, createdAt: new Date().toISOString(), applications: [{ name: '失败不能保存', path: incoming.path, mode: 'proxy', category: '其他应用', favorite: false }] })
+  f.runtime.failNextReload = true
+  await assert.rejects(transfer.import({ token: next.token, keys: ['0'], applyRouting: true, restoreStrategy: false, restoreLanguage: false }))
+  assert.equal(await fs.readFile(path.join(f.service.root, 'inventory.json'), 'utf8'), beforeInventory)
+  assert.equal((await f.service.state()).managed.find(item => item.id === incoming.id)?.mode, 'direct')
+  assert.equal((await f.service.state()).pendingId, undefined)
+  assert.deepEqual(f.runtime.current.rules.slice(-f.config.rules.length), f.config.rules)
+})
 
 test('正常客户端离线时轮询和新选择不改磁盘；重新连接不重放旧规则', async t => {
   const f = await fixture(t)
@@ -525,6 +555,29 @@ test('统一跟随不能只更新默认组而遗漏旧代理应用，也不能�
 })
 
 const automaticStrategy: ProxyStrategy = { mode: 'fallback', nodes: ['Node', 'NodeTwo'], interval: 60, timeout: 5000, tolerance: 100 }
+
+test('导入策略显式迁移原代理应用，重新实例化保留；失败回退策略与原规则', async t => {
+  const f = await groupFixture(t)
+  const proxy = { ...pathApp, id: 'proxy', path: 'C:\\ProxyApp\\Example.exe', mode: 'proxy' as const }
+  await f.service.applyAutomatically({ applications: [pathApp, proxy], target: 'Group', proxyGroup: 'Group', revision: 'initial' })
+  const transfer = new SettingsTransferService(f.service, async () => [pathApp, proxy], async () => true)
+  const document = { app: 'AppRoute' as const, kind: 'approute-settings' as const, version: 1 as const, createdAt: new Date().toISOString(), applications: [], proxyStrategy: automaticStrategy }
+  const preview = await transfer.preview(document)
+  assert.equal(preview.affectedProxyCount, 1)
+  await transfer.import({ token: preview.token, keys: [], applyRouting: true, restoreStrategy: true, restoreLanguage: false })
+  const saved = await new RoutingService(f.service.options).state()
+  assert.equal(saved.proxyStrategy?.mode, 'fallback')
+  assert.equal(saved.managed.find(item => item.id === proxy.id)?.target, strategyOwnership.name)
+  assert.equal(saved.managed.find(item => item.id === pathApp.id)?.mode, 'direct')
+  assert.deepEqual(f.runtime.current['proxy-groups'][0], f.config['proxy-groups'][0])
+  const next = await transfer.preview({ ...document, proxyStrategy: { mode: 'existing', group: 'Group' } })
+  f.runtime.failNextReload = true
+  await assert.rejects(transfer.import({ token: next.token, keys: [], applyRouting: true, restoreStrategy: true, restoreLanguage: false }))
+  const reverted = await f.service.state()
+  assert.equal(reverted.proxyStrategy?.mode, 'fallback')
+  assert.equal(reverted.managed.find(item => item.id === proxy.id)?.target, strategyOwnership.name)
+  assert.deepEqual(f.runtime.current.rules.slice(-f.config.rules.length), f.config.rules)
+})
 
 test('策略切换统一迁移代理应用，保留直连和原组；重建与独立恢复完整撤销', async t => {
   const f = await groupFixture(t)
