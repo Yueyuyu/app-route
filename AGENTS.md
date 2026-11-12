@@ -14,6 +14,8 @@
 
 ## 语言与维护
 
+开发任务先按 [任务与模块索引](docs/engineering/subsystems.md) 定位实际执行路径，再选读 [经验库](docs/engineering/lessons.md)。关键修复必须证明测试能抓住旧行为；验证结果写入提交正文。完整约定见 [开发与验收入口](docs/engineering/README.md)，不要仅扩充文字规则而遗漏相应检查。
+
 界面、桌面菜单和四语首页维护先读 `docs/LOCALIZATION.md`；文案集中在 `src/shared/i18n/messages.ts`。语言偏好独立存储，不改分流数据；公开截图仅使用隔离演示后台。
 
 - 交流、代码注释、文档及提交描述默认使用简体中文。

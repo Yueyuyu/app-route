@@ -146,7 +146,7 @@ function install() {
   const current = spawnSync('git', ['config', '--get', 'core.hooksPath'], { encoding: 'utf8' }).stdout.trim();
   if (current && current !== '.githooks') fail(`已有 hooksPath=${current}，请人工整合，未覆盖`);
   const existing = path.resolve(git('rev-parse', '--git-path', 'hooks'));
-  for (const name of ['pre-commit', 'pre-push']) if (!current && fs.existsSync(path.join(existing, name))) fail(`已有 ${name}，请人工整合，未覆盖`);
+  for (const name of ['pre-commit', 'pre-push', 'commit-msg']) if (!current && fs.existsSync(path.join(existing, name))) fail(`已有 ${name}，请人工整合，未覆盖`);
   git('config', '--local', 'core.hooksPath', '.githooks');
   if (process.env.ACTIONLINT) git('config', '--local', 'preflight.actionlint', process.env.ACTIONLINT);
   console.log('已启用本仓库 pre-commit / pre-push；未改变全局 Git 设置。');

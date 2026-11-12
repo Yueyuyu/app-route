@@ -5,6 +5,8 @@
     ".github/scripts/preflight.checks.mjs",
     ".githooks/pre-commit",
     ".githooks/pre-push",
+    ".githooks/commit-msg",
+    ".github/scripts/commit-evidence.mjs",
     "scripts/ci-scope.mjs",
     ".githooks/.gitattributes"
   ],
@@ -12,6 +14,7 @@
     "package.json"
   ],
   "checks": [
+    ["node", "--test", ".github/scripts/commit-evidence.checks.mjs"],
     [
       "node",
       "--test",

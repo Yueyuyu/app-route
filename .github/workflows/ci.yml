@@ -25,6 +25,10 @@ jobs:
           node-version: '24.14.0'
       - name: 核对提交内容与脚本引用
         run: node .github/scripts/preflight.mjs check HEAD
+      - name: 核对提交验收记录
+        run: node .github/scripts/commit-evidence.mjs ci
+      - name: 验收记录规则回归
+        run: node --test .github/scripts/commit-evidence.checks.mjs
       - name: 提交门禁回归测试
         run: node --test .github/scripts/preflight.checks.mjs
       - id: scope

@@ -39,4 +39,6 @@ verify 先运行 actionlint 和门禁回归，再根据已登记的文档范围�
 
 不使用 --no-verify 绕过失败，不通过删除测试或放宽范围掩盖错误。Git hooks 是防误操作门禁，不是防恶意修改的安全边界。CI 同时运行提交内容检查与独立 Node 回归；测试文件使用 .checks.mjs，避免被业务 Vitest 自动收集。
 
+`commit-msg` 要求正文有具体的“变更：”“验证：”“未验证：”，再从本次门禁记录自动附上 `Verified-tree` 和 `Verified-checks`。CI 对启用后的整批非合并提交核对正文与实际 Git 树。它证明记录对应哪份内容，不证明作者描述真实；完整日志仍保存在本地或 CI 产物。历史提交不改写。示例见 [开发验收](../docs/engineering/README.md)。
+
 PowerShell 调用 git 等外部命令后必须检查 $LASTEXITCODE；不能只依赖 $ErrorActionPreference。没有执行通过的项目检查不登记为完成。

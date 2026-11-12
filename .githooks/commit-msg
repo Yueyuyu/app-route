@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+exec node .github/scripts/commit-evidence.mjs prepare "$1"
