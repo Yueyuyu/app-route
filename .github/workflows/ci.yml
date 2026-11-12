@@ -54,6 +54,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: 关键保护反向验证（临时副本）
+        run: npm run check:regression-proof
       - name: 准备隔离测试内核
         if: needs.scope.outputs.integration == 'true'
         run: node scripts/prepare-test-core.mjs
@@ -71,7 +73,7 @@ jobs:
         if: needs.scope.outputs.ui == 'true'
         run: node scripts/verify-startup.mjs
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: checks-${{ matrix.os }}
           path: output/

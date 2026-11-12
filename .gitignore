@@ -5,6 +5,7 @@ release/
 .runtime/
 output/playwright/
 output/startup/
+output/regression-proof/
 output/*-check.json
 coverage/
 *.log

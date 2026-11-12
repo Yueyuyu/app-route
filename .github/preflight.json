@@ -27,6 +27,7 @@
     ]
   ],
   "programChecks": [
+    ["npm", "run", "check:regression-proof"],
     [
       "npm",
       "run",

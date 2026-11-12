@@ -40,6 +40,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: npm run check:regression-proof
       - run: node scripts/prepare-test-core.mjs
       - run: node scripts/verify-runtime-selections.mjs
       - run: npm run check:recovery-faults

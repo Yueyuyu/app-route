@@ -3,17 +3,13 @@ import path from 'node:path'
 import assert from 'node:assert/strict'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
+import { createDesktopSandbox } from './lib/testSandbox.mjs'
 
 const root = process.cwd(), stage = path.join(root, '.runtime/desktop-stage')
-const fixture = path.join(root, '.runtime', `startup-ui-${Date.now()}`)
+const sandbox = await createDesktopSandbox('startup')
+const { fixture, env } = sandbox
 const output = path.join(root, 'output/playwright/startup')
-await fs.mkdir(fixture, { recursive: true }); await fs.mkdir(output, { recursive: true })
-for (const file of ['main.cjs', 'preload.cjs', 'package.json']) await fs.copyFile(path.join(stage, file), path.join(fixture, file))
-await fs.cp(path.join(stage, 'ui'), path.join(fixture, 'ui'), { recursive: true })
-await fs.mkdir(path.join(fixture, 'runtime')); await fs.copyFile(process.execPath, path.join(fixture, process.platform === 'win32' ? 'runtime/node.exe' : 'runtime/node'))
-await fs.copyFile(path.join(root, 'tests/fixtures/documentationBackend.mjs'), path.join(fixture, 'backend.mjs'))
-await fs.copyFile(path.join(root, 'resources/application-icons/catalog.json'), path.join(fixture, 'catalog.json'))
-const env = { ...process.env, APPROUTE_DATA_DIR: path.join(fixture, 'profile/AppRoute'), LOCALAPPDATA: path.join(fixture, 'profile'), APPDATA: path.join(fixture, 'roaming'), ELECTRON_RUN_AS_NODE: undefined }
+await fs.mkdir(output, { recursive: true })
 await fs.mkdir(env.APPROUTE_DATA_DIR, { recursive: true })
 await fs.writeFile(path.join(env.APPROUTE_DATA_DIR, 'preferences.json'), JSON.stringify({ version: 1, language: 'zh-CN' }))
 await fs.writeFile(path.join(fixture, 'hold-scan'), 'fixture only')
@@ -24,7 +20,7 @@ await fs.unlink(damagedFile) // 仅破坏本次临时夹具，验证局部错误
 const errors = [], checks = []
 let desktop
 try {
-  desktop = await electron.launch({ executablePath, args: [fixture], env, timeout: 30000 })
+  desktop = await sandbox.launch(electron, executablePath)
   const page = await desktop.firstWindow(); page.on('pageerror', error => errors.push(error.message))
   // 自定义本地协议不保证进入 Resource Timing；用 CDP 观察完整受控导航的实际请求。
   const network = await page.context().newCDPSession(page), requests = new Set()
@@ -67,4 +63,4 @@ try {
 } catch (error) {
   if (desktop) await desktop.firstWindow().then(page => page.screenshot({ path: path.join(output, 'failure.png') })).catch(() => {})
   throw error
-} finally { await desktop?.close() }
+} finally { await sandbox.dispose() }

@@ -2,7 +2,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { installFixtureBoundary } from './fixtureBoundary.mjs'
 const root = path.dirname(fileURLToPath(import.meta.url))
+if (process.env.APPROUTE_TEST_SANDBOX !== root) throw new Error('演示后台必须运行在独立夹具中')
+installFixtureBoundary(root)
+fs.appendFileSync(path.join(root, 'backend-started'), process.pid + '\n')
+process.on('exit', () => fs.writeFileSync(path.join(root, `backend-exited-${process.pid}`), 'true'))
 const catalog = JSON.parse(fs.readFileSync(path.join(root, 'catalog.json'), 'utf8'))
 const ids = ['chrome', 'firefox', 'telegram', 'discord', 'slack', 'spotify', 'steam', 'vscode']
 const applications = ids.map((id, index) => {

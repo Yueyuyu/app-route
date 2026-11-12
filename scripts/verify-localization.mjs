@@ -3,20 +3,16 @@ import path from 'node:path'
 import assert from 'node:assert/strict'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
+import { createDesktopSandbox } from './lib/testSandbox.mjs'
 import { resolveLocale, translate } from '../src/shared/i18n/index.ts'
 import { setDesktopViewport } from './lib/desktopViewport.mjs'
 
 // 使用真实的桌面主进程/preload/UI 与独立演示后台，不接触用户配置或真实代理。
-const root = process.cwd(), stage = path.join(root, '.runtime/desktop-stage')
-const fixture = path.join(root, '.runtime', `localization-${Date.now()}`)
+const root = process.cwd()
+const sandbox = await createDesktopSandbox('localization')
+const { fixture, env } = sandbox
 const output = path.join(root, 'output/playwright/localization')
-await fs.mkdir(fixture, { recursive: true }); await fs.mkdir(output, { recursive: true })
-for (const file of ['main.cjs', 'preload.cjs', 'package.json']) await fs.copyFile(path.join(stage, file), path.join(fixture, file))
-await fs.cp(path.join(stage, 'ui'), path.join(fixture, 'ui'), { recursive: true })
-await fs.mkdir(path.join(fixture, 'runtime')); await fs.copyFile(process.execPath, path.join(fixture, process.platform === 'win32' ? 'runtime/node.exe' : 'runtime/node'))
-await fs.copyFile(path.join(root, 'tests/fixtures/documentationBackend.mjs'), path.join(fixture, 'backend.mjs'))
-await fs.copyFile(path.join(root, 'resources/application-icons/catalog.json'), path.join(fixture, 'catalog.json'))
-const env = { ...process.env, APPROUTE_DATA_DIR: path.join(fixture, 'profile/AppRoute'), LOCALAPPDATA: path.join(fixture, 'profile'), APPDATA: path.join(fixture, 'roaming'), ELECTRON_RUN_AS_NODE: undefined }
+await fs.mkdir(output, { recursive: true })
 const results = [], errors = []
 const translations = {
  'zh-CN': ['简体中文', '应用管理', '分流规则', '图标管理', '使用帮助', '连接详情', '代理策略', '恢复网络', '取消', '添加应用'],
@@ -26,7 +22,7 @@ const translations = {
 }
 let desktop
 try {
- desktop = await electron.launch({ executablePath, args: [fixture], env, timeout: 30000 })
+ desktop = await sandbox.launch(electron, executablePath)
  const page = await desktop.firstWindow(); page.on('pageerror', e => errors.push(e.message))
  await desktop.evaluate(({ shell, clipboard }) => {
    globalThis.appRouteTestLinks = []; globalThis.appRouteTestCopy = ''
@@ -163,8 +159,8 @@ try {
    await layout(locale + '-narrow'); await screenshot(locale + '-narrow')
    await setDesktopViewport(page, { width: 1440, height: 1000 })
  }
- await desktop.close(); desktop = undefined
- desktop = await electron.launch({ executablePath, args: [fixture], env, timeout: 30000 })
+ await sandbox.close(desktop); desktop = undefined
+ desktop = await sandbox.launch(electron, executablePath)
  const reopened = await desktop.firstWindow(); await reopened.locator('.language-switcher').waitFor()
  assert.equal(await reopened.locator('html').getAttribute('lang'), 'fr')
  assert.equal(await desktop.evaluate(({ Menu }) => Menu.getApplicationMenu().items[1].label), 'Édition')
@@ -185,4 +181,4 @@ try {
   const page = desktop?.windows()[0]
   if (page) { await page.screenshot({ path: path.join(output, 'failure.png') }); await fs.writeFile(path.join(output, 'failure.html'), await page.content()) }
   throw error
-} finally { await desktop?.close() }
+} finally { await sandbox.dispose() }

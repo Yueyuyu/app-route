@@ -4,26 +4,22 @@ import assert from 'node:assert/strict'
 import { build } from 'rolldown'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
+import { createDesktopSandbox } from './lib/testSandbox.mjs'
 import { translate } from '../src/shared/i18n/index.ts'
 import { setDesktopViewport } from './lib/desktopViewport.mjs'
 
 // 真实 Electron 主进程、文件对话框调用、IPC、设置存储；路由只记录到隔离夹具。
-const root = process.cwd(), stage = path.join(root, '.runtime/desktop-stage')
-const fixture = path.join(root, '.runtime', `settings-ui-${Date.now()}`)
+const root = process.cwd()
+const sandbox = await createDesktopSandbox('settings-ui')
+const { fixture, env } = sandbox
 const output = path.join(root, 'output/playwright/settings')
-await fs.mkdir(fixture, { recursive: true }); await fs.mkdir(output, { recursive: true })
-for (const file of ['main.cjs', 'preload.cjs', 'package.json']) await fs.copyFile(path.join(stage, file), path.join(fixture, file))
-await fs.cp(path.join(stage, 'ui'), path.join(fixture, 'ui'), { recursive: true })
-await fs.mkdir(path.join(fixture, 'runtime')); await fs.copyFile(process.execPath, path.join(fixture, process.platform === 'win32' ? 'runtime/node.exe' : 'runtime/node'))
-await fs.copyFile(path.join(root, 'tests/fixtures/documentationBackend.mjs'), path.join(fixture, 'backend.mjs'))
-await fs.copyFile(path.join(root, 'resources/application-icons/catalog.json'), path.join(fixture, 'catalog.json'))
+await fs.mkdir(output, { recursive: true })
 await build({ input: 'tests/fixtures/settingsFixture.ts', platform: 'node', output: { file: path.join(fixture, 'settings-fixture.mjs'), format: 'esm' } })
-const env = { ...process.env, APPROUTE_DATA_DIR: path.join(fixture, 'profile/AppRoute'), LOCALAPPDATA: path.join(fixture, 'profile'), APPDATA: path.join(fixture, 'roaming'), ELECTRON_RUN_AS_NODE: undefined }
 const importedFile = path.join(fixture, 'import.json'), exportedFile = path.join(fixture, 'export.json')
 const errors = [], checks = []
 let desktop
 try {
-  desktop = await electron.launch({ executablePath, args: [fixture], env, timeout: 30000 })
+  desktop = await sandbox.launch(electron, executablePath)
   const page = await desktop.firstWindow()
   page.on('pageerror', error => errors.push(error.message))
   await page.locator('.application-table button.application-name').first().waitFor()
@@ -116,4 +112,4 @@ try {
 } catch (error) {
   if (desktop) await desktop.firstWindow().then(page => page.screenshot({ path: path.join(output, 'failure.png') })).catch(() => {})
   throw error
-} finally { await desktop?.close() }
+} finally { await sandbox.dispose() }
