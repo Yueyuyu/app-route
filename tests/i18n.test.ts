@@ -51,3 +51,24 @@ test('语言偏好跨实例保留，只写偏好文件；损坏文件与分流�
     assert.equal(await fs.readFile(path.join(root, 'state.json'), 'utf8'), state)
   } finally { await fs.rm(root, { recursive: true, force: true }) }
 })
+
+test('快速切换语言按选择顺序保存，并发实例不损坏偏好文件', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'approute-language-concurrent-'))
+  try {
+    const first = new LanguagePreferencesStore(root), second = new LanguagePreferencesStore(root)
+    const choices = ['en', 'zh-CN', 'fr', 'ja', 'system', 'en'] as const
+    await Promise.all(choices.map(language => first.write(language)))
+    assert.equal(await first.read(), 'en')
+    await Promise.all(choices.flatMap(language => [first.write(language), second.write(language)]))
+    assert.ok(isLanguagePreference(await second.read()))
+    await second.write('fr')
+    assert.equal(await first.read(), 'fr')
+    assert.equal((await fs.readdir(root)).some(name => name.endsWith('.tmp')), false)
+    await fs.writeFile(path.join(root, 'preferences.json'), '{broken')
+    await assert.rejects(first.write('ja'))
+    assert.equal(await fs.readFile(path.join(root, 'preferences.json'), 'utf8'), '{broken')
+    await fs.writeFile(path.join(root, 'preferences.json'), JSON.stringify({ version: 1, language: 'en' }))
+    await first.write('ja')
+    assert.equal(await first.read(), 'ja')
+  } finally { await fs.rm(root, { recursive: true, force: true }) }
+})
