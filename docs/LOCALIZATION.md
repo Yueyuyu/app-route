@@ -43,7 +43,7 @@ npm run check
 npm run check:i18n
 ```
 
-第一项包含语言解析、翻译槽位、名称保留、偏好跨实例保存和损坏文件保护测试。第二项仅在 Windows 执行，使用真实 Electron 主进程、preload 和打包界面，后台替换为 `tests/fixtures/documentationBackend.mjs`：
+第一项包含语言解析、翻译槽位、名称保留、偏好跨实例保存和损坏文件保护测试。第二项可在 Windows 与 macOS 原生环境执行，发布 CI 覆盖 Windows x64、Mac arm64 / x64；使用真实 Electron 主进程、preload 和打包界面，后台替换为 `tests/fixtures/documentationBackend.mjs`：
 
 - `LOCALAPPDATA`、`APPDATA` 隔离到忽略目录；演示后台没有系统扫描、代理控制或外部网络请求。
 - 检查四语主页面、帮助展开、策略候选/高级设置、连接详情、恢复确认、添加应用和窄窗口。
@@ -55,7 +55,7 @@ npm run check:i18n
 
 ## 四语 README 同步
 
-`README.md` 为中文入口，其他三个文件为 `README.en.md`、`README.ja.md`、`README.fr.md`。功能范围、预览版限制、构建命令、截图及恢复边界保持一致；技术文档尚为中文的链接明确标注。修改能力或发布状态时同时核对四份首页。
+`README.md` 为中文入口，其他三个文件为 `README.en.md`、`README.ja.md`、`README.fr.md`。四语用户指南位于 `docs/guide/<locale>/`，同一任务使用相同文件名。功能范围、预览版限制、截图及恢复边界保持一致；中文技术文档明确标注。安装包链接从发布清单生成，维护与检查方法见 [文档维护](DOCUMENTATION.md)。修改能力或发布状态时同时核对四语首页与对应教程。
 
 首页结构参考 [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev/blob/main/README.md) 的品牌/截图/安装入口，以及 [LocalSend](https://github.com/localsend/localsend/blob/main/README.md) 的一句话介绍、语言导航、功能与贡献分层。AppRoute 使用自己的文案和素材，按实际验证状态说明能力，不复制其他项目的功能承诺。参考日期：2026-11-11。
 

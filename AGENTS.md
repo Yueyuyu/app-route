@@ -55,6 +55,8 @@
 
 ## 验证与发布
 
+- 修改 README、教程、下载入口或 Release 时先读 `docs/DOCUMENTATION.md`。发布清单以已公开资产为准，四语下载表由 `npm run docs:generate` 生成；运行 `npm run docs:check` 和 `npm run docs:build`。不手改生成区域、不覆盖旧二进制，不把文档部署当作新应用版本发布。
+
 - 使用 Node.js 24 LTS；依赖变更同步锁文件。提交前运行 `npm run check`。
 - 修改扫描桥接须验证本机同源检查、错误脱敏和真实扫描；不要将扫描内容输出到公共日志。
 - 修改界面时检查相关交互及桌面布局；只有布局变化涉及小屏时才补充小屏验证。
