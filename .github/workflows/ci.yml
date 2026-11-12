@@ -1,4 +1,4 @@
-name: 检查与构建
+name: 按改动检查
 on:
   push:
     branches: [main]
@@ -7,14 +7,94 @@ on:
 permissions:
   contents: read
 jobs:
+  scope:
+    name: 识别改动范围
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      program: ${{ steps.scope.outputs.program }}
+      integration: ${{ steps.scope.outputs.integration }}
+      ui: ${{ steps.scope.outputs.ui }}
+      docs: ${{ steps.scope.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+      - id: scope
+        run: node scripts/ci-scope.mjs
   check:
-    runs-on: windows-latest
+    name: 程序检查 (${{ matrix.os }})
+    needs: scope
+    if: needs.scope.outputs.program == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    concurrency:
+      group: program-${{ github.ref }}-${{ matrix.os }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '24.14.0'
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: 准备隔离测试内核
+        if: needs.scope.outputs.integration == 'true'
+        run: node scripts/prepare-test-core.mjs
+      - if: needs.scope.outputs.integration == 'true'
+        run: node scripts/verify-runtime-selections.mjs
+      - if: needs.scope.outputs.integration == 'true'
+        run: npm run check:recovery-faults
+      - name: 桌面交互与四语检查（不生成安装器）
+        if: needs.scope.outputs.ui == 'true'
+        run: npm run check:i18n
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: checks-${{ matrix.os }}
+          path: output/
+          retention-days: 7
+  docs:
+    name: 文档检查与站点构建
+    needs: scope
+    if: needs.scope.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+          cache: npm
+      - run: npm ci
       - run: npm run docs:check
+      - run: npm run docs:build
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          path: docs/site/.vitepress/dist
+          retention-days: 1
+  deploy-docs:
+    name: 发布文档站
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - uses: actions/deploy-pages@v4
+        id: deployment

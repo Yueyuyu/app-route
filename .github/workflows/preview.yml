@@ -1,14 +1,24 @@
-name: 桌面预览版构建
+name: 发布前完整验收
 on:
-  push:
-    branches: [main, codex/clash-party-recovery]
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
   group: preview-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+          cache: npm
+      - run: npm ci
+      - run: npm run docs:check
+      - run: npm run docs:build
   desktop:
     strategy:
       fail-fast: false
@@ -57,9 +67,13 @@ jobs:
             output/packaged-check.json
             output/clean-install-check.json
             output/runtime-selection-check.json
+            output/recovery-fault-check.json
+            output/installer-build-check.json
           if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: verification-${{ matrix.artifact }}
           path: output/
+          retention-days: 7
