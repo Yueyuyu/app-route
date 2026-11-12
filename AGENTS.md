@@ -4,9 +4,11 @@
 
 阅读 `README.md` 了解当前可运行能力，阅读 `docs/PROJECT.md`、`docs/ARCHITECTURE.md` 和 `docs/COMPATIBILITY.md` 了解产品及适配边界。功能状态以 `docs/ROADMAP.md` 为准；完成对应功能时同步更新。
 
-当前为 0.2 集成测试版：已实现 Clash Party / Mihomo 运行控制、专属覆写、试运行与独立离线恢复；本机正常重启及两份真实订阅往返切换已观察到规则重新生成，远程订阅刷新、整机睡眠及完整兼容验收仍待完成。已有本机 Windows 安装流程及 macOS 双架构实验性构建，Mac 真实分流尚未验收；适配边界见 `docs/MACOS.md`，尚未签名或发布稳定安装版。
+当前为 0.2 集成测试版：已实现 Clash Party / Mihomo 运行控制、专属覆写、试运行与独立离线恢复；本机正常重启及两份真实订阅往返切换已观察到规则重新生成，稳定状态下正常睡眠唤醒已验收；成功远程订阅刷新、未确认事务跨睡眠及完整兼容矩阵仍待完成。已有本机 Windows 安装流程及 macOS 双架构实验性构建，Mac 真实分流尚未验收；适配边界见 `docs/MACOS.md`，尚未签名或发布稳定安装版。
 
 2026-11-12 已完成最终 Windows 桌面交互复验；当前远程订阅返回 HTTP 403，失败保留检查通过，但不得当作成功更新验收。后续先查 `docs/VERIFICATION.md`，区分远端拒绝、配置再生成与真实睡眠证据，不重复改写用户配置来掩盖验收缺口。
+
+重载必须通过 `MihomoRuntime.reload`：它先同步已经处于自动状态的组，避免 Mihomo 读回失效前的固定节点缓存；明确固定及手选组不改动。不要绕过此入口直接写 `/configs`。隔离回归脚本为 `scripts/verify-runtime-selections.mjs`，原始 API 只用于独立实例的问题对照。
 
 涉及品牌图标、艺术字或复用视觉效果时，先读 `docs/design/README.md`、`docs/design/app-icon.md` 和 `docs/design/wordmark.md`。AppRoute 沿用已确认原图；跨项目的通用风格按字标规范中的 UI Design Lab 来源提交、ID 与版本读取，不把字标图片当作可安装字体。
 

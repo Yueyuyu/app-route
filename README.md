@@ -5,7 +5,7 @@
 
 AppRoute 是一个桌面应用（Windows 预览版，macOS 实验性预览版）：扫描本机软件，为应用选择 **按 Clash 规则、直接联网或跟随代理组**，并显示规则加载与实际连接的验证状态。当前配合已有的 Clash Party / Mihomo 使用。
 
-> **0.2.0-preview.1 · 预览版，非稳定版。** 提供 Windows x64、macOS Apple Silicon 和 Intel 构建流程。本机 Windows 已验证正常重启与两份真实订阅往返切换；远程订阅刷新、整机睡眠及 Mac 真实分流仍待验收。安装包尚无发布者签名或 Apple 公证，也没有自动更新。
+> **0.2.0-preview.2 · 预览版，非稳定版。** 提供 Windows x64、macOS Apple Silicon 和 Intel 构建流程。本机 Windows 已验证正常重启、两份真实订阅往返切换及稳定状态下的睡眠唤醒；成功远程订阅刷新、未确认事务跨睡眠及 Mac 真实分流仍待验收。本版修复自动代理组重载时读回旧固定节点的问题。安装包尚无发布者签名或 Apple 公证，也没有自动更新。
 
 [预览版下载](https://github.com/Yueyuyu/app-route/releases) · [Mac 支持范围](docs/MACOS.md) · [验收记录](docs/VERIFICATION.md)
 

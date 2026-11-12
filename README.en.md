@@ -4,7 +4,7 @@
 
 AppRoute is a desktop companion (Windows preview and experimental macOS builds) for **Clash Party / Mihomo**. Discover apps, choose **Clash rules, Direct or Follow group**, and distinguish loaded rules from verified connections.
 
-> **0.2.0-preview.1 — preview, not a stable release.** Build targets: Windows x64, macOS Apple Silicon and Intel. Windows restart and switching between two real subscriptions have been checked. Remote subscription refresh, physical sleep and real Mac routing remain unverified. Packages have no publisher signature or Apple notarization; automatic updates are not available.
+> **0.2.0-preview.2 — preview, not a stable release.** Build targets: Windows x64, macOS Apple Silicon and Intel. Windows restart, switching between two real subscriptions and sleep/wake with confirmed settings have been checked. Successful remote refresh, pending transactions across sleep and real Mac routing remain unverified. This release fixes stale pinned selections returning when automatic groups reload. Packages have no publisher signature or Apple notarization; automatic updates are not available.
 
 [Preview downloads](https://github.com/Yueyuyu/app-route/releases) · [macOS scope](docs/MACOS.md)
 
