@@ -1,6 +1,6 @@
 import http from 'node:http'
 import fs from 'node:fs/promises'
-import type { ProxyInfo } from '../../core/managedRouting.ts'
+import { configuredProxySelections, type ProxyInfo } from '../../core/managedRouting.ts'
 
 export interface RuntimeConfig { mode: string; 'mixed-port': number; 'find-process-mode'?: string; tun?: { enable: boolean }; [key: string]: unknown }
 export interface RuntimeRule { type: string; payload: string; proxy: string; extra?: { disabled?: boolean } }
@@ -61,7 +61,21 @@ export class MihomoRuntime {
     if (!Array.isArray(response.connections)) throw new Error('内核连接记录格式错误。')
     return { connections: response.connections }
   }
-  reload(payload: string) { return this.request<void>('PUT', '/configs?force=true', { payload }) }
+  async reload(payload: string) {
+    const before = (await this.proxies()).proxies
+    // Mihomo 会因节点失效清除运行时 fixed，却保留旧选择缓存；重载可能把自动组重新固定。
+    // 只同步本来已是自动选择的组，不改变手选组或仍然有效的固定选择。
+    const automatic = Object.values(before).filter(group => ['Fallback', 'URLTest'].includes(group.type) && group.fixed === '')
+    for (const group of automatic) {
+      const endpoint = `/proxies/${encodeURIComponent(group.name)}`
+      const current = await this.request<ProxyInfo>('GET', endpoint)
+      if (current.type !== group.type || current.fixed !== '' || JSON.stringify(current.all) !== JSON.stringify(group.all)) throw new Error('代理组选择或成员已变化，已停止重载。')
+      await this.request<void>('DELETE', endpoint)
+    }
+    const after = (await this.proxies()).proxies
+    if (configuredProxySelections(before) !== configuredProxySelections(after)) throw new Error('代理组选择已变化，已停止重载。')
+    return this.request<void>('PUT', '/configs?force=true', { payload })
+  }
   delay(name: string, url: string) { return this.request<{ delay: number }>('GET', `/proxies/${encodeURIComponent(name)}/delay?timeout=5000&url=${encodeURIComponent(url)}`) }
   checkGroup(name: string) { return this.request<Record<string, number>>('GET', `/group/${encodeURIComponent(name)}/delay?timeout=5000&url=${encodeURIComponent('https://www.gstatic.com/generate_204')}`) }
 }

@@ -3404,6 +3404,16 @@ export const messages: Record<string, readonly [string, string, string]> = {
     "ネットワーク再確認",
     "Nouvelle vérification réseau"
   ],
+  "代理组选择或成员已变化，已停止重载。": [
+    "Proxy group selection or members changed. Reload was stopped.",
+    "プロキシグループの選択またはメンバーが変更されたため、再読み込みを中止しました。",
+    "La sélection ou les membres du groupe proxy ont changé. Le rechargement a été arrêté."
+  ],
+  "代理组选择已变化，已停止重载。": [
+    "Proxy group selection changed. Reload was stopped.",
+    "プロキシグループの選択が変更されたため、再読み込みを中止しました。",
+    "La sélection du groupe proxy a changé. Le rechargement a été arrêté."
+  ],
   "本地管理记录需要核对。": [
     "Local management records need checking.",
     "ローカル管理記録の確認が必要です。",
