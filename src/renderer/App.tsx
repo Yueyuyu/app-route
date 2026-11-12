@@ -2,25 +2,28 @@ import { t, formatTime, initializeLanguage } from './i18n'
 import { useEffect, useMemo, useState, type Key } from 'react'
 import { Alert, App as AntApp, Button, Collapse, Drawer, Dropdown, Input, Menu, Select, Tabs } from 'antd'
 import { AppstoreOutlined, BookOutlined, CloseOutlined, FileTextOutlined, InfoCircleOutlined, MenuOutlined, PlusOutlined, ScanOutlined, SearchOutlined, PictureOutlined, StarOutlined, SettingOutlined } from '@ant-design/icons'
-import { SettingsPage } from './components/SettingsPage'
 import { ApplicationTable } from './components/ApplicationTable'
-import { ApplicationEditor } from './components/ApplicationEditor'
-import { DraftPage, HelpPage } from './components/SecondaryPages'
+import { deferredFeature } from './components/deferredFeature'
 import { useApplicationInventory } from './hooks/useApplicationInventory'
 import { useRoutingIntegration } from './hooks/useRoutingIntegration'
 import { applicationKey, applicationView, filterApplications, isSystemTool, type ApplicationView } from '../core/applicationViews'
 import { inventoryWithRouting } from '../core/applicationInventory'
 import { RoutingPanel } from './components/RoutingPanel'
-import { IconManagement } from './components/IconManagement'
 import { Brand } from './components/Brand'
 import { ApplicationIconsProvider } from './hooks/useApplicationIcons'
-import { ApplicationDetails } from './components/ApplicationDetails'
 import { HelpTip } from './components/HelpTip'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ConnectionStatus } from './components/ConnectionStatus'
 import { AboutApp } from './components/AboutApp'
 import { useNetworkDiagnostics } from './hooks/useNetworkDiagnostics'
 import { routeLabels, type Application, type Page, type RouteMode } from './types'
+
+const SettingsPage = deferredFeature(() => import('./components/SettingsPage').then(module => ({ default: module.SettingsPage })))
+const IconManagement = deferredFeature(() => import('./components/IconManagement').then(module => ({ default: module.IconManagement })))
+const DraftPage = deferredFeature(() => import('./components/SecondaryPages').then(module => ({ default: module.DraftPage })))
+const HelpPage = deferredFeature(() => import('./components/SecondaryPages').then(module => ({ default: module.HelpPage })))
+const ApplicationEditor = deferredFeature(() => import('./components/ApplicationEditor').then(module => ({ default: module.ApplicationEditor })))
+const ApplicationDetails = deferredFeature(() => import('./components/ApplicationDetails').then(module => ({ default: module.ApplicationDetails })))
 
 export default function App() {
   const inventory = useApplicationInventory()
@@ -42,12 +45,15 @@ export default function App() {
   const [selected, setSelected] = useState<Key[]>([])
   const [editing, setEditing] = useState<Application>()
   const [editorOpen, setEditorOpen] = useState(false)
+  const [editorVisited, setEditorVisited] = useState(false), [detailsVisited, setDetailsVisited] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [detailId, setDetailId] = useState<string>()
   const [inspectionOpen, setInspectionOpen] = useState(false)
   const [inspectionTab, setInspectionTab] = useState('overview')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const detailApplication = applications.find(app => app.id === detailId)
+  useEffect(() => { if (editorOpen) setEditorVisited(true) }, [editorOpen])
+  useEffect(() => { if (detailId) setDetailsVisited(true) }, [detailId])
   const searching = Boolean(search.trim())
 
   const views = useMemo(() => ({ configured: applicationView(applications, 'configured', inventory.favorites, inventory.running),
@@ -111,7 +117,7 @@ export default function App() {
           {(filter !== 'all' || category !== 'all' || favoritesOnly) && <div className="active-filters"><span>{t("筛选：")}{[filter !== 'all' && t(routeLabels[filter as RouteMode]), category !== 'all' && t(category), favoritesOnly && t("已收藏")].filter(Boolean).join(' · ')}</span><Button size="small" type="link" onClick={() => { setFilter('all'); setCategory('all'); setFavoritesOnly(false); setSelected([]) }}>{t("清除筛选")}</Button></div>}
           {view === 'running' && inventory.runningError && <Alert type="warning" title={t(inventory.runningError)} action={<Button onClick={() => void inventory.refreshRunning()}>{t("重试")}</Button>} />}
           {selected.length > 0 && <div className="bulk-toolbar"><span>{t("已选择 {0} 个应用", [selected.length])}</span><Button size="small" icon={<StarOutlined />} onClick={() => { inventory.addFavorites(applications.filter(app => selected.includes(app.id))); setSelected([]); void message.success(t("已加入收藏")) }}>{t("加入收藏")}</Button><Dropdown trigger={['click']} menu={{ items: (Object.keys(routeLabels) as RouteMode[]).map((mode) => ({ key: mode, label: t(routeLabels[mode]) })), onClick: ({ key }) => { changeMode(selected.map(String), key as RouteMode) } }}><Button size="small" disabled={routing.groupBusy || Boolean(routing.status?.untrackedRuleCount) || !routing.status?.connected || (Boolean(routing.status?.pending) && !applying)}>{t("批量应用连接方式")}</Button></Dropdown><Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setSelected([])}>{t("取消选择")}</Button></div>}
-          {(primary.length > 0 || folded.length === 0) && <ApplicationTable groupBusy={routing.groupBusy} status={routing.status} busyIds={routing.busyIds} pendingRoutes={routing.pendingRoutes} failures={routing.failures} loading={inventory.loading || !inventory.ready} applications={primary} favorites={inventory.favorites} toggleFavorite={inventory.toggleFavorite} selected={selected} setSelected={setSelected} changeMode={changeMode} details={app => setDetailId(app.id)} remove={removeApplication} clearFilters={showAll} emptyDescription={searching ? t("没有匹配的应用，请尝试名称、进程或清除筛选") : view === 'configured' ? t("从全部应用选择联网方式，设置成功后会出现在这里") : t("没有找到匹配的应用")} />}
+          {(primary.length > 0 || folded.length === 0) && <ApplicationTable groupBusy={routing.groupBusy} status={routing.status} busyIds={routing.busyIds} pendingRoutes={routing.pendingRoutes} failures={routing.failures} loading={!inventory.ready || (inventory.loading && !inventory.applications.length)} applications={primary} favorites={inventory.favorites} toggleFavorite={inventory.toggleFavorite} selected={selected} setSelected={setSelected} changeMode={changeMode} details={app => setDetailId(app.id)} remove={removeApplication} clearFilters={showAll} emptyDescription={searching ? t("没有匹配的应用，请尝试名称、进程或清除筛选") : view === 'configured' ? t("从全部应用选择联网方式，设置成功后会出现在这里") : t("没有找到匹配的应用")} />}
           {folded.length > 0 && <Collapse className="system-tools" items={[{ key: 'tools', label: t("系统工具与维护程序 · {0} 个", [folded.length]), children: <ApplicationTable groupBusy={routing.groupBusy} status={routing.status} busyIds={routing.busyIds} pendingRoutes={routing.pendingRoutes} failures={routing.failures} loading={false} applications={folded} favorites={inventory.favorites} toggleFavorite={inventory.toggleFavorite} selected={selected} setSelected={setSelected} changeMode={changeMode} details={app => setDetailId(app.id)} remove={removeApplication} clearFilters={showAll} /> }]} />}
           <div className="table-footer"><span>{t("当前视图 {0} 个 · 本机共 {1} 个", [visible.length, applications.length])}{inventory.loading ? t(" · 正在检查新应用…") : inventory.scannedAt ? t(" · 最近检查 {0}", [formatTime(inventory.scannedAt, { hour: '2-digit', minute: '2-digit' })]) : ''}</span><Button type="link" size="small" icon={<InfoCircleOutlined />} onClick={() => setPage('help')}>{t("联网方式说明")}</Button></div>
 
@@ -119,8 +125,8 @@ export default function App() {
       </main>
       {inventory.saveError && <footer className="workspace-footer"><span>{t("列表缓存未能保存，下次将重新扫描。")}</span></footer>}
     </div>
-    <ApplicationEditor open={editorOpen} application={editing} applications={applications} onClose={() => setEditorOpen(false)} onSave={(app) => { inventory.saveApplication(app); if (!editing) inventory.addFavorites([app]); void message.success(t("应用资料已保存，请在列表中选择联网方式")) }} />
-    <ApplicationDetails application={detailApplication} status={routing.status} favorite={Boolean(detailApplication && inventory.favorites.includes(applicationKey(detailApplication)))} pending={detailId ? routing.pendingRoutes[detailId] : undefined} failure={detailId ? routing.failures[detailId] : undefined} close={() => setDetailId(undefined)} edit={app => { setDetailId(undefined); setEditing(app); setEditorOpen(true) }} toggleFavorite={inventory.toggleFavorite} />
+    {(editorOpen || editorVisited) && <ApplicationEditor open={editorOpen} application={editing} applications={applications} onClose={() => setEditorOpen(false)} onSave={(app) => { inventory.saveApplication(app); if (!editing) inventory.addFavorites([app]); void message.success(t("应用资料已保存，请在列表中选择联网方式")) }} />}
+    {(detailApplication || detailsVisited) && <ApplicationDetails application={detailApplication} status={routing.status} favorite={Boolean(detailApplication && inventory.favorites.includes(applicationKey(detailApplication)))} pending={detailId ? routing.pendingRoutes[detailId] : undefined} failure={detailId ? routing.failures[detailId] : undefined} close={() => setDetailId(undefined)} edit={app => { setDetailId(undefined); setEditing(app); setEditorOpen(true) }} toggleFavorite={inventory.toggleFavorite} />}
     <Drawer title={<Brand />} className="navigation-drawer" placement="left" open={menuOpen} onClose={() => setMenuOpen(false)} size={280}>{navigation}<div className="sidebar-bottom"><ConnectionStatus status={routing.status} error={routing.error} busy={applying} diagnostics={diagnostics} onDetails={tab => { if (settingsBusy) return; setMenuOpen(false); setPage('apps'); setInspectionTab(tab ?? 'overview'); setInspectionOpen(true) }} /><AboutApp /></div></Drawer>
   </div></ApplicationIconsProvider>
 }

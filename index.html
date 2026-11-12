@@ -8,9 +8,10 @@
     <link rel="icon" type="image/png" href="/brand/app-route-32.png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/brand/app-route-180.png" sizes="180x180" />
     <title>AppRoute 应用分流</title>
+    <style>.boot-placeholder{min-height:100vh;display:grid;place-content:center;gap:16px;background:#f8faff;color:#3265ed;font:600 22px "Segoe UI",sans-serif;text-align:center}.boot-placeholder::after{content:"";width:24px;height:24px;margin:auto;border:3px solid #e3eafa;border-top-color:#3265ed;border-radius:50%;animation:boot-spin 1s linear infinite}@keyframes boot-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.boot-placeholder::after{animation:none}}</style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="boot-placeholder" role="status" aria-label="AppRoute" aria-busy="true">AppRoute</div></div>
     <script type="module" src="/src/renderer/main.tsx"></script>
   </body>
 </html>

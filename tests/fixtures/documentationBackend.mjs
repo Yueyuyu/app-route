@@ -40,7 +40,12 @@ process.on('message', async ({ id, action, body }) => {
     if (scenario.configuration) value.configurationFingerprint = scenario.configuration
     if (scenario.node) { value.outlets['Demo group'].node = scenario.node; value.outlets['Demo group'].chain = ['Demo group', scenario.node] }
   }
-  else if (action === 'applications.scan') value = { applications, scannedAt: '2026-11-11T04:00:00Z' }
+  else if (action === 'applications.scan') {
+    // 首屏验收人为延迟扫描，核对缓存列表是否仍可使用；不会延迟其他 IPC。
+    while (fs.existsSync(path.join(root, 'hold-scan'))) await new Promise(resolve => setTimeout(resolve, 20))
+    value = { applications, scannedAt: '2026-11-11T04:00:00Z' }
+    fs.writeFileSync(path.join(root, 'scan-completed'), 'true')
+  }
   else if (action === 'integration.reconcile') value = undefined
   else if (action === 'applications.running') value = applications.slice(0, 4).map((app, i) => ({ path: app.path, pid: 100 + i, parentPid: 1 }))
   else if (action === 'inventory.read') value = inventory

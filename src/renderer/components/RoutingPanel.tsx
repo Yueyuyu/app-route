@@ -1,4 +1,4 @@
-import { ConnectionInspector } from './ConnectionInspector'
+import { deferredFeature } from './deferredFeature'
 import { t } from '../i18n'
 import { Alert, App, Button, Drawer } from 'antd'
 import { ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
@@ -10,6 +10,8 @@ import { outletLabel } from '../i18n'
 import { ProxyStrategyDrawer } from './ProxyStrategyDrawer'
 import { HelpTip } from './HelpTip'
 import { strategyLabels, type ProxyStrategy } from '../../shared/proxyStrategy'
+
+const ConnectionInspector = deferredFeature(() => import('./ConnectionInspector').then(module => ({ default: module.ConnectionInspector })))
 
 interface Props {
   status?: IntegrationStatus; error: string; refresh: () => Promise<unknown>; busy: boolean
@@ -56,7 +58,7 @@ export function RoutingPanel({ status, error, refresh, busy: applying, setProxyS
     </section>
     <Drawer title={t("连接详情与恢复")} open={inspectionOpen} onClose={() => setInspectionOpen(false)} size={580} afterOpenChange={visible => { if (visible) inspectionClose.current?.focus() }}
       footer={<div className="drawer-footer"><Button ref={inspectionClose} onClick={() => setInspectionOpen(false)}>{t("关闭")}</Button><Button icon={<ReloadOutlined />} loading={diagnostics.busy} disabled={busy || Boolean(working)} onClick={() => void run('diagnose')}>{t("网络自检")}</Button><Button danger disabled={busy || Boolean(working)} onClick={recover}>{t("恢复网络")}</Button></div>}>
-      <ConnectionInspector status={status} error={error} diagnostics={diagnostics} tab={tab} setTab={setTab} refresh={refresh} busy={busy || Boolean(working)} />
+      {inspectionOpen && <ConnectionInspector status={status} error={error} diagnostics={diagnostics} tab={tab} setTab={setTab} refresh={refresh} busy={busy || Boolean(working)} />}
     </Drawer>
   </>
 }

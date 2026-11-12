@@ -63,6 +63,9 @@ jobs:
       - name: 设置导入桌面验收（隔离数据）
         if: needs.scope.outputs.ui == 'true'
         run: node scripts/verify-settings-ui.mjs
+      - name: 首屏加载与局部故障验收（隔离数据）
+        if: needs.scope.outputs.ui == 'true'
+        run: node scripts/verify-startup.mjs
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

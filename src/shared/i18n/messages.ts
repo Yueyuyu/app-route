@@ -1,6 +1,8 @@
 /** 中文原句作为 gettext 风格键；译文顺序为 English、日本語、Français。
  * 修改原句时同步更新三种译文，保留 {0} 等插值参数。用户数据不进入此目录。 */
 export const messages: Record<string, readonly [string, string, string]> = {
+  "正在加载页面…": ["Loading…", "読み込み中…", "Chargement…"],
+  "页面加载失败，请重试；其他页面和恢复入口仍可使用。": ["This view could not load. Retry; other pages and recovery remain available.", "画面を読み込めません。再試行してください。他の画面と復旧機能は引き続き利用できます。", "Cette vue n’a pas pu être chargée. Réessayez ; les autres pages et la restauration restent disponibles."],
   "本机备份": ["Local backups","ローカルバックアップ","Sauvegardes locales"],
   "手动备份": ["Manual backup","手動バックアップ","Sauvegarde manuelle"],
   "导入前备份": ["Before import","インポート前","Avant import"],

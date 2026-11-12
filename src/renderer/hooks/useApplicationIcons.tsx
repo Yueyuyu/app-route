@@ -44,14 +44,17 @@ export function ApplicationIconsProvider({ applications, children, onResolved }:
   const identities = JSON.stringify(applications.map(({ id, name, processes, category, source, icon }) => ({ id, name, processes, category, source, ...(icon?.startsWith('data:image/png;base64,') ? { icon } : {}) })))
   useEffect(() => {
     let active = true
-    void (async () => {
+    let timer: number | undefined
+    // 先绘制缓存列表；StrictMode 重挂和新扫描取代旧资料时不继续排队登记旧批次。
+    const register = async () => {
       try {
         const items = JSON.parse(identities) as Application[]
-        for (let i = 0; i < items.length; i += 20) await iconRequest('register', { applications: items.slice(i, i + 20) })
+        for (let i = 0; i < items.length && active; i += 20) await iconRequest('register', { applications: items.slice(i, i + 20) })
         if (active) await refresh()
       } catch (e) { if (active) setError(e instanceof Error ? e.message : '图标登记失败') }
-    })()
-    return () => { active = false }
+    }
+    const frame = window.requestAnimationFrame(() => { timer = window.setTimeout(() => void register(), 0) })
+    return () => { active = false; window.cancelAnimationFrame(frame); window.clearTimeout(timer) }
   }, [identities, refresh])
   async function mutate(action: string, body: unknown) {
     setBusy(true); setError(''); const current = ++sequence.current

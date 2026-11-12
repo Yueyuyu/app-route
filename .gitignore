@@ -4,6 +4,7 @@ dist-electron/
 release/
 .runtime/
 output/playwright/
+output/startup/
 output/*-check.json
 coverage/
 *.log

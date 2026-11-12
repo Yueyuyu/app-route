@@ -369,3 +369,4 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .settings-backups-note { padding: 16px 24px; line-height: 1.7; }
 .settings-backups > .ant-alert { margin: 0 24px 16px; }
 .settings-backups .ant-pagination { margin-inline: 24px; }
+.deferred-feature { display: flex; align-items: center; gap: 12px; padding: 24px; }
