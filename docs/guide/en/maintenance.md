@@ -32,6 +32,8 @@ These additions are not included in the published 0.2.0-preview.2 installer. Use
 
 Import details only merges app details and favorites. Import and apply requires confirmation and uses the existing rollback protection. Proxy apps follow the current group unless you explicitly restore the saved strategy; doing so also migrates existing proxy apps. Language restoration is optional. Each import creates a backup first. Files contain local paths and node names: keep them private.
 
+Local backups lets you create, preview, export or confirm deletion of one snapshot. Manual and pre-import backups contain full settings; routing history restores rules and strategy while preserving current favorites and categories. Damaged or unfinished records cannot be restored directly. Restoration still requires selecting apps. Deletion does not change current routing or the offline recovery tool.
+
 ## Uninstall
 
 If you no longer want AppRoute routing, recover and verify first, then fully quit and uninstall. Exiting or uninstalling does not by itself remove persistent Clash rules. Windows uninstall keeps user data by default; removing the Mac app does not clear preferences. Safe one-click downgrade and cross-version data rollback are not provided.

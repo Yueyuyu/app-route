@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Alert, App, Button, Checkbox, Drawer, Empty, Space, Table, Tag } from 'antd'
 import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'
 import { t, formatDateTime } from '../i18n'
 import { routeLabels } from '../types'
 import { settingsError } from '../settingsError'
+import { SettingsBackupsPanel } from './SettingsBackupsPanel'
 import type { ImportRow, SettingsImportResult, SettingsPreview } from '../../shared/settings'
 
 interface Props { busy: boolean; setBusy: (value: boolean) => void; onImported: () => Promise<void> }
@@ -13,6 +14,8 @@ export function SettingsPage({ busy, setBusy, onImported }: Props) {
   const [keys, setKeys] = useState<string[]>([])
   const [restoreStrategy, setRestoreStrategy] = useState(false), [restoreLanguage, setRestoreLanguage] = useState(false)
   const [notice, setNotice] = useState<{ error: boolean; text: string; warnings?: string[] }>()
+  const [backupRevision, setBackupRevision] = useState(0)
+  const previewClose = useRef<HTMLButtonElement>(null)
   function showPreview(value: SettingsPreview) {
     setPreview(value); setRestoreStrategy(false); setRestoreLanguage(false)
     setKeys(value.rows.filter(row => row.available && !row.configured && (row.mode !== 'rule' || row.favorite)).slice(0, 100).map(row => row.key))
@@ -40,7 +43,7 @@ export function SettingsPage({ busy, setBusy, onImported }: Props) {
     finally {
       try { await onImported() }
       catch { setNotice({ error: true, text: '设置已变化，请重新预览。' }) }
-      finally { setBusy(false) }
+      finally { setBusy(false); setBackupRevision(value => value + 1) }
     }
   }
   function confirmRouting() {
@@ -59,9 +62,10 @@ export function SettingsPage({ busy, setBusy, onImported }: Props) {
       <div className="settings-transfer-card"><div><h2>{t('迁移设置')}</h2><p>{t('保存应用选择、收藏、语言和代理策略。文件包含本机程序路径，请妥善保管。')}</p></div>
         <Space><Button icon={<DownloadOutlined />} disabled={busy} onClick={() => void exportSettings()}>{t('导出设置')}</Button><Button type="primary" icon={<UploadOutlined />} disabled={busy} onClick={() => void pick()}>{t('导入设置')}</Button></Space>
       </div>
+      <SettingsBackupsPanel busy={busy} setBusy={setBusy} revision={backupRevision} onPreview={showPreview} />
     </>}
-    <Drawer title={t('导入预览')} open={Boolean(preview)} onClose={() => { if (!busy) setPreview(undefined) }} closable={!busy} maskClosable={!busy} keyboard={!busy} size={880}
-      footer={<div className="drawer-footer settings-import-footer"><span>{t('已选择 {0} 个应用', [keys.length])}</span><Button disabled={busy} onClick={() => setPreview(undefined)}>{t('取消')}</Button><Button disabled={busy || (!keys.length && !restoreLanguage) || keys.length > 100} onClick={() => void importSettings(false)}>{t('仅导入资料')}</Button><Button type="primary" disabled={busy || (!keys.length && !restoreStrategy) || keys.length > 100} loading={busy} onClick={confirmRouting}>{t('导入并应用')}</Button></div>}>
+    <Drawer title={t('导入预览')} open={Boolean(preview)} onClose={() => { if (!busy) setPreview(undefined) }} closable={!busy} maskClosable={!busy} keyboard={!busy} size={880} afterOpenChange={visible => { if (visible) previewClose.current?.focus() }}
+      footer={<div className="drawer-footer settings-import-footer"><span>{t('已选择 {0} 个应用', [keys.length])}</span><Button ref={previewClose} disabled={busy} onClick={() => setPreview(undefined)}>{t('取消')}</Button><Button disabled={busy || (!keys.length && !restoreLanguage) || keys.length > 100} onClick={() => void importSettings(false)}>{t('仅导入资料')}</Button><Button type="primary" disabled={busy || (!keys.length && !restoreStrategy) || keys.length > 100} loading={busy} onClick={confirmRouting}>{t('导入并应用')}</Button></div>}>
       {preview && <>
         <div className="settings-import-summary"><span>{t('来源时间：{0}', [formatDateTime(preview.createdAt)])}</span><p>{t('已有分流默认不勾选；路径不匹配的应用不会按名称猜测。每次最多选择 100 个。')}</p></div>
         <Table className="settings-preview-table" rowKey="key" size="small" dataSource={preview.rows} columns={columns} pagination={{ pageSize: 10, showSizeChanger: false }} scroll={{ x: 740 }}

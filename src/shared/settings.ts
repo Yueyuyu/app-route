@@ -2,10 +2,11 @@ import type { RouteMode } from './application.ts'
 import type { LanguagePreference } from './i18n/index.ts'
 import type { ProxyStrategy } from './proxyStrategy.ts'
 
-export interface SettingsApplication { name: string; path?: string; category: string; mode: RouteMode; favorite: boolean }
+export interface SettingsApplication { name: string; path?: string; category: string; mode: RouteMode; favorite?: boolean }
 export interface SettingsSnapshot {
   app: 'AppRoute'; kind: 'approute-settings'; version: 1; createdAt: string
   applications: SettingsApplication[]
+  scope?: 'routing'
   language?: LanguagePreference
   proxyStrategy?: ProxyStrategy
   missingTargetAction?: 'block' | 'original'

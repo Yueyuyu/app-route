@@ -9,6 +9,8 @@ import { RoutingService } from '../src/main/services/routingService.ts'
 import { InventoryPreferencesStore } from '../src/main/services/inventoryPreferences.ts'
 import type { SettingsSnapshot } from '../src/shared/settings.ts'
 import type { Application } from '../src/shared/application.ts'
+import { randomUUID } from 'node:crypto'
+import { atomicWrite } from '../src/main/storage/localState.ts'
 
 const application: Application = { id: 'local-id', name: '本机音乐', path: 'C:\\Apps\\Music\\Music.exe', processes: ['Music.exe'], category: '音乐娱乐', mode: 'rule', source: 'scan' }
 const snapshot = (): SettingsSnapshot => ({ app: 'AppRoute', kind: 'approute-settings', version: 1, createdAt: '2026-11-12T00:00:00Z', applications: [{ name: '导入音乐', path: application.path, category: '音乐娱乐', mode: 'direct', favorite: true }], language: 'fr' })
@@ -106,4 +108,25 @@ test('链接备份目录不能读写或删除目录外文件', async t => {
   await assert.rejects(service.backups.create(snapshot(), 'manual'), /安全读取/)
   await assert.rejects(service.backups.list(), /安全读取/)
   assert.deepEqual(await fs.readdir(outside), [])
+})
+
+test('分流历史预览保留当前资料和收藏，待确认记录不可恢复或删除', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'approute-history-')); t.after(() => fs.rm(root, { recursive: true, force: true }))
+  const service = new SettingsTransferService(new RoutingService({ root }), async () => [application], async () => true)
+  const favorite = application.path!.toLowerCase()
+  await service.inventory.write({ version: 1, applications: [{ ...application, name: '当前自定义名称', category: '当前分类' }], favorites: [favorite] })
+  const state = { version: 1, revision: 'old', managed: [{ id: application.id, name: '旧名称', processes: application.processes, processPaths: [application.path], mode: 'direct' }] }
+  const id = `state/${Date.now()}-${randomUUID()}.json`
+  await atomicWrite(path.join(root, 'backups', id), JSON.stringify(state))
+  const backup = await service.backups.read(id)
+  assert.equal(backup.snapshot.scope, 'routing'); assert.equal(backup.snapshot.applications[0].favorite, undefined)
+  const preview = await service.preview(backup.snapshot)
+  await service.import({ token: preview.token, keys: ['0'], applyRouting: false, restoreStrategy: false, restoreLanguage: false })
+  const inventory = await service.inventory.read()
+  assert.equal(inventory.applications[0].name, '当前自定义名称'); assert.equal(inventory.applications[0].category, '当前分类')
+  assert.deepEqual(inventory.favorites, [favorite])
+  await atomicWrite(path.join(root, 'backups', id), JSON.stringify({ ...state, pendingId: 'pending-fixture' }))
+  const pending = await service.backups.read(id)
+  assert.equal(pending.restorable, false)
+  await assert.rejects(service.backups.remove(id, pending.fingerprint), /未完成事务/)
 })

@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { SettingsTransferService } from '../../src/main/services/settingsTransfer.ts'
 import type { Application } from '../../src/shared/application.ts'
 import type { RoutingService } from '../../src/main/services/routingService.ts'
@@ -15,6 +16,11 @@ export async function createSettingsFixture(root: string, applications: Applicat
   } } as unknown as RoutingService
   const service = new SettingsTransferService(routing, async () => applications, async file => applications.some(app => app.path === file))
   await service.inventory.write({ version: 1, applications, favorites: [applications[0].path!.toLowerCase()] })
+  const history = path.join(profile, 'backups/state')
+  await fs.mkdir(history, { recursive: true })
+  for (const [index, content] of [JSON.stringify(state), JSON.stringify({ ...state, pendingId: 'fixture-pending' }), '{broken'].entries()) {
+    await fs.writeFile(path.join(history, `${Date.now() - (index + 1) * 1000}-${randomUUID()}.json`), content)
+  }
   return async (action: string, body: any) => {
     switch (action) {
       case 'inventory.read': return service.inventory.read()
@@ -26,7 +32,7 @@ export async function createSettingsFixture(root: string, applications: Applicat
       case 'settings.backup-create': return { id: await service.backups.create(await service.snapshot(), 'manual') }
       case 'settings.backup-preview': {
         const backup = await service.backups.read(body.id)
-        if (backup.fingerprint !== body.fingerprint) throw new Error('备份已变化或属于未完成事务，请刷新列表。')
+        if (!backup.restorable || backup.fingerprint !== body.fingerprint) throw new Error('备份已变化或属于未完成事务，请刷新列表。')
         return service.preview(backup.snapshot)
       }
       case 'settings.backup-export': return (await service.backups.read(body.id)).snapshot

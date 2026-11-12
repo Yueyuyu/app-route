@@ -32,6 +32,8 @@ Ces ajouts ne figurent pas dans l’installateur publié 0.2.0-preview.2. Export
 
 L’import des informations seules fusionne les informations et les favoris. L’import avec application demande une confirmation et utilise la protection de restauration existante. Le groupe proxy actuel reste utilisé sauf restauration explicite de la stratégie enregistrée, qui migre aussi les applications proxy existantes. La langue est facultative. Une sauvegarde précède chaque import. Le fichier contient des chemins locaux et des noms de nœuds : gardez-le privé.
 
+Sauvegardes locales permet de créer, prévisualiser, exporter ou confirmer la suppression d’un instantané. Les sauvegardes manuelles et préalables contiennent tous les paramètres ; l’historique restaure uniquement les règles et la stratégie, en conservant favoris et catégories actuels. Les enregistrements endommagés ou inachevés ne sont pas directement restaurables. Sélectionnez toujours les applications à restaurer. La suppression ne change ni le routage actuel ni l’outil de restauration hors ligne.
+
 ## Désinstallation
 
 Si vous ne voulez plus du routage AppRoute, restaurez et vérifiez avant de quitter puis de désinstaller. Quitter ou désinstaller ne retire pas à lui seul les règles Clash persistantes. Windows conserve les données par défaut ; supprimer l’application Mac ne supprime pas les préférences. Le retour sécurisé en un clic à une ancienne version et la restauration de données entre versions ne sont pas fournis.

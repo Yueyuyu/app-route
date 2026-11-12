@@ -52,7 +52,7 @@ export class SettingsTransferService {
     const before = await this.fingerprint()
     const [state, inventory, scanned] = await Promise.all([this.routing.state(), this.inventory.read(), this.scan()])
     if (state.pendingId) throw new Error('请等待分流操作或恢复检查完成。')
-    const local = new Map([...inventory.applications, ...scanned].filter(app => app.path).map(app => [processPathKey(app.path!), app]))
+    const local = new Map([...scanned, ...inventory.applications].filter(app => app.path).map(app => [processPathKey(app.path!), app]))
     const applications = new Map<string, Application>()
     const rows = await Promise.all(snapshot.applications.map(async (item, i) => {
       const key = String(i), found = item.path ? local.get(processPathKey(item.path)) : undefined
@@ -61,7 +61,7 @@ export class SettingsTransferService {
       if (!found || !await this.available(found.path!)) reason = '本机未找到对应路径，请先扫描或添加应用。'
       else {
         // 导入 ID 和辅助进程不可信；只用本机确认的主程序，应用时后台再次识别组件。
-        const application = { ...found, id: configured?.id ?? found.id, name: item.name, category: item.category, mode: item.mode, source: 'manual' as const, processPaths: undefined, processWarnings: undefined }
+        const application = { ...found, id: configured?.id ?? found.id, name: snapshot.scope === 'routing' ? found.name : item.name, category: snapshot.scope === 'routing' ? found.category : item.category, mode: item.mode, source: 'manual' as const, processPaths: undefined, processWarnings: undefined }
         try { assertNoSystemHostRouting([application]); managedApplications([application], 'preview-target'); applications.set(key, application) }
         catch { reason = '该应用属于受保护或共享进程，不能导入分流设置。' }
       }
@@ -92,7 +92,10 @@ export class SettingsTransferService {
         const app = session.applications.get(key)!, identity = processPathKey(app.path!)
         candidate.set(identity, { ...app, mode: 'rule' })
         // 只恢复用户明确选中的条目，未选中应用的收藏保持原样。
-        if (session.snapshot.applications[Number(key)].favorite) favorites.add(identity); else favorites.delete(identity)
+        const favorite = session.snapshot.applications[Number(key)].favorite
+        if (session.snapshot.scope !== 'routing') {
+          if (favorite === true) favorites.add(identity); else if (favorite === false) favorites.delete(identity)
+        }
       }
       const nextInventory = cleanInventoryPreferences({ version: 1, applications: [...candidate.values()], favorites: [...favorites] })
       const before = await this.snapshot()

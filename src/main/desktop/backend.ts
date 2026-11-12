@@ -42,7 +42,11 @@ async function dispatch(action: DesktopAction, body: any = {}) {
       return settings.preview(backup.snapshot)
     }
     case 'settings.backup-delete': return settings.backups.remove(body.id, body.fingerprint)
-    case 'settings.backup-export': return (await settings.backups.read(body.id)).snapshot
+    case 'settings.backup-export': {
+      const backup = await settings.backups.read(body.id)
+      if (!backup.restorable || backup.fingerprint !== body.fingerprint) throw new Error('备份已变化或属于未完成事务，请刷新列表。')
+      return backup.snapshot
+    }
     case 'integration.reconcile': await service.reconcileInterrupted(); return service.status()
     case 'integration.repair-preview': { const { state: _state, ...preview } = await inspectManagementRepair(service); return preview }
     case 'integration.repair-records': return repairManagementRecords(service, body.fingerprint)

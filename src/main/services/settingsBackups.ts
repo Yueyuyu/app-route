@@ -29,9 +29,9 @@ export class SettingsBackupStore {
     const fingerprint = digest(content)
     if (id.startsWith('state/')) {
       const state = parseRoutingState(content)
-      const snapshot = parseSettingsSnapshot({ app: 'AppRoute', kind: 'approute-settings', version: 1,
+      const snapshot = parseSettingsSnapshot({ app: 'AppRoute', kind: 'approute-settings', version: 1, scope: 'routing',
         createdAt: new Date(Number(id.split('/')[1].slice(0, 13))).toISOString(),
-        applications: state.managed.map(app => ({ name: app.name, path: app.processPaths?.[0], category: '其他应用', mode: app.mode, favorite: false })),
+        applications: state.managed.map(app => ({ name: app.name, path: app.processPaths?.[0], category: '其他应用', mode: app.mode })),
         proxyStrategy: state.proxyStrategy ?? (state.proxyGroup ? { mode: 'existing', group: state.proxyGroup } : undefined), missingTargetAction: state.missingTargetAction })
       return { snapshot, fingerprint, kind: 'routing' as const, restorable: !state.pendingId, bytes: stat.size }
     }

@@ -362,3 +362,10 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .settings-import-options p { margin: 0; line-height: 1.7; }
 .settings-page > .ant-alert { margin-bottom: 20px; }
 @media (max-width: 1100px) { .settings-transfer-card { align-items: flex-start; flex-direction: column; gap: 16px; } }
+.settings-backups { border: 1px solid #e3eafa; border-radius: 12px; background: #fff; overflow: hidden; }
+.settings-backups-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 24px; }
+.settings-backups-heading h2 { font-size: 17px; margin: 0 0 8px; }
+.settings-backups-heading p, .settings-backups-note { color: #718099; font-size: 13px; margin: 0; }
+.settings-backups-note { padding: 16px 24px; line-height: 1.7; }
+.settings-backups > .ant-alert { margin: 0 24px 16px; }
+.settings-backups .ant-pagination { margin-inline: 24px; }
