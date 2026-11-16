@@ -1,5 +1,11 @@
 // 精确替换只在临时副本发生。实现变化后匹配失败，要求重新审查破坏点，不能悄悄跳过。
 export const regressionCases = [
+  { id: 'trusted-release-assets', file: 'src/core/releaseUpdates.ts',
+    before: 'asset.browser_download_url !== downloadUrl', after: 'false',
+    test: 'tests/releaseUpdates.test.ts', name: '下载必须匹配系统架构、固定仓库与校验摘要，缺失附件不能假报最新' },
+  { id: 'upgrade-backup-integrity', file: 'src/main/services/upgradeVerification.ts',
+    before: 'backup.fingerprint !== baseline.fingerprint', after: 'false',
+    test: 'tests/releaseUpdates.test.ts', name: '升级备份只追加本机备份，升级核对不重放配置，发现用户新选择时保留它' },
   { id: 'diagnosis-missing-records', file: 'src/core/applicationDiagnosis.ts',
     before: 'const integrityIssue = Boolean(status?.dataIssue || status?.untrackedRuleCount)', after: 'const integrityIssue = false',
     test: 'tests/applicationDiagnosis.test.ts', name: '管理记录缺失或损坏不能被单应用诊断解释成沿用原规则' },

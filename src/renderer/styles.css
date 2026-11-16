@@ -383,3 +383,14 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .connection-samples .ant-collapse-header-text { overflow-wrap: anywhere; }
 .connection-samples .ant-tag { margin-inline: 8px; }
 .route-explanation { overflow-wrap: anywhere; line-height: 1.8; }
+.about-app-modal .ant-modal-body { max-height: calc(100dvh - 180px); overflow-y: auto; }
+.update-panel { border-top: 1px solid #e3eafa; margin-top: 20px; padding-top: 20px; }
+.update-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.update-controls .ant-radio-group { display: flex; flex-wrap: wrap; }
+.update-controls .ant-radio-button-wrapper { white-space: normal; height: auto; line-height: 1.5; padding-block: 6px; }
+.update-result { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
+.update-download { margin-top: 16px; }
+.update-notes { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.7; max-height: 200px; overflow-y: auto; }
+.update-checksum { overflow-wrap: anywhere; user-select: text; }
+.update-panel > .ant-alert, .upgrade-verification { margin-top: 16px; }
+.upgrade-verification { border-top: 1px solid #e3eafa; padding-top: 16px; }

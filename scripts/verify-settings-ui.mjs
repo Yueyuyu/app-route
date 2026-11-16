@@ -26,9 +26,17 @@ try {
   page.on('pageerror', error => errors.push(error.message))
   await page.locator('.application-table button.application-name').first().waitFor()
   await setDesktopViewport(page, { width: 1440, height: 1000 })
-  await desktop.evaluate(({ dialog }, files) => {
+  await desktop.evaluate(({ dialog, net, shell }, files) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [files.importedFile] })
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: files.exportedFile })
+    globalThis.appRouteUpdateRequests = []; globalThis.appRouteUpdateLinks = []
+    shell.openExternal = async url => { globalThis.appRouteUpdateLinks.push(url) }
+    net.fetch = async (url, options) => {
+      if (url !== 'https://api.github.com/repos/Yueyuyu/app-route/releases?per_page=100' || options.credentials !== 'omit' || options.body || options.headers.Authorization) throw new Error('unexpected update request')
+      globalThis.appRouteUpdateRequests.push(url)
+      const suffix = process.platform === 'win32' ? 'setup-x64.exe' : `mac-${process.arch}.dmg`
+      return Response.json(['9.0.0', '9.1.0-preview.1'].map(version => ({ tag_name: 'v' + version, draft: false, prerelease: version.includes('-'), published_at: '2026-11-16T00:00:00Z', body: 'Demo release notes\n<img src="https://example.invalid/not-loaded">', assets: [{ name: `AppRoute-${version}-${suffix}`, browser_download_url: `https://github.com/Yueyuyu/app-route/releases/download/v${version}/AppRoute-${version}-${suffix}`, size: 12345, state: 'uploaded', digest: 'sha256:' + 'a'.repeat(64) }] })))
+    }
   }, { importedFile, exportedFile })
   for (const [locale, label] of [['zh-CN', '简体中文'], ['en', 'English'], ['ja', '日本語'], ['fr', 'Français']]) {
     const tr = source => translate(locale, source)
@@ -90,6 +98,48 @@ try {
     assert.equal(await fs.stat(path.join(env.APPROUTE_DATA_DIR, 'backups', backupId)).then(() => true, () => false), false)
     assert.equal(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'inventory.json'), 'utf8'), beforeDelete)
     checks.push(locale + ': backup create, preview, export, confirmed deletion without changing current settings')
+    const beforeUpgrade = await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'inventory.json'), 'utf8')
+    await page.locator('.sidebar .about-app-trigger').click()
+    await page.locator('.about-app-modal').getByRole('button', { name: tr('版本更新'), exact: true }).click()
+    await page.locator('.update-panel').waitFor()
+    if (locale === 'zh-CN') assert.equal(await desktop.evaluate(() => globalThis.appRouteUpdateRequests.length), 0, 'opening update panel does not contact GitHub automatically')
+    await page.locator('.update-controls label').filter({ hasText: tr('仅稳定版') }).click()
+    assert.equal(await page.getByRole('radio', { name: tr('仅稳定版'), exact: true }).isChecked(), true)
+    await page.getByRole('button', { name: tr('检查更新'), exact: true }).click()
+    await page.locator('.update-result').getByText(tr('发现新版本'), { exact: true }).waitFor()
+    await page.locator('.update-version').getByText('9.0.0', { exact: false }).waitFor()
+    assert.ok((await page.locator('.update-version').innerText()).includes('9.0.0'))
+    await page.locator('.update-controls label').filter({ hasText: tr('包含预览版') }).click()
+    assert.equal(await page.getByRole('radio', { name: tr('包含预览版'), exact: true }).isChecked(), true)
+    await page.getByRole('button', { name: tr('检查更新'), exact: true }).click()
+    await page.locator('.update-version').getByText('9.1.0-preview.1', { exact: false }).waitFor()
+    await page.locator('.update-panel .ant-collapse-header').click()
+    await page.locator('.update-notes').waitFor()
+    assert.ok((await page.locator('.update-notes').innerText()).includes('<img'))
+    assert.equal(await page.locator('.update-notes img').count(), 0, 'release notes are plain text')
+    await page.getByRole('button', { name: tr('备份并下载'), exact: true }).click()
+    await page.getByText(tr('升级前备份已保存，已打开对应安装包下载入口。'), { exact: true }).waitFor()
+    await page.locator('.upgrade-verification').getByText(translate(locale, '升级前备份已保存，等待安装 {0}。', ['9.1.0-preview.1']), { exact: true }).waitFor()
+    const baseline = JSON.parse(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'upgrade.json'), 'utf8'))
+    const upgradeBackup = JSON.parse(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'backups', baseline.backupId), 'utf8'))
+    assert.equal(upgradeBackup.backupKind, 'before-upgrade')
+    assert.equal(upgradeBackup.applications.length, 8)
+    assert.equal(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'inventory.json'), 'utf8'), beforeUpgrade)
+    const links = await desktop.evaluate(() => globalThis.appRouteUpdateLinks)
+    assert.match(links.at(-1), /^https:\/\/github.com\/Yueyuyu\/app-route\/releases\/download\/v9\.1\.0-preview\.1\/AppRoute-9\.1\.0-preview\.1-(setup-x64\.exe|mac-(arm64|x64)\.dmg)$/)
+    assert.equal(await fs.stat(path.join(fixture, 'routing-request.json')).then(() => true, () => false), false, 'upgrade backup must not apply routing')
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false)
+    await page.screenshot({ path: path.join(output, locale + '-update.png'), animations: 'disabled' })
+    if (locale === 'zh-CN') {
+      await fs.writeFile(path.join(fixture, 'block-upgrade'), 'fixture')
+      await page.getByRole('button', { name: tr('备份并下载'), exact: true }).click()
+      await page.getByText(tr('管理记录待核对，请先处理后再创建升级备份。'), { exact: true }).waitFor()
+      assert.equal(await desktop.evaluate(() => globalThis.appRouteUpdateLinks.length), links.length, 'backup failure prevents download')
+      await fs.unlink(path.join(fixture, 'block-upgrade'))
+      checks.push('failed upgrade backup prevents opening a download')
+    }
+    await page.keyboard.press('Escape'); await page.locator('.about-app-modal').waitFor({ state: 'hidden' })
+    checks.push(locale + ': stable/preview channels, plain notes, trusted download after real backup, no routing changes')
     await setDesktopViewport(page, { width: 1440, height: 1000 })
   }
   const tr = source => translate('fr', source)

@@ -9,6 +9,10 @@
 
 There is no auto-update. Normal upgrades retain app preferences, routing records and recovery data. Do not delete user data to upgrade. On failure, preserve diagnostic information and report it. Downgrade data compatibility is not guaranteed.
 
+## In-app update checks (source development version)
+
+This is not included in the 0.2.0-preview.2 installer. In newer source builds, open About → App updates, select stable releases or previews, and check the release notes, matching installer and SHA-256. Back up and download saves settings before opening the project download; you still run the installer manually. The next version checks existing settings without overwriting differences. A checksum does not replace publisher signing, and real network connections need separate verification.
+
 <a id="recovery"></a>
 
 ## Restore network

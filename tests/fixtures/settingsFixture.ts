@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { SettingsTransferService } from '../../src/main/services/settingsTransfer.ts'
+import { UpgradeVerificationService } from '../../src/main/services/upgradeVerification.ts'
 import type { Application } from '../../src/shared/application.ts'
 import type { RoutingService } from '../../src/main/services/routingService.ts'
 
@@ -10,11 +11,12 @@ export async function createSettingsFixture(root: string, applications: Applicat
   const profile = process.env.APPROUTE_DATA_DIR!
   if (!path.resolve(profile).startsWith(path.resolve(root) + path.sep) || !path.basename(root).startsWith('settings-ui-')) throw new Error('设置验收必须使用独立目录')
   const state = { version: 1, revision: 'fixture', managed: status.managed, proxyGroup: 'Demo group', missingTargetAction: 'block' }
-  const routing = { root: profile, state: async () => state, applyAutomatically: async (input: unknown) => {
+  const routing = { root: profile, state: async () => state, status: async () => ({ ...status, dataIssue: await fs.access(path.join(root, 'block-upgrade')).then(() => true, () => false) }), applyAutomatically: async (input: unknown) => {
     await fs.writeFile(path.join(root, 'routing-request.json'), JSON.stringify(input))
     return { outcome: 'applied' }
   } } as unknown as RoutingService
   const service = new SettingsTransferService(routing, async () => applications, async file => applications.some(app => app.path === file))
+  const upgrade = new UpgradeVerificationService(service)
   await service.inventory.write({ version: 1, applications, favorites: [applications[0].path!.toLowerCase()] })
   const history = path.join(profile, 'backups/state')
   await fs.mkdir(history, { recursive: true })
@@ -23,6 +25,8 @@ export async function createSettingsFixture(root: string, applications: Applicat
   }
   return async (action: string, body: any) => {
     switch (action) {
+      case 'updates.prepare': return upgrade.prepare(body.fromVersion, body.targetVersion)
+      case 'updates.status': return upgrade.check(body.currentVersion)
       case 'inventory.read': return service.inventory.read()
       case 'inventory.write': return service.inventory.write(body)
       case 'settings.snapshot': return service.snapshot()

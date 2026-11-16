@@ -7,7 +7,7 @@ import { HelpTip } from './HelpTip'
 import type { SettingsBackup, SettingsPreview } from '../../shared/settings'
 
 interface Props { busy: boolean; setBusy: (value: boolean) => void; revision: number; onPreview: (preview: SettingsPreview) => void }
-const sourceLabels = { manual: '手动备份', 'before-import': '导入前备份', routing: '分流历史' }
+const sourceLabels = { manual: '手动备份', 'before-import': '导入前备份', 'before-upgrade': '升级前备份', routing: '分流历史' }
 
 export function SettingsBackupsPanel({ busy, setBusy, revision, onPreview }: Props) {
   const { message, modal } = App.useApp()

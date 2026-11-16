@@ -6,6 +6,7 @@ import { ApplicationIconService } from '../services/applicationIconService.ts'
 import { InventoryPreferencesStore } from '../services/inventoryPreferences.ts'
 import { RoutingService } from '../services/routingService.ts'
 import { SettingsTransferService } from '../services/settingsTransfer.ts'
+import { UpgradeVerificationService } from '../services/upgradeVerification.ts'
 import { scanApplications } from '../platform/applications.ts'
 import { runningApplications } from '../platform/applications.ts'
 import { validateDesktopRequest } from './boundary.ts'
@@ -18,6 +19,7 @@ const service = new RoutingService({ kitBundle: path.join(resources, 'recovery.c
 const icons = new ApplicationIconService({ scan: () => scanApplications(path.join(resources, 'windows', 'scan-applications.ps1')) })
 const inventory = new InventoryPreferencesStore(service.root)
 const settings = new SettingsTransferService(service, async () => (await scan(true)).applications)
+const upgrade = new UpgradeVerificationService(settings)
 let cachedScan: ApplicationScanResult | undefined
 let lastScan = 0, mutations = 0, disconnected = false
 const attempts = new Set<string>()
@@ -27,6 +29,8 @@ async function scan(force = false) {
 }
 async function dispatch(action: DesktopAction, body: any = {}) {
   switch (action) {
+    case 'updates.prepare': return upgrade.prepare(body.fromVersion, body.targetVersion)
+    case 'updates.status': return upgrade.check(body.currentVersion)
     case 'applications.scan': return scan(body.force === true)
     case 'applications.running': return runningApplications()
     case 'inventory.read': return inventory.read()
@@ -74,7 +78,7 @@ export function safeDesktopError(error: unknown) {
 }
 process.on('message', async (request: { id: number; action: DesktopAction; body?: unknown }) => {
   if (!request || !Number.isSafeInteger(request.id)) return
-  const mutation = request.action?.startsWith('settings.') || request.action?.startsWith('integration.') && !['integration.status', 'integration.diagnose'].includes(request.action)
+  const mutation = request.action === 'updates.prepare' || request.action?.startsWith('settings.') || request.action?.startsWith('integration.') && !['integration.status', 'integration.diagnose'].includes(request.action)
   if (mutation) mutations++
   try { validateDesktopRequest(request.action, request.body); const value = await dispatch(request.action, request.body); if (process.connected) process.send?.({ id: request.id, value }) }
   catch (error) { if (process.connected) process.send?.({ id: request.id, error: safeDesktopError(error) }) }

@@ -2,7 +2,8 @@ import { appRouteDataDirectory, nodeExecutableName } from '../platform/paths.ts'
 import { readMacApplication } from '../platform/macos/applications.ts'
 import { resolveLocale, translate, type LanguagePreference } from '../../shared/i18n/index.ts'
 import { LanguagePreferencesStore } from './languagePreferences.ts'
-import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, protocol, session, shell, nativeImage, powerMonitor, clipboard } from 'electron'
+import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, protocol, session, shell, nativeImage, powerMonitor, clipboard, net } from 'electron'
+import { ReleaseUpdateService } from './releaseUpdates.ts'
 import { projectLink, versionSummary, type BuildInfo } from '../../shared/appInfo.ts'
 import { fork, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs/promises'
@@ -25,6 +26,7 @@ const languageSettings = () => ({ language, systemLanguages })
 let languageWrite: Promise<unknown> = Promise.resolve()
 const pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
 const resources = app.getAppPath()
+let updates: ReleaseUpdateService, installedBuild: BuildInfo
 const icon = path.join(resources, 'ui', process.platform === 'darwin' ? 'brand/app-route-512.png' : 'favicon.ico')
 function startBackend() {
   if (worker?.connected) return
@@ -88,6 +90,8 @@ else {
   void app.whenReady().then(async () => {
     systemLanguages = app.getPreferredSystemLanguages()
     language = await languageStore.read().catch(() => 'system' as const)
+    installedBuild = await fs.readFile(path.join(resources, 'ui', 'build-info.json'), 'utf8').then(text => JSON.parse(text)).catch(() => ({ version: app.getVersion(), builtAt: '', revision: 'unknown', dirty: false }))
+    updates = new ReleaseUpdateService(installedBuild.version, process.platform, process.arch, (input, init) => net.fetch(input as string, init))
     session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
     session.defaultSession.setPermissionCheckHandler(() => false)
     protocol.handle('approute', async req => {
@@ -106,6 +110,15 @@ else {
     ipcMain.handle('approute:request', async (event, action: unknown, body?: unknown) => {
       if (event.sender !== window?.webContents || !isTrustedDesktopSender(event.senderFrame?.url ?? '', event.senderFrame === event.sender.mainFrame)) throw new Error(tr("桌面请求来源无效。"))
       validateDesktopRequest(action, body)
+      if (action === 'updates.check') return updates.check((body as { channel?: unknown } | undefined)?.channel)
+      if (action === 'updates.status') return request(action, { currentVersion: installedBuild.version })
+      if (action === 'updates.prepare') {
+        const input = body as { channel?: unknown; version?: unknown } | undefined
+        const release = updates.selected(input?.channel, input?.version)
+        const result = await request(action, { fromVersion: installedBuild.version, targetVersion: release.version })
+        await shell.openExternal(release.downloadUrl)
+        return { ...result, opened: true }
+      }
       if (action === 'settings.pick-import') {
         const chosen = await dialog.showOpenDialog(window!, { title: tr('导入设置'), filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] })
         if (chosen.canceled || !chosen.filePaths[0]) return null
@@ -170,6 +183,7 @@ else {
       return request(action, body)
     })
     startBackend(); createWindow()
+    void request('updates.status', { currentVersion: installedBuild.version }).catch(() => {})
     powerMonitor.on('resume', () => { window?.webContents.send('approute:resume'); void request('integration.reconcile').catch(() => {}).finally(() => window?.webContents.send('approute:refresh')) })
     tray = new Tray(process.platform === 'darwin' ? nativeImage.createFromPath(icon).resize({ width: 18, height: 18 }) : nativeImage.createFromPath(icon))
     tray.on('double-click', showWindow)

@@ -9,6 +9,7 @@
 | 设置与备份 | [设置迁移](../SETTINGS-TRANSFER.md)、[settingsTransfer](../../src/main/services/settingsTransfer.ts)、[settingsBackups](../../src/main/services/settingsBackups.ts) | 新旧格式、资料导入、恢复、删除、界面缓存；预览不写设置，未选条目保持 | `npm test`；`npm run check:settings-ui` |
 | 应用发现与身份 | [架构](../ARCHITECTURE.md)、[platform](../../src/main/platform/applications.ts)、[processFamily](../../src/core/processFamily.ts) | Windows / Mac、运行中/安装后、共享宿主、便携应用；名称不代替精确身份 | `npm test`；对应平台只读实测单独记录 |
 | 桌面与多语言 | [桌面](../DESKTOP.md)、[语言](../LOCALIZATION.md)、[main](../../src/main/desktop/main.ts)、[preload](../../src/preload/index.ts) | 页面、托盘、菜单、弹窗、Esc/焦点、四语、窄屏；不暴露任意文件与 shell | `npm run check:i18n` |
+| 版本更新与升级核对 | [更新流程](../UPDATES.md)、[发布约束](../../src/core/releaseUpdates.ts)、[升级核对](../../src/main/services/upgradeVerification.ts) | 稳定/预览、系统架构、备份失败、差异提示；固定仓库，备份后下载，不自动重放设置 | `tests/releaseUpdates.test.ts`；`npm run check:settings-ui` |
 | 首屏与图标 | [首屏](../STARTUP.md)、[图标服务](../../src/main/services/applicationIconService.ts) | 缓存/冷启动、慢扫描、可选页面失败、图标缺失；入口资源预算保持 | `npm run check:startup`；`npm run build` |
 | 文档、构建、发布 | [文档规范](../DOCUMENTATION.md)、[CI](../CI.md)、[门禁](../../.github/PREFLIGHT.md) | 文档/程序/发布范围、脚本重命名、产物清单、源 SHA；下载只指向真实发布 | `npm run docs:check`；发布前工作流 |
 

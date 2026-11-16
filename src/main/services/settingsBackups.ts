@@ -36,9 +36,9 @@ export class SettingsBackupStore {
       return { snapshot, fingerprint, kind: 'routing' as const, restorable: !state.pendingId, bytes: stat.size }
     }
     const snapshot = parseSettingsText(content), value = JSON.parse(content)
-    return { snapshot, fingerprint, kind: value.backupKind === 'before-import' ? 'before-import' as const : 'manual' as const, restorable: true, bytes: stat.size }
+    return { snapshot, fingerprint, kind: value.backupKind === 'before-upgrade' ? 'before-upgrade' as const : value.backupKind === 'before-import' ? 'before-import' as const : 'manual' as const, restorable: true, bytes: stat.size }
   }
-  async create(snapshot: SettingsSnapshot, kind: 'manual' | 'before-import') {
+  async create(snapshot: SettingsSnapshot, kind: 'manual' | 'before-import' | 'before-upgrade') {
     const clean = parseSettingsSnapshot(snapshot)
     const content = JSON.stringify({ ...clean, backupKind: kind }, null, 2)
     if (Buffer.byteLength(content) > settingsFileLimit) throw new Error('设置文件过大，最多支持 2 MB。')

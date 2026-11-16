@@ -31,13 +31,14 @@ const settingsFixture = fs.existsSync(path.join(root, 'settings-fixture.mjs'))
   ? await import('./settings-fixture.mjs').then(module => module.createSettingsFixture(root, applications, status)) : undefined
 process.on('message', async ({ id, action, body }) => {
   fs.appendFileSync(path.join(root, 'requests.jsonl'), JSON.stringify({ action }) + '\n')
-  if (settingsFixture && (action.startsWith('settings.') || action.startsWith('inventory.'))) {
+  if (settingsFixture && (action.startsWith('settings.') || action.startsWith('inventory.') || action.startsWith('updates.'))) {
     try { process.send?.({ id, value: await settingsFixture(action, body) }) }
     catch (error) { process.send?.({ id, error: error.message }) }
     return
   }
   let value
-  if (action === 'integration.status') {
+  if (action === 'updates.status') value = { state: 'none' }
+  else if (action === 'integration.status') {
     value = structuredClone(status)
     const scenarioPath = path.join(root, 'scenario.json')
     const scenario = fs.existsSync(scenarioPath) ? JSON.parse(fs.readFileSync(scenarioPath, 'utf8')) : {}

@@ -9,6 +9,10 @@
 
 Il n’y a pas de mise à jour automatique. Les mises à jour normales conservent préférences, règles enregistrées et données de restauration. Ne supprimez pas les données utilisateur. En cas d’échec, conservez le diagnostic et signalez-le. La compatibilité des données lors d’un retour à une ancienne version n’est pas garantie.
 
+## Vérifier les mises à jour dans l’application (version source)
+
+Cette fonction ne figure pas dans l’installateur 0.2.0-preview.2. Dans les nouvelles versions source, ouvrez À propos → Mises à jour, choisissez les versions stables ou les préversions, puis consultez les notes, le programme adapté et son SHA-256. Sauvegarder et télécharger enregistre les paramètres avant d’ouvrir le téléchargement du projet ; vous lancez toujours l’installation manuellement. La nouvelle version compare les paramètres sans écraser les différences. Une empreinte ne remplace pas la signature de l’éditeur ; les connexions réelles restent à vérifier séparément.
+
 <a id="recovery"></a>
 
 ## Restaurer le réseau

@@ -23,6 +23,6 @@ export interface SettingsImportRequest {
 }
 export interface SettingsImportResult { imported: number; routingApplied: boolean; backupId: string; warnings: string[] }
 export interface SettingsBackup {
-  id: string; createdAt: string; kind: 'manual' | 'before-import' | 'routing'; count: number
+  id: string; createdAt: string; kind: 'manual' | 'before-import' | 'before-upgrade' | 'routing'; count: number
   bytes: number; valid: boolean; restorable: boolean; fingerprint: string
 }
