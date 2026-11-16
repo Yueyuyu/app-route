@@ -370,3 +370,16 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .settings-backups > .ant-alert { margin: 0 24px 16px; }
 .settings-backups .ant-pagination { margin-inline: 24px; }
 .deferred-feature { display: flex; align-items: center; gap: 12px; padding: 24px; }
+.observation-summary { margin: 16px 0 6px; font-weight: 600; }
+.application-diagnosis ol { list-style: none; padding: 0; margin: 14px 0; }
+.application-diagnosis li { border-bottom: 1px solid #edf0f7; }
+.application-diagnosis summary { display: flex; gap: 10px; align-items: center; padding: 10px 0; cursor: pointer; }
+.application-diagnosis summary::before { content: '›'; transition: transform .15s; }
+.application-diagnosis details[open] summary::before { transform: rotate(90deg); }
+.application-diagnosis summary strong { flex: 1; }
+.application-diagnosis summary .ant-tag { margin: 0; }
+.application-diagnosis summary:focus-visible { outline: 2px solid #4169ff; outline-offset: 2px; border-radius: 4px; }
+.application-diagnosis li p { color: #53617a; margin: 6px 0 0; line-height: 1.65; }
+.connection-samples .ant-collapse-header-text { overflow-wrap: anywhere; }
+.connection-samples .ant-tag { margin-inline: 8px; }
+.route-explanation { overflow-wrap: anywhere; line-height: 1.8; }

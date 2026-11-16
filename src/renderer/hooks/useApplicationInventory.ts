@@ -76,7 +76,7 @@ export function useApplicationInventory() {
   const refreshRunning = useCallback(async () => {
     try {
       const result = window.appRoute ? await window.appRoute.request<RunningApplicationProcess[]>('applications.running') : await fetch('/api/applications/running', { headers: { 'X-AppRoute-UI': '1' } }).then(async response => { if (!response.ok) throw new Error(); return response.json() })
-      setRunning(result); setRunningError('')
+      setRunning(result); setRunningError(''); return result
     } catch { setRunning([]); setRunningError('暂时无法读取运行中的应用，请稍后重试。') }
   }, [])
   useEffect(() => {

@@ -153,7 +153,7 @@ export class RoutingService {
         const matched = currentRuleMatched && (app.mode === 'direct' ? direct : chains.includes(app.target ?? '') && (followsGroup || !direct))
         const node = chains[0]
         const currentNode = app.mode === 'direct' ? 'DIRECT' : outlets[app.target!]?.node
-        return [{ applicationId: app.id, process: connection.metadata.process ?? '', destination: connection.metadata.host || connection.metadata.destinationIP || '未知目标', outbound: chains.join(' ← '), matched, currentRuleMatched, node,
+        return [{ applicationId: app.id, process: connection.metadata.process ?? '', destination: connection.metadata.host || connection.metadata.destinationIP || '未知目标', outbound: chains.join(' ← '), routeChain: [...chains].reverse(), matched, currentRuleMatched, node,
           usesCurrentNode: currentNode && node ? currentNode === node : undefined, startedAt: connection.start }]
       }), observedAt)
       const uncoveredProcesses = connections.connections.flatMap(connection => {

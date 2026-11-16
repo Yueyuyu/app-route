@@ -40,6 +40,8 @@ export interface ConnectionEvidence {
   process: string
   destination: string
   outbound: string
+  /** 按请求经过的顺序排列；避免界面解析带箭头的展示文本。 */
+  routeChain?: string[]
   matched: boolean
   startedAt: string
   currentRuleMatched?: boolean

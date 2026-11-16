@@ -21,7 +21,7 @@ const status = { connected: true, version: 'v1.19.32', mode: 'rule', tun: false,
   proxyGroup: 'Demo group', proxyStrategy: { mode: 'existing', group: 'Demo group' }, strategyLoaded: true,
   strategyNodes: ['A', 'B', 'C'].map((letter, i) => ({ name: 'Demo node ' + letter, type: 'Shadowsocks', health: 'healthy', delay: 48 + i * 30 })),
   outlets: { 'Demo group': { target: 'Demo group', type: 'Selector', chain: ['Demo group', 'Demo node A'], node: 'Demo node A', kind: 'proxy', health: 'healthy', checkedAt: new Date().toISOString(), delay: 48 } },
-  managed, rulesLoaded: true, evidence: [{ applicationId: 'telegram', process: applications[2].processes[0], destination: 'example.com', outbound: 'Demo group', matched: true, node: 'Demo node A', usesCurrentNode: true, startedAt: '2026-11-11T04:01:00Z' }],
+  managed, rulesLoaded: true, evidence: Array.from({ length: 3 }, () => ({ applicationId: 'telegram', process: applications[2].processes[0], destination: 'example.com', outbound: 'Demo node A ← Demo group', routeChain: ['Demo group', 'Demo node A'], matched: true, currentRuleMatched: true, node: 'Demo node A', usesCurrentNode: true, startedAt: '2026-11-11T04:01:00Z' })),
   recoveryReady: true, recoveryPath: 'C:\\Demo\\AppRoute\\recovery\\Restore-Network.cmd', persistenceObserved: false,
   warning: '当前规则已加载，持久化尚未验证。首次登记后请正常退出并重新打开 Clash Party，再检查规则是否仍已加载。' }
 const icons = { applications: applications.map(app => ({ key: app.id, applicationId: app.id, name: app.name, processes: app.processes, category: app.category, origin: 'scan', available: true, source: 'builtin', icon: app.icon, hasCustom: false, needsAttention: false, detail: '使用随软件附带的公共图标' })), scannedAt: '2026-11-11T04:00:00Z', scanWarnings: [] }
@@ -44,6 +44,11 @@ process.on('message', async ({ id, action, body }) => {
     if (scenario.offline) { value.connected = false; value.rulesLoaded = false }
     if (scenario.configuration) value.configurationFingerprint = scenario.configuration
     if (scenario.node) { value.outlets['Demo group'].node = scenario.node; value.outlets['Demo group'].chain = ['Demo group', scenario.node] }
+    if (scenario.mismatch) value.evidence[0].matched = false
+    if (scenario.untracked) { value.managed = []; value.untrackedRuleCount = 121; value.rulesLoaded = false }
+    const observedAt = new Date().toISOString()
+    value.observedAt = observedAt
+    value.observations = { telegram: { observedAt, latestStartedAt: value.evidence[0].startedAt, connectionCount: value.evidence.length, matchedCount: value.evidence.filter(item => item.matched).length, processes: [applications[2].processes[0]], allUseOldNode: false } }
   }
   else if (action === 'applications.scan') {
     // 首屏验收人为延迟扫描，核对缓存列表是否仍可使用；不会延迟其他 IPC。

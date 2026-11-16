@@ -1,5 +1,8 @@
 // 精确替换只在临时副本发生。实现变化后匹配失败，要求重新审查破坏点，不能悄悄跳过。
 export const regressionCases = [
+  { id: 'diagnosis-missing-records', file: 'src/core/applicationDiagnosis.ts',
+    before: 'const integrityIssue = Boolean(status?.dataIssue || status?.untrackedRuleCount)', after: 'const integrityIssue = false',
+    test: 'tests/applicationDiagnosis.test.ts', name: '管理记录缺失或损坏不能被单应用诊断解释成沿用原规则' },
   { id: 'single-flight-status', file: 'src/core/statusRefresh.ts',
     before: 'if (this.pending) return this.pending', after: '/* proof: duplicate pending reads */',
     test: 'tests/statusRefresh.test.ts', name: '慢状态请求合并，完成后下一次读取仍访问新状态' },
