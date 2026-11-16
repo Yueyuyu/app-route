@@ -15,6 +15,7 @@ export class TemporaryRoutingService {
     if (!temporaryDurations.includes(request?.minutes as 15) || !request.application?.path || !['direct', 'proxy'].includes(request.application.mode)) throw new Error('请选择应用、临时联网方式和有效时长。')
     const state = await this.routing.state(), app = request.application, previous = state.managed.find(item => item.id === app.id)
     if (previous && (!previous.processPaths?.length || processPathKey(previous.processPaths[0]) !== processPathKey(app.path!))) throw new Error('主程序身份已改变，请重新扫描应用。')
+    if (previous?.domainExceptions?.length) throw new Error('请先移除域名例外，再设置临时分流。')
     const target = app.mode === 'proxy' ? state.proxyGroup : undefined
     if (app.mode === 'proxy' && !target) throw new Error('请先绑定代理组。')
     const temporary = { id: randomUUID(), expiresAt: new Date(this.now() + (this.durationMs ?? request.minutes * 60000)).toISOString(), previous: previous?.temporary?.previous ?? { mode: previous?.mode ?? 'rule' as const, target: previous?.target,

@@ -7,14 +7,14 @@ import { routeLabels } from '../types'
 import type { AutomaticApplyResult } from '../../shared/integration'
 import type { RoutingChange, RoutingHistory, RoutingHistoryItem } from '../../shared/routingHistory'
 
-const sources = { application: '手动设置', strategy: '代理策略', import: '设置导入', helper: '辅助进程补充', undo: '撤销操作', temporary: '临时分流', expiry: '结束临时分流', unknown: '旧版记录' }
+const sources = { application: '手动设置', strategy: '代理策略', import: '设置导入', helper: '辅助进程补充', undo: '撤销操作', temporary: '临时分流', expiry: '结束临时分流', exceptions: '域名例外', unknown: '旧版记录' }
 const phases = { prepared: '准备中', pending: '等待确认', confirmed: '已应用', 'rolled-back': '已自动恢复', 'recovery-required': '需要恢复' }
 function Changes({ changes, reverse = false }: { changes: RoutingChange[]; reverse?: boolean }) {
   const shown = reverse ? changes.filter(change => change.before.mode !== change.after.mode || change.before.target !== change.after.target) : changes
   return <div className="routing-history-changes">{shown.map(change => {
     const before = reverse ? change.after : change.before, after = reverse ? change.before : change.after
     const label = (value: typeof before) => <span>{t(routeLabels[value.mode])}{value.target && <small>{value.target}</small>}{value.expiresAt && <small>{t('恢复时间：{0}', [formatDateTime(value.expiresAt)])}</small>}{!reverse && <small>{t('{0} 个进程', [value.processes])}</small>}</span>
-    return <div key={change.id}><strong>{change.name}</strong>{label(before)}<span aria-hidden>→</span>{label(after)}</div>
+    return <div key={change.id}><strong>{change.name}</strong>{label(before)}<span aria-hidden>→</span>{label(after)}{(before.exceptions || after.exceptions) && <small className="break-text">{t('域名例外')}：{before.exceptions || t('无')} → {after.exceptions || t('无')}</small>}</div>
   })}</div>
 }
 interface Props { open: boolean; onClose: () => void; revision?: string; connected: boolean; busy: boolean; setBusy: (busy: boolean) => void; onChanged: () => Promise<unknown> }

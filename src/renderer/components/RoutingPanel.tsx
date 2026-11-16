@@ -26,7 +26,7 @@ export function RoutingPanel({ status, error, refresh, busy: applying, setProxyS
   const busy = applying || diagnostics.busy
   const outlet = status?.proxyGroup ? status.outlets?.[status.proxyGroup] : undefined
   const currentNode = !status?.connected ? t("等待连接") : !status.proxyGroup ? t("尚未选择代理组") : outletLabel(outlet)
-  const legacy = status?.managed.some(app => app.mode === 'proxy' && app.target !== status.proxyGroup)
+  const legacy = status?.managed.some(app => app.mode === 'proxy' && app.target !== status.proxyGroup || app.domainExceptions?.some(item => item.mode === 'proxy' && item.target !== status.proxyGroup))
   const nodeWarning = outlet && (['direct', 'reject', 'missing', 'unknown'].includes(outlet.kind) || outlet.health === 'unhealthy')
   async function run(action: string) {
     setWorking(action)

@@ -1,3 +1,4 @@
+import { validateDomainExceptions } from './domainExceptions.ts'
 import { processPathKey } from '../shared/applicationIdentity.ts'
 import { isLanguagePreference } from '../shared/i18n/language.ts'
 import { validateProxyStrategy } from './proxyStrategy.ts'
@@ -19,7 +20,9 @@ export function parseSettingsSnapshot(input: unknown): SettingsSnapshot {
     if (!item || !text(item.name, 200) || !text(item.category, 100) || !['rule', 'direct', 'proxy'].includes(item.mode) ||
         (item.path !== undefined && !validProcessPath(item.path)) || (item.favorite !== undefined && typeof item.favorite !== 'boolean')) throw new Error('设置文件含有无效的应用资料。')
     if (item.path) { const key = processPathKey(item.path); if (paths.has(key)) throw new Error('设置文件含有重复的应用路径。'); paths.add(key) }
-    return { name: item.name, category: item.category, mode: item.mode, ...(item.path ? { path: item.path } : {}), ...(item.favorite === undefined ? {} : { favorite: item.favorite }) }
+    const domainExceptions = item.domainExceptions === undefined ? undefined : validateDomainExceptions(item.domainExceptions)
+    if (item.mode === 'rule' && domainExceptions?.length) throw new Error('沿用原有规则时不能包含应用域名例外。')
+    return { ...(domainExceptions ? { domainExceptions } : {}), name: item.name, category: item.category, mode: item.mode, ...(item.path ? { path: item.path } : {}), ...(item.favorite === undefined ? {} : { favorite: item.favorite }) }
   })
   if (value.language !== undefined && !isLanguagePreference(value.language)) throw new Error('设置文件的显示语言无效。')
   if (value.missingTargetAction !== undefined && !['block', 'original'].includes(value.missingTargetAction)) throw new Error('设置文件的代理失效策略无效。')

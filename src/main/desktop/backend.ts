@@ -36,6 +36,7 @@ async function scan(force = false) {
 }
 async function dispatch(action: DesktopAction, body: any = {}) {
   switch (action) {
+    case 'integration.domain-exceptions': return service.setDomainExceptions(body)
     case 'integration.temporary': return temporary.apply(body)
     case 'integration.temporary-end': return temporary.end(body)
     case 'integration.history': return history.list()

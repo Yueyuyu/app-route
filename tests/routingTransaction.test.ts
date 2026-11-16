@@ -1,3 +1,4 @@
+import { canonicalRulePayload, domainRuntimePayload } from '../src/core/domainExceptions.ts'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -41,7 +42,7 @@ class MockRuntime extends MihomoRuntime {
   }
   override async checkGroup() { return { Node: 10, Backup: 20 } }
   override async connections() { return { connections: this.activeConnections } }
-  override async rules(): Promise<{ rules: RuntimeRule[] }> { return { rules: this.current.rules.map((r: string) => { const parts = r.split(','); const type = parts.shift()!; const proxy = parts.pop()!; return { type, payload: parts.join(','), proxy } }) } }
+  override async rules(): Promise<{ rules: RuntimeRule[] }> { return { rules: this.current.rules.map((r: string) => { const parts = r.split(','); const type = parts.shift()!; const proxy = parts.pop()!; return { type, payload: canonicalRulePayload(type, parts.join(',')), proxy } }) } }
   override async reload(payload: string) { this.reloadCount++; if (!this.available || this.failNextReload) { this.failNextReload = false; throw new Error('模拟重载失败') }; this.current = YAML.parse(payload) }
 }
 
@@ -57,6 +58,98 @@ async function fixture(t: TestContext, overrides: ServiceOptions = {}) {
   const service = new RoutingService({ root, partyRoot: party, runtime: async () => runtime, validate: async () => {}, installKit: async () => {}, guardian: async () => { guardianStarted = true }, ...overrides })
   return { service, runtime, config, party, guardianStarted: () => guardianStarted }
 }
+
+test('代理例外出口失效后仍能撤销应用专属规则', async t => {
+  let groupAvailable = true
+  const f = await fixture(t, { probe: async (_runtime, target) => target !== 'Group' || groupAvailable, resolveFamily: async item => ({ ...item, processPaths: [item.path!] }) })
+  const local = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }
+  await f.service.applyAutomatically({ revision: 'initial', applications: [local], proxyGroup: 'Group', target: 'Group' })
+  await f.service.setDomainExceptions({ revision: (await f.service.state()).revision, applicationId: app.id, exceptions: [{ kind: 'exact', domain: 'api.example.test', mode: 'proxy' }] })
+  groupAvailable = false
+  const removed = await f.service.applyAutomatically({ revision: (await f.service.state()).revision, applications: [{ ...local, mode: 'rule' }] })
+  assert.equal(removed.outcome, 'applied', removed.message)
+  assert.equal((await f.service.state()).managed.length, 0)
+  assert.deepEqual(f.runtime.current.rules, f.config.rules)
+})
+
+test('仅域名例外使用代理时，管理记录修复仍恢复正确绑定组', async t => {
+  const f = await fixture(t, { probe: async () => true, resolveFamily: async item => ({ ...item, processPaths: [item.path!] }) })
+  const local = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }
+  await f.service.applyAutomatically({ revision: 'initial', applications: [local], proxyGroup: 'Group', target: 'Group' })
+  await f.service.setDomainExceptions({ revision: (await f.service.state()).revision, applicationId: app.id, exceptions: [{ kind: 'exact', domain: 'api.example.test', mode: 'proxy' }] })
+  await atomicWrite(path.join(f.party, 'work/config.yaml'), YAML.stringify(f.runtime.current))
+  await f.service.save({ revision: 'lost', managed: [] })
+  const preview = await inspectManagementRepair(f.service)
+  assert.equal(preview.state.proxyGroup, 'Group')
+  await repairManagementRecords(f.service, preview.fingerprint)
+  assert.equal((await f.service.state()).managed[0].domainExceptions![0].target, 'Group')
+  assert.equal((await f.service.status()).rulesLoaded, true)
+})
+
+test('更换代理组同步迁移直连应用的代理例外，清除最后一条例外不改其他规则', async t => {
+  const f = await fixture(t, { probe: async () => true, resolveFamily: async item => ({ ...item, processPaths: [item.path!] }) })
+  f.config['proxy-groups'].push({ name: 'Next', type: 'select', proxies: ['Node'] })
+  f.runtime.current = structuredClone(f.config)
+  f.runtime.proxyEntries.Next = { name: 'Next', type: 'Selector', all: ['Node'], now: 'Node' }
+  await atomicWrite(path.join(f.party, 'work/config.yaml'), YAML.stringify(f.config))
+  const local = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }
+  await f.service.applyAutomatically({ revision: 'initial', applications: [local], proxyGroup: 'Group', target: 'Group' })
+  assert.equal((await f.service.setDomainExceptions({ revision: (await f.service.state()).revision, applicationId: app.id, exceptions: [{ kind: 'exact', domain: 'api.example.test', mode: 'proxy' }] })).outcome, 'applied')
+  const migrated = await f.service.setProxyGroup({ revision: (await f.service.state()).revision, target: 'Next' })
+  assert.equal(migrated.outcome, 'applied', migrated.message)
+  assert.equal((await f.service.state()).managed[0].mode, 'direct')
+  assert.equal((await f.service.state()).managed[0].domainExceptions![0].target, 'Next')
+  assert.ok(f.runtime.current.rules[0].endsWith(',Next'))
+  const removed = await f.service.setDomainExceptions({ revision: (await f.service.state()).revision, applicationId: app.id, exceptions: [] })
+  assert.equal(removed.outcome, 'applied', removed.message)
+  assert.deepEqual(f.runtime.current.rules, ['PROCESS-PATH,'+local.path+',DIRECT', ...f.config.rules])
+})
+
+test('域名例外事务保留其他应用、导出恢复和辅助进程，异常恢复旧配置', async t => {
+  const f = await fixture(t, { probe: async () => true, resolveFamily: async item => ({ ...item, processPaths: [item.path!] }) })
+  const first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }, second = { ...first, id: 'second', path: 'C:\\Second\\Other.exe', processes: ['Other.exe'] }
+  assert.equal((await f.service.applyAutomatically({ revision: 'initial', applications: [first, second], target: 'Group', proxyGroup: 'Group' })).outcome, 'applied')
+  const beforeOther = (await f.service.state()).managed.find(item => item.id === 'second')
+  const entries = [{ kind: 'suffix' as const, domain: 'example.test', mode: 'proxy' as const }, { kind: 'exact' as const, domain: 'api.example.test', mode: 'direct' as const }]
+  const changed = await f.service.setDomainExceptions({ revision: (await f.service.state()).revision, applicationId: first.id, exceptions: entries })
+  assert.equal(changed.outcome, 'applied', changed.message)
+  const saved = (await f.service.state()).managed.find(item => item.id === first.id)!
+  assert.equal(saved.domainExceptions?.length, 2)
+  assert.deepEqual((await f.service.state()).managed.find(item => item.id === 'second'), beforeOther)
+  assert.equal(f.runtime.current.rules.filter((rule: string) => rule.startsWith('AND')).length, 2)
+  assert.deepEqual(f.runtime.current.rules.slice(-f.config.rules.length), f.config.rules)
+  const service = new RoutingService(f.service.options)
+  assert.equal((await service.status()).rulesLoaded, true)
+  const settings = new SettingsTransferService(service, async () => [first, second], async () => true)
+  const backup = await settings.snapshot()
+  assert.equal(backup.applications.find(item => item.path === first.path)?.domainExceptions?.length, 2)
+  await assert.rejects(new TemporaryRoutingService(service).apply({ revision: (await service.state()).revision, application: first, minutes: 15 }), /移除域名例外/)
+  const oldRevision = (await service.state()).revision
+  f.runtime.failNextReload = true
+  const failed = await service.setDomainExceptions({ revision: oldRevision, applicationId: first.id, exceptions: [] })
+  assert.equal(failed.outcome, 'restored', failed.message)
+  assert.deepEqual((await service.state()).managed.find(item => item.id === first.id)!.domainExceptions, saved.domainExceptions)
+  const stale = await service.setDomainExceptions({ revision: oldRevision, applicationId: first.id, exceptions: [] })
+  assert.equal(stale.outcome, 'unchanged')
+  const helper = await service.applyAutomatically({ revision: (await service.state()).revision, applications: [first] }, 'helper')
+  assert.equal(helper.outcome, 'applied', helper.message)
+  assert.deepEqual((await service.state()).managed.find(item => item.id === first.id)!.domainExceptions, saved.domainExceptions)
+  const timestamp = new Date(Date.now()+1000).toISOString()
+  f.runtime.activeConnections = [
+    { start: timestamp, metadata: { process: 'Example.exe', processPath: first.path, host: 'shop.example.test' }, chains: ['Node', 'Group'], rule: 'AND', rulePayload: domainRuntimePayload(first.path, entries[0]) },
+    { start: timestamp, metadata: { process: 'Example.exe', processPath: first.path, host: 'shop.example.test' }, chains: ['DIRECT'], rule: 'ProcessPath', rulePayload: first.path },
+  ] as RuntimeConnection[]
+  const evidence = (await service.status()).evidence
+  assert.equal(evidence.find(item => item.outbound.includes('Group'))!.matched, true)
+  assert.equal(evidence.find(item => item.outbound === 'DIRECT')!.matched, false, 'base rule cannot count as domain-exception verification')
+  f.runtime.activeConnections = []
+  assert.equal((await service.applyAutomatically({ revision: (await service.state()).revision, applications: [{ ...first, mode: 'rule' }] })).outcome, 'applied')
+  assert.equal((await service.state()).managed.some(item => item.id === first.id), false)
+  const preview = await settings.preview(backup)
+  await settings.import({ token: preview.token, keys: [preview.rows.find(item => item.path === first.path)!.key], applyRouting: true, restoreStrategy: false, restoreLanguage: false })
+  assert.deepEqual((await service.state()).managed.find(item => item.id === first.id)!.domainExceptions, saved.domainExceptions)
+  assert.deepEqual((await service.state()).managed.find(item => item.id === 'second'), beforeOther)
+})
 
 test('失效路径重绑需确认，失败保留旧规则，成功移除旧身份且不保留旧辅助路径', async t => {
   const f = await fixture(t, { probe: async () => true, resolveFamily: async item => ({ ...item, processPaths: [item.path!] }) })

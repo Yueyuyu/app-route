@@ -47,6 +47,13 @@ process.on('message', async ({ id, action, body }) => {
   let value
   if (action === 'updates.status') value = { state: 'none' }
   else if (action === 'settings.scenarios') value = { items: [], unreadable: 0 }
+  else if (action === 'integration.domain-exceptions') {
+    const app = status.managed.find(item => item.id === body.applicationId)
+    if (!app || body.revision !== status.revision) { process.send?.({ id, error: '设置已经变化，请刷新后重试。' }); return }
+    app.domainExceptions = body.exceptions.map(item => ({ ...item, ...(item.mode === 'proxy' ? { target: status.proxyGroup } : {}) }))
+    status.revision = 'demo-domain-' + ++temporarySequence
+    value = { outcome: 'applied', message: '规则已就绪', status }
+  }
   else if (action === 'integration.temporary') {
     const app = status.managed.find(item => item.id === body.application.id)
     if (!app || body.revision !== status.revision) { process.send?.({ id, error: '临时设置已变化，请刷新后重试。' }); return }

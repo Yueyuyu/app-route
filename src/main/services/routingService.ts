@@ -1,3 +1,5 @@
+import { assertExceptionPaths, bindDomainExceptions, canonicalRulePayload, domainRuntimePayload, matchingDomainException } from '../../core/domainExceptions.ts'
+import type { DomainException, DomainExceptionRequest } from '../../shared/domainExceptions.ts'
 import { appRouteDataDirectory, clashPartyDataDirectory, recoveryEntryName } from '../platform/paths.ts'
 import { processBasename, macApplicationBundle } from '../../shared/applicationIdentity.ts'
 import fs from 'node:fs/promises'
@@ -64,6 +66,7 @@ export interface ServiceOptions {
   temporaryGuardian?: () => Promise<void>
 }
 interface RoutingMutationContext {
+  exceptions?: Map<string, DomainException[]>
   temporary?: { applicationId: string; value: TemporaryRoute }
   expiring?: { applicationId: string; id: string }
 }
@@ -119,7 +122,7 @@ export class RoutingService {
     const { rules } = await runtime.rules()
     const expected = ruleStrings(effectiveApplications(managed, Object.keys((await runtime.proxies()).proxies)))
     return expected.every((text, i) => {
-      const [type, payload, proxy] = text.split(',')
+      const parts = text.split(','), type = parts.shift()!, proxy = parts.pop()!, payload = canonicalRulePayload(type, parts.join(','))
       const actual = rules[i]
       return actual?.type.replaceAll('-', '').toLowerCase() === type.replaceAll('-', '').toLowerCase() && (payload.startsWith('/') ? actual.payload === payload : actual.payload.toLowerCase() === payload.toLowerCase()) && actual.proxy === proxy && !actual.extra?.disabled
     })
@@ -152,20 +155,23 @@ export class RoutingService {
         .sort((a, b) => Number(Boolean(b.all)) - Number(Boolean(a.all)))
         .map(p => ({ name: p.name, type: p.type, current: p.now ?? p.name, udp: p.udp === true }))
       const groupChoices = choices.filter(p => isFollowGroup(proxies.proxies[p.name]))
-      const targets = new Set([...state.managed.filter(app => app.mode === 'proxy').map(app => app.target!), ...groupChoices.map(p => p.name), ...(state.proxyGroup ? [state.proxyGroup] : [])])
+      const targets = new Set([...state.managed.filter(app => app.mode === 'proxy').map(app => app.target!), ...state.managed.flatMap(app => app.domainExceptions?.filter(item => item.mode === 'proxy').map(item => item.target!) ?? []), ...groupChoices.map(p => p.name), ...(state.proxyGroup ? [state.proxyGroup] : [])])
       const outlets = Object.fromEntries([...targets].map(target => [target, resolveProxyOutlet(target, proxies.proxies)]))
-      const changedTarget = state.managed.some(app => app.mode === 'proxy' && (!declared.has(app.target!) || ['missing', 'unknown'].includes(outlets[app.target!].kind)))
+      const changedTarget = state.managed.some(app => (app.mode === 'proxy' && (!declared.has(app.target!) || ['missing', 'unknown'].includes(outlets[app.target!].kind))) || app.domainExceptions?.some(item => item.mode === 'proxy' && (!declared.has(item.target!) || ['missing', 'unknown'].includes(outlets[item.target!].kind))))
       const observedAt = new Date().toISOString()
       const { evidence, observations } = sampleConnectionEvidence(connections.connections.flatMap(connection => {
         const app = state.managed.find(app => managedProcessMatches(app, connection.metadata))
         if (!app || Date.parse(connection.start) < Date.parse(app.appliedAt ?? state.appliedAt ?? new Date().toISOString())) return []
         const chains = connection.chains ?? []
         const direct = chains.some(p => p === 'DIRECT')
-        const currentRuleMatched = connection.rule.replaceAll('-', '').toLowerCase() === (app.processPaths ? 'processpath' : 'processname') && (app.processPaths ?? app.processes).some(p => (p.startsWith('/') ? p === connection.rulePayload : p.toLowerCase() === connection.rulePayload.toLowerCase()))
-        const followsGroup = isFollowGroup(proxies.proxies[app.target ?? ''])
-        const matched = currentRuleMatched && (app.mode === 'direct' ? direct : chains.includes(app.target ?? '') && (followsGroup || !direct))
+        const effective = effectiveApplications([app], Object.keys(proxies.proxies))[0]
+        const exception = effective && matchingDomainException(effective, connection.metadata.host ?? '')
+        const target = exception ? exception.mode === 'direct' ? 'DIRECT' : exception.target! : effective?.mode === 'direct' ? 'DIRECT' : effective?.target ?? app.target!
+        const currentRuleMatched = !effective || effective.mode === 'rule' && !exception ? false : exception ? connection.rule.toLowerCase() === 'and' && (app.processPaths ?? []).some(p => domainRuntimePayload(p, exception) === connection.rulePayload) : connection.rule.replaceAll('-', '').toLowerCase() === (app.processPaths ? 'processpath' : 'processname') && (app.processPaths ?? app.processes).some(p => (p.startsWith('/') ? p === connection.rulePayload : p.toLowerCase() === connection.rulePayload.toLowerCase()))
+        const followsGroup = isFollowGroup(proxies.proxies[target])
+        const matched = currentRuleMatched && (target === 'DIRECT' ? direct : chains.includes(target) && (followsGroup || !direct))
         const node = chains[0]
-        const currentNode = app.mode === 'direct' ? 'DIRECT' : outlets[app.target!]?.node
+        const currentNode = target === 'DIRECT' ? 'DIRECT' : resolveProxyOutlet(target, proxies.proxies).node
         return [{ applicationId: app.id, process: connection.metadata.process ?? '', destination: connection.metadata.host || connection.metadata.destinationIP || '未知目标', outbound: chains.join(' ← '), routeChain: [...chains].reverse(), matched, currentRuleMatched, node,
           usesCurrentNode: currentNode && node ? currentNode === node : undefined, startedAt: connection.start }]
       }), observedAt)
@@ -230,17 +236,21 @@ export class RoutingService {
       }))
       const runtime = await this.runtime()
       const baseline = await runtime.proxies()
+      // 撤销专属规则时不再依赖将被移除的代理出口，否则失效节点会挡住恢复。
+      const intendedExceptions = request.applications.flatMap(app => app.mode === 'rule' ? [] : context.exceptions?.get(app.id) ?? previous.managed.find(old => old.id === app.id)?.domainExceptions ?? [])
+      const needsProxy = request.proxyGroup || request.applications.some(app => app.mode === 'proxy') || intendedExceptions.some(item => item.mode === 'proxy')
+      const proxyTarget = request.target ?? previous.proxyGroup
       const probes = [{ target: 'DIRECT', url: 'https://www.baidu.com/' }, { target: 'GLOBAL', url: 'https://www.gstatic.com/generate_204' }]
       const customStrategy = nextStrategy && nextStrategy.mode !== 'existing' ? nextStrategy : undefined
-      if (!customStrategy && (request.proxyGroup || request.applications.some(app => app.mode === 'proxy'))) probes.push({ target: request.target!, url: strategyTestUrl })
+      if (!customStrategy && needsProxy) probes.push({ target: proxyTarget!, url: strategyTestUrl })
       const probe = (p: typeof probes[number]) => this.options.probe ? this.options.probe(runtime, p.target, p.url) : runtime.delay(p.target, p.url).then(() => true, () => false)
       // 进程读取与基线探测相互独立；两者都成功后才进入写入事务。
       const [applications, before] = await Promise.all([this.timings.measure('进程识别', resolveApplications), this.timings.measure('网络基线', () => Promise.all(probes.map(probe)))])
       const candidateAvailable = customStrategy ? (await Promise.all(customStrategy.nodes.map(target => probe({ target, url: strategyTestUrl })))).some(Boolean) : false
       if (!before.some(Boolean) && !candidateAvailable) throw new Error('网络基线检查未通过，暂未修改设置。')
       if (customStrategy && !candidateAvailable) throw new Error('候选节点探测均未通过，原策略保留。')
-      if (applications.some(app => app.mode === 'direct') && !before[0]) throw new Error('当前直连出口不可用，暂未修改设置。')
-      if (!customStrategy && (request.proxyGroup || applications.some(app => app.mode === 'proxy')) && !before.at(-1)) throw new Error('所选代理出口不可用，请更换出口。')
+      if ((applications.some(app => app.mode === 'direct') || intendedExceptions.some(item => item.mode === 'direct')) && !before[0]) throw new Error('当前直连出口不可用，暂未修改设置。')
+      if (!customStrategy && needsProxy && !before.at(-1)) throw new Error('所选代理出口不可用，请更换出口。')
       const pending = await this.apply({ ...request, applications }, source, context)
       transactionId = pending.pending?.id
       if (!transactionId) throw new Error('未取得恢复事务，不能确认应用。')
@@ -268,6 +278,14 @@ export class RoutingService {
       return { outcome, message: `${error instanceof Error ? error.message : '操作失败。'}${restored ? '已自动恢复上一次设置。' : outcome === 'unchanged' ? '原设置保留。' : '请检查恢复状态。'}`, status }
     }
   }
+  async setDomainExceptions(request: DomainExceptionRequest) {
+    const state = await this.state(), app = state.managed.find(item => item.id === request?.applicationId)
+    if (!app || !app.processPaths?.length) throw new Error('域名例外需要已管理的精确程序路径。')
+    if (app.temporary) throw new Error('请先结束临时分流，再设置域名例外。')
+    const exceptions = bindDomainExceptions(request.exceptions, state.proxyGroup)
+    return this.applyAutomatically({ revision: request.revision, target: app.target ?? state.proxyGroup,
+      applications: [{ ...app, path: app.processPaths[0], source: 'manual', category: '已管理应用' }] }, 'exceptions', { exceptions: new Map([[app.id, exceptions]]) })
+  }
   /** 一个组供所有代理应用共用；更换组走完整事务，节点切换本身完全由 Mihomo 执行。 */
   async setProxyGroup(request: { target: string; revision: string }): Promise<AutomaticApplyResult> {
     return this.setProxyStrategy({ revision: request.revision, strategy: { mode: 'existing', group: request.target } })
@@ -278,7 +296,7 @@ export class RoutingService {
     const state = await this.state()
     const target = strategy.mode === 'existing' ? strategy.group : strategyOwnership.name
     return this.applyAutomatically({ revision: request.revision, target, proxyGroup: target, proxyStrategy: strategy, missingTargetAction: request.missingTargetAction ?? state.missingTargetAction,
-      applications: state.managed.filter(app => app.mode === 'proxy').map(app => ({ ...app, path: app.processPaths?.[0], source: 'manual', category: '已管理应用' })) }, 'strategy')
+      applications: state.managed.filter(app => app.mode === 'proxy' || app.domainExceptions?.some(item => item.mode === 'proxy')).map(app => ({ ...app, path: app.processPaths?.[0], source: 'manual', category: '已管理应用' })) }, 'strategy')
   }
   async apply(request: ApplyRequest, source: RoutingOperationSource = 'application', context: RoutingMutationContext = {}): Promise<IntegrationStatus> {
     await withLock(this.root, async () => {
@@ -297,7 +315,11 @@ export class RoutingService {
         const original = previous.managed.find(old => old.id === app.id)
         const restoring = context.expiring?.applicationId === app.id ? original?.temporary?.previous : undefined
         const temporary = context.temporary?.applicationId === app.id ? context.temporary.value : source === 'helper' ? original?.temporary : undefined
-        return { ...app, appliedAt, ...(app.mode === 'proxy' ? { missingTargetAction: restoring?.missingTargetAction ?? (!request.proxyGroup ? original?.missingTargetAction : undefined) ?? missingTargetAction } : {}), ...(temporary ? { temporary } : {}) }
+        const requestedExceptions = context.exceptions?.get(app.id)
+        const domainExceptions = requestedExceptions !== undefined ? bindDomainExceptions(requestedExceptions, request.proxyGroup ?? previous.proxyGroup)
+          : request.proxyGroup && original?.domainExceptions ? bindDomainExceptions(original.domainExceptions, request.proxyGroup) : original?.domainExceptions
+        if (domainExceptions?.length) { assertExceptionPaths(app.processPaths); if (requestedExceptions && original?.temporary) throw new Error('请先结束临时分流，再设置域名例外。'); if (temporary) throw new Error('请先移除域名例外，再设置临时分流。') }
+        return { ...app, appliedAt, ...(domainExceptions ? { domainExceptions } : {}), ...(app.mode === 'proxy' ? { missingTargetAction: restoring?.missingTargetAction ?? (!request.proxyGroup ? original?.missingTargetAction : undefined) ?? missingTargetAction } : {}), ...(temporary ? { temporary } : {}) }
       })
       assertNoSystemHostRouting(request.applications)
       const selectedIds = new Set(request.applications.map(app => app.id))
@@ -330,8 +352,9 @@ export class RoutingService {
       }
       const validGroup = (name: string) => custom && name === strategyOwnership.name || isFollowGroup(proxies.proxies[name])
       if (request.proxyGroup !== undefined && (typeof request.proxyGroup !== 'string' || request.proxyGroup !== request.target || !declared.has(request.proxyGroup) || !validGroup(request.proxyGroup) ||
-          managed.some(app => app.mode === 'proxy' && app.target !== request.proxyGroup))) throw new Error('请选择有效代理组，并统一更新已有代理应用。')
+          managed.some(app => app.mode === 'proxy' && app.target !== request.proxyGroup || app.domainExceptions?.some(item => item.mode === 'proxy' && item.target !== request.proxyGroup)))) throw new Error('请选择有效代理组，并统一更新已有代理应用。')
       for (const app of managed) if (app.mode === 'proxy' && (!declared.has(app.target!) || !(validGroup(app.target!) || isProxyOnly(app.target!, proxies.proxies)))) throw new Error('代理出口不存在或类型不支持，请重新选择。')
+      for (const app of managed) for (const item of app.domainExceptions ?? []) if (item.mode === 'proxy' && (!declared.has(item.target!) || !validGroup(item.target!))) throw new Error('请先选择有效的代理组。')
       const candidate = YAML.stringify(addManagedRules(snapshot.config, managed, strategy))
       // 校验配置与准备离线恢复互不依赖，但必须等两者结束才能写配置或释放锁。
       const preparation = await Promise.allSettled([this.timings.measure('配置校验', () => this.validate(candidate, snapshot.workDir)), this.timings.measure('恢复工具', () => this.ensureRecovery())])

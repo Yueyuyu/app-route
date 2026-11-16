@@ -1,3 +1,4 @@
+import type { ManagedDomainException } from './domainExceptions.ts'
 import type { Application, RouteMode } from './application.ts'
 import type { ProxyStrategy, StrategyNode } from './proxyStrategy.ts'
 import type { TemporaryRoute } from './temporaryRouting.ts'
@@ -13,6 +14,7 @@ export interface ManagedApplication {
   target?: string
   missingTargetAction?: 'block' | 'original'
   temporary?: TemporaryRoute
+  domainExceptions?: ManagedDomainException[]
 }
 export interface ApplyRequest {
   applications: Application[]; target?: string; revision: string

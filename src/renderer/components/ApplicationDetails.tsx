@@ -10,6 +10,7 @@ import type { RunningApplicationProcess } from '../../shared/desktop'
 import { routeLabels, type Application } from '../types'
 import { ApplicationIcon } from './ApplicationIcon'
 import { ApplicationStatus } from './ApplicationStatus'
+import { DomainExceptionsPanel } from './DomainExceptionsPanel'
 import { TemporaryRoutingPanel } from './TemporaryRoutingPanel'
 
 export function ApplicationDetails({ application, status, favorite, pending, failure, close, edit, toggleFavorite, check, busy, setBusy }: {
@@ -19,9 +20,9 @@ export function ApplicationDetails({ application, status, favorite, pending, fai
   busy: boolean; setBusy: (value: boolean) => void
 }) {
   const [checking, setChecking] = useState(false), [report, setReport] = useState<ApplicationDiagnosis>()
-  const [temporaryOpen, setTemporaryOpen] = useState(false)
+  const [temporaryOpen, setTemporaryOpen] = useState(false), [exceptionsOpen, setExceptionsOpen] = useState(false)
   const currentId = useRef(application?.id); currentId.current = application?.id
-  useEffect(() => { setReport(undefined) }, [application?.id])
+  useEffect(() => { setReport(undefined); setExceptionsOpen(false) }, [application?.id])
   const managed = application && managedFor(application, status?.managed)
   const evidence = status?.connected ? status.evidence.filter(item => item.applicationId === managed?.id) : []
   const observation = status?.connected ? status.observations?.[managed?.id ?? ''] : undefined
@@ -35,7 +36,7 @@ export function ApplicationDetails({ application, status, favorite, pending, fai
     catch { if (currentId.current === selected.id) setReport(diagnoseApplication(selected)) }
     finally { setChecking(false) }
   }
-  return <Drawer title={t('应用详情')} open={Boolean(application)} onClose={() => { if (!temporaryOpen) close() }} keyboard={!temporaryOpen} maskClosable={!temporaryOpen} size={600} footer={<div className="drawer-footer"><Button onClick={close} disabled={busy}>{t('关闭')}</Button>{application && <><Button disabled={busy} icon={<EditOutlined />} onClick={() => edit(application)}>{t('编辑资料')}</Button><Button type="primary" aria-label={t('检查这个应用')} aria-busy={checking} loading={checking} onClick={() => void inspect()}>{t('检查这个应用')}</Button></>}</div>}>
+  return <Drawer title={t('应用详情')} open={Boolean(application)} onClose={() => { if (!temporaryOpen && !exceptionsOpen && !busy) close() }} keyboard={!temporaryOpen && !exceptionsOpen && !busy} maskClosable={!temporaryOpen && !exceptionsOpen && !busy} closable={!busy} size={600} footer={<div className="drawer-footer"><Button onClick={close} disabled={busy}>{t('关闭')}</Button>{application && <><Button disabled={busy} icon={<EditOutlined />} onClick={() => edit(application)}>{t('编辑资料')}</Button><Button type="primary" aria-label={t('检查这个应用')} aria-busy={checking} loading={checking} onClick={() => void inspect()}>{t('检查这个应用')}</Button></>}</div>}>
     {application && <>
       {status && !status.connected && <Alert className="detail-offline" type="warning" showIcon title={t('连接已中断，以下保留最近一次读取的记录。')} />}
       <div className="detail-app-heading"><ApplicationIcon name={application.name} icon={application.icon} application={application} /><div><h2>{application.name}</h2><span>{t(application.category)}</span></div><Button aria-label={(favorite ? t('取消收藏') : t('收藏')) + ' ' + application.name} aria-pressed={favorite} icon={favorite ? <StarFilled /> : <StarOutlined />} onClick={() => toggleFavorite(application)}>{favorite ? t('已收藏') : t('收藏')}</Button></div>
@@ -52,6 +53,7 @@ export function ApplicationDetails({ application, status, favorite, pending, fai
       <div className="detail-section"><h3>{t('连接样本')}<small>{evidence?.length ?? 0}</small></h3><p className="secondary-copy">{t('相同组件、目标和出口已合并。样本用于解释，不代表全部流量。')}</p>
         {samples.length ? <Collapse className="connection-samples" items={samples.map(group => ({ key: group.key, label: <span><strong>{group.sample.process}</strong> · {group.sample.destination}<Tag color={group.sample.matched ? 'success' : 'error'}>{t(group.sample.matched ? '符合设置' : '不符合设置')}</Tag><small>{t('样本 {0} 条', [group.count])}</small></span>, children: <><p className="route-explanation">{group.sample.process} → {t(group.sample.currentRuleMatched ? 'AppRoute 专属规则' : '其他规则或尚未匹配')} → {group.sample.routeChain?.join(' → ') || group.sample.outbound}</p><p>{t('最近建立：{0}', [formatDateTime(group.latestStartedAt)])}{group.sample.usesCurrentNode === false && t('（旧节点）')}</p></> }))} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('尚未观察到新连接')} />}
       </div>
+      <DomainExceptionsPanel managed={managed} status={status} busy={busy} setBusy={setBusy} open={exceptionsOpen} setOpen={setExceptionsOpen} onChanged={check} />
       <TemporaryRoutingPanel application={application} managed={managed} status={status} busy={busy} setBusy={setBusy} open={temporaryOpen} setOpen={setTemporaryOpen} onChanged={check} />
       <Collapse items={[
         { key: 'processes', label: t('主程序与辅助进程 · {0} 个', [application.processes.length]), children: <><p className="secondary-copy">{t('应用规则按程序路径匹配；辅助进程由后端识别。')}</p><ul className="process-list">{application.processes.map(name => <li key={name}>{name} <Tag>{t(observedProcesses.includes(name) ? '已观察连接' : '暂未观察')}</Tag></li>)}</ul>{application.processWarnings?.map(warning => <Alert key={warning} type="warning" title={t(warning)} />)}</> },

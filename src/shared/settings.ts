@@ -1,8 +1,9 @@
+import type { DomainException } from './domainExceptions.ts'
 import type { RouteMode } from './application.ts'
 import type { LanguagePreference } from './i18n/index.ts'
 import type { ProxyStrategy } from './proxyStrategy.ts'
 
-export interface SettingsApplication { name: string; path?: string; category: string; mode: RouteMode; favorite?: boolean }
+export interface SettingsApplication { name: string; path?: string; category: string; mode: RouteMode; favorite?: boolean; domainExceptions?: DomainException[] }
 export interface SettingsSnapshot {
   app: 'AppRoute'; kind: 'approute-settings'; version: 1; createdAt: string
   applications: SettingsApplication[]
@@ -16,7 +17,7 @@ export interface ImportRow extends SettingsApplication {
   localPath?: string; manualBinding?: boolean; canBind?: boolean; replacingPath?: string
   differences: SettingsDifference[]
 }
-export interface SettingsDifference { field: 'name' | 'category' | 'mode' | 'favorite' | 'path'; before: string | boolean; after: string | boolean }
+export interface SettingsDifference { field: 'name' | 'category' | 'mode' | 'favorite' | 'path' | 'domainExceptions'; before: string | boolean; after: string | boolean }
 export interface ImportCandidate { key: string; name: string; path: string }
 export interface SettingsBindingRequest { token: string; key: string; candidate: string }
 export interface SettingsPreview {

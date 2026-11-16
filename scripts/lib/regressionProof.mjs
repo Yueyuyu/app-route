@@ -1,5 +1,10 @@
 // 精确替换只在临时副本发生。实现变化后匹配失败，要求重新审查破坏点，不能悄悄跳过。
 export const regressionCases = [
+  { id: 'remove-failed-domain-proxy', file: 'src/main/services/routingService.ts',
+    before: "request.applications.flatMap(app => app.mode === 'rule' ? [] : context.exceptions?.get(app.id)", after: 'request.applications.flatMap(app => context.exceptions?.get(app.id)',
+    test: 'tests/routingTransaction.test.ts', name: '代理例外出口失效后仍能撤销应用专属规则' },
+  { id: 'domain-suffix-boundary', file: 'src/core/domainExceptions.ts', before: "domain.endsWith('.' + item.domain)", after: 'domain.endsWith(item.domain)',
+    test: 'tests/domainExceptions.test.ts', name: '域名例外按精确和最长后缀排序，拒绝越界匹配和规则注入' },
   { id: 'rebind-stale-helpers', file: 'src/main/services/routingService.ts',
     before: 'samePrimary ? previousPaths : undefined', after: 'previousPaths',
     test: 'tests/routingTransaction.test.ts', name: '失效路径重绑需确认，失败保留旧规则，成功移除旧身份且不保留旧辅助路径' },

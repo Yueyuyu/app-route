@@ -425,3 +425,6 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .settings-scenarios { margin: 24px 0; }
 .scenario-applications .ant-select { width: 100%; }
 .settings-scenarios-table .ant-table-cell { overflow-wrap: anywhere; }
+
+.domain-exceptions-modal .ant-select { width: 100%; }
+.domain-exceptions-modal .ant-modal-body { overflow-wrap: anywhere; }

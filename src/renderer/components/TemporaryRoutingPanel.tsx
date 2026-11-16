@@ -18,7 +18,7 @@ export function TemporaryRoutingPanel({ application, managed, status, busy, setB
   useEffect(() => { setNotice(undefined); setOpen(false) }, [application.id])
   const lease = managed?.temporary, expired = lease && Date.parse(lease.expiresAt) <= Date.now()
   const previous = lease?.previous ?? { mode: managed?.mode ?? 'rule', target: managed?.target }
-  const disabled = busy || !window.appRoute || !status?.connected || Boolean(status.pending) || !application.path || Boolean(status.untrackedRuleCount || status.dataIssue)
+  const disabled = Boolean(managed?.domainExceptions?.length) || busy || !window.appRoute || !status?.connected || Boolean(status.pending) || !application.path || Boolean(status.untrackedRuleCount || status.dataIssue)
   function show(end: boolean) { setEnding(end); setMode(lease ? managed!.mode === 'proxy' ? 'proxy' : 'direct' : application.mode === 'direct' && status?.proxyGroup ? 'proxy' : 'direct'); setOpen(true); setNotice(undefined) }
   async function confirm() {
     if (disabled || working || !status) return
@@ -33,6 +33,7 @@ export function TemporaryRoutingPanel({ application, managed, status, busy, setB
   }
   return <section className="detail-section temporary-routing" aria-label={t('临时分流')}>
     <div className="temporary-routing-heading"><h3><ClockCircleOutlined /> {t('临时分流')}</h3><Button disabled={disabled} onClick={() => show(false)}>{t(lease ? '调整期限' : '设置期限')}</Button></div>
+    {Boolean(managed?.domainExceptions?.length) && <p className="secondary-copy">{t('请先移除域名例外，再设置临时分流。')}</p>}
     {lease && <><p><Tag color={expired ? 'warning' : 'blue'}>{t(expired ? '到期待恢复' : '临时设置中')}</Tag>{t('恢复时间：{0}', [formatDateTime(lease.expiresAt)])}</p><p className="subtle">{t('恢复为：{0}', [t(routeLabels[previous.mode])])}{previous.target ? ` · ${previous.target}` : ''}</p><Button size="small" disabled={disabled} onClick={() => show(true)}>{t('现在恢复原选择')}</Button></>}
     {notice && <Alert showIcon type={notice.error ? 'warning' : 'success'} title={t(notice.text)} />}
     <Modal open={open} title={t(ending ? '结束临时分流' : '临时分流')} onCancel={() => { if (!working) setOpen(false) }} keyboard={!working} maskClosable={!working} closable={!working}

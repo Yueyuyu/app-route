@@ -22,7 +22,7 @@ export async function inspectManagementRepair(service: RoutingService): Promise<
   const legacy = snapshot.script.match(/^  var apps = (\[.*\]);$/m)?.[1]
   const record = metadata ? JSON.parse(metadata.slice('// AppRoute record: '.length)) : { apps: legacy ? JSON.parse(legacy) : [] }
   if (!Array.isArray(record.apps) || !record.apps.length) throw new Error('找不到可核对的 AppRoute 覆写记录。')
-  const targets = [...new Set(record.apps.filter((a: any) => a.mode === 'proxy').map((a: any) => a.target))]
+  const targets = [...new Set(record.apps.flatMap((a: any) => [...(a.mode === 'proxy' ? [a.target] : []), ...(Array.isArray(a.domainExceptions) ? a.domainExceptions.filter((item: any) => item.mode === 'proxy').map((item: any) => item.target) : [])]))]
   // 旧自动策略没有可独立验证的元数据，不能猜测其节点策略。
   if (!metadata && targets.some(target => String(target).startsWith('AppRoute'))) throw new Error('旧版自动策略记录不完整，请使用离线恢复后重新设置。')
   const recovered = parseRoutingState(JSON.stringify({ revision: randomUUID(), managed: record.apps, proxyStrategy: record.strategy,

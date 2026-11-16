@@ -2,15 +2,15 @@ import type { RouteMode } from './application.ts'
 import type { ManagedApplication } from './integration.ts'
 import type { ProxyStrategy } from './proxyStrategy.ts'
 
-export type RoutingOperationSource = 'application' | 'strategy' | 'import' | 'helper' | 'undo' | 'temporary' | 'expiry'
+export type RoutingOperationSource = 'application' | 'strategy' | 'import' | 'helper' | 'undo' | 'temporary' | 'expiry' | 'exceptions'
 export interface HistoryRoutingState {
   revision: string; pendingId?: string; managed: ManagedApplication[]
   proxyGroup?: string; proxyStrategy?: ProxyStrategy; missingTargetAction?: 'block' | 'original'
 }
 export interface RoutingChange {
   id: string; name: string
-  before: { mode: RouteMode; target?: string; processes: number; expiresAt?: string }
-  after: { mode: RouteMode; target?: string; processes: number; expiresAt?: string }
+  before: { mode: RouteMode; target?: string; processes: number; expiresAt?: string; exceptions?: string }
+  after: { mode: RouteMode; target?: string; processes: number; expiresAt?: string; exceptions?: string }
 }
 export interface RoutingHistoryItem {
   id: string; at?: string; source: RoutingOperationSource | 'unknown'

@@ -1,3 +1,4 @@
+import { validateDomainExceptions, assertExceptionPaths, bindDomainExceptions } from '../../core/domainExceptions.ts'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -19,6 +20,13 @@ export function parseRoutingState(text: string): RoutingState {
     if (!item || !['direct', 'proxy'].includes(item.mode)) throw new Error('本地管理记录需要核对。')
     managedApplications([{ ...item, source: 'manual', category: '' }], item.target)
     if (item.missingTargetAction !== undefined && !['block', 'original'].includes(item.missingTargetAction)) throw new Error('本地管理记录需要核对。')
+    if (item.domainExceptions !== undefined) {
+      assertExceptionPaths(item.processPaths)
+      const normalized = validateDomainExceptions(item.domainExceptions)
+      if (normalized.some((entry, index) => JSON.stringify(entry) !== JSON.stringify(validateDomainExceptions([item.domainExceptions[index]])[0]))) throw new Error('域名例外顺序无效。')
+      item.domainExceptions.forEach((entry: any) => bindDomainExceptions([entry], entry.target))
+      if (item.temporary && normalized.length) throw new Error('请先结束临时分流，再设置域名例外。')
+    }
     if (item.temporary !== undefined) { validateTemporaryRoute(item.temporary); if (!item.processPaths?.length) throw new Error('临时分流缺少精确程序路径。') }
   })
   assertNoProcessOverlap(value.managed)

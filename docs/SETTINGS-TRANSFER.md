@@ -56,3 +56,5 @@
 | `scripts/verify-settings-ui.mjs` | 隔离 Electron、原生文件入口、四语窄窗口及 IPC 验收 |
 
 `npm run check` 包含格式、旧格式兼容、冲突、旧缓存、原规则保留和失败回退回归；`npm run check:settings-ui` 使用真实桌面与设置存储、模拟路由后台，不接触用户配置。该检查纳入日常 UI CI 与发布前验收，不能代替 Mac 真机分流验证。
+
+域名例外的导出、差异预览、历史备份与旧格式兼容见 [按应用域名例外](DOMAIN-EXCEPTIONS.md)。缺少例外字段的老文件不清除当前例外。

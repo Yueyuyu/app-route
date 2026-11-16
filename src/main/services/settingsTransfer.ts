@@ -1,3 +1,4 @@
+import { validateDomainExceptions } from '../../core/domainExceptions.ts'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -13,7 +14,7 @@ import { SettingsBackupStore } from './settingsBackups.ts'
 import type { RoutingService } from './routingService.ts'
 import type { Application } from '../../shared/application.ts'
 import type { ManagedApplication } from '../../shared/integration.ts'
-import type { SettingsBindingRequest, SettingsImportRequest, SettingsImportResult, SettingsPreview, SettingsSnapshot } from '../../shared/settings.ts'
+import type { SettingsApplication, SettingsBindingRequest, SettingsImportRequest, SettingsImportResult, SettingsPreview, SettingsSnapshot } from '../../shared/settings.ts'
 
 interface ImportSession { snapshot: SettingsSnapshot; fingerprint: string; expires: number; applications: Map<string, Application>; preview: SettingsPreview; candidates: Map<string, Application>; bindings: Map<string, string>; replacements: Map<string, ManagedApplication> }
 export class SettingsTransferService {
@@ -37,12 +38,12 @@ export class SettingsTransferService {
     const before = await this.fingerprint()
     const [state, inventory, language] = await Promise.all([this.routing.state(), this.inventory.read(), this.language.read()])
     if (state.pendingId) throw new Error('请等待分流操作或恢复检查完成。')
-    const applications = new Map(inventory.applications.filter(app => app.path).map(app => [processPathKey(app.path!), { name: app.name, path: app.path, category: app.category || '其他应用', mode: 'rule' as Application['mode'], favorite: inventory.favorites.includes(processPathKey(app.path!)) }]))
+    const applications = new Map<string, SettingsApplication>(inventory.applications.filter(app => app.path).map(app => [processPathKey(app.path!), { name: app.name, path: app.path, category: app.category || '其他应用', mode: 'rule' as Application['mode'], favorite: inventory.favorites.includes(processPathKey(app.path!)) }]))
     for (const app of state.managed) {
       const primary = app.processPaths?.[0]
       if (!primary) continue // 旧进程名规则不能在其他电脑猜测为同名程序。
       const key = processPathKey(primary), previous = applications.get(key)
-      applications.set(key, { name: previous?.name ?? app.name, path: primary, category: previous?.category ?? '其他应用', mode: app.mode, favorite: previous?.favorite ?? false })
+      applications.set(key, { name: previous?.name ?? app.name, path: primary, category: previous?.category ?? '其他应用', mode: app.mode, domainExceptions: validateDomainExceptions(app.domainExceptions ?? []), favorite: previous?.favorite ?? false })
     }
     if (before !== await this.fingerprint()) throw new Error('设置已变化，请重新预览。')
     return parseSettingsSnapshot({ app: 'AppRoute', kind: 'approute-settings', version: 1, createdAt: new Date().toISOString(), applications: [...applications.values()], language,
@@ -53,7 +54,7 @@ export class SettingsTransferService {
     const state = await this.routing.state()
     const missing = await Promise.all(state.managed.map(async app => app.processPaths?.[0] && !await this.available(app.processPaths[0]) ? app : undefined))
     return this.preview({ app: 'AppRoute', kind: 'approute-settings', version: 1, scope: 'routing', createdAt: new Date().toISOString(),
-      applications: missing.filter((app): app is ManagedApplication => Boolean(app)).map(app => ({ name: app.name, path: app.processPaths![0], category: '已管理应用', mode: app.mode })) })
+      applications: missing.filter((app): app is ManagedApplication => Boolean(app)).map(app => ({ name: app.name, path: app.processPaths![0], category: '已管理应用', mode: app.mode, domainExceptions: validateDomainExceptions(app.domainExceptions ?? []) })) })
   }
   async preview(snapshot: SettingsSnapshot, bindings = new Map<string, string>()): Promise<SettingsPreview> {
     snapshot = parseSettingsSnapshot(snapshot)
@@ -91,10 +92,10 @@ export class SettingsTransferService {
       return { ...item, key, currentMode, configured: Boolean(configured || old), available: !reason,
         ...(replacing ? { replacingPath: replacing.processPaths![0] } : {}),
         localPath: found?.path, manualBinding: Boolean(binding), canBind: Boolean(binding) || reason === '本机未找到对应路径，请先扫描或添加应用。',
-        differences: found && !reason ? [...settingsDifferences({ name: found.name, category: found.category || '其他应用', mode: currentMode, favorite: inventory.favorites.includes(processPathKey(found.path!)) }, item, snapshot.scope), ...(replacing ? [{ field: 'path' as const, before: replacing.processPaths![0], after: found.path! }] : [])] : [], ...(reason ? { reason } : {}) }
+        differences: found && !reason ? [...settingsDifferences({ name: found.name, category: found.category || '其他应用', mode: currentMode, domainExceptions: validateDomainExceptions((replacing ?? configured ?? old)?.domainExceptions ?? []), favorite: inventory.favorites.includes(processPathKey(found.path!)) }, item, snapshot.scope), ...(replacing ? [{ field: 'path' as const, before: replacing.processPaths![0], after: found.path! }] : [])] : [], ...(reason ? { reason } : {}) }
     }))
     if (before !== await this.fingerprint()) throw new Error('设置已变化，请重新预览。')
-    const preview: SettingsPreview = { token: randomUUID(), createdAt: snapshot.createdAt, rows, language: snapshot.language, proxyStrategy: snapshot.proxyStrategy, currentGroup: state.proxyGroup, affectedProxyCount: state.managed.filter(app => app.mode === 'proxy').length,
+    const preview: SettingsPreview = { token: randomUUID(), createdAt: snapshot.createdAt, rows, language: snapshot.language, proxyStrategy: snapshot.proxyStrategy, currentGroup: state.proxyGroup, affectedProxyCount: state.managed.filter(app => app.mode === 'proxy' || app.domainExceptions?.some(item => item.mode === 'proxy')).length,
       currentLanguage, currentStrategy: state.proxyStrategy ?? (state.proxyGroup ? { mode: 'existing', group: state.proxyGroup } : undefined),
       candidates: [...candidates].map(([key, app]) => ({ key, name: app.name, path: app.path! })).sort((a, b) => a.name.localeCompare(b.name)) }
     this.session = { snapshot, fingerprint: before, expires: Date.now() + 10 * 60_000, applications, preview, candidates, bindings, replacements }
@@ -160,10 +161,10 @@ export class SettingsTransferService {
       if (request.applyRouting && (selected.length || request.restoreStrategy)) {
         const strategy = request.restoreStrategy ? session.snapshot.proxyStrategy : undefined
         const target = strategy ? strategy.mode === 'existing' ? strategy.group : strategyOwnership.name : state.proxyGroup
-        const migrated = strategy ? state.managed.filter(app => app.mode === 'proxy' && !selected.some(item => item.id === app.id)).map(app => ({ ...app, path: app.processPaths?.[0], source: 'manual' as const, category: '已管理应用' })) : []
+        const migrated = strategy ? state.managed.filter(app => (app.mode === 'proxy' || app.domainExceptions?.some(item => item.mode === 'proxy')) && !selected.some(item => item.id === app.id)).map(app => ({ ...app, path: app.processPaths?.[0], source: 'manual' as const, category: '已管理应用' })) : []
         if (selected.length + migrated.length > 100) throw new Error('同时应用的项目超过 100 个，请分批导入或单独恢复代理策略。')
         const result = await this.routing.applyAutomatically({ applications: [...selected, ...migrated], revision: state.revision, target,
-          ...(strategy ? { proxyStrategy: strategy, proxyGroup: target, missingTargetAction: session.snapshot.missingTargetAction ?? state.missingTargetAction } : {}) }, 'import')
+          ...(strategy ? { proxyStrategy: strategy, proxyGroup: target, missingTargetAction: session.snapshot.missingTargetAction ?? state.missingTargetAction } : {}) }, 'import', { exceptions: new Map(request.keys.flatMap((key, index) => { const rows = session.snapshot.applications[Number(key)].domainExceptions; return rows === undefined ? [] : [[selected[index].id, rows]] })) })
         if (result.outcome !== 'applied') throw new Error(result.message)
         routingApplied = true
       }

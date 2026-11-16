@@ -74,13 +74,21 @@ export function managedApplications(input: Application[], target?: string): Mana
 }
 
 export function ruleStrings(apps: ManagedApplication[]): string[] {
-  return apps.flatMap(app => (app.processPaths ?? app.processes).map(process => `${app.processPaths ? 'PROCESS-PATH' : 'PROCESS-NAME'},${process},${app.mode === 'direct' ? 'DIRECT' : app.target}`))
+  return apps.flatMap(app => [
+    ...(app.domainExceptions ?? []).flatMap(item => (app.processPaths ?? []).map(process => `AND,((PROCESS-PATH,${process}),(${item.kind === 'exact' ? 'DOMAIN' : 'DOMAIN-SUFFIX'},${item.domain})),${item.mode === 'direct' ? 'DIRECT' : item.target}`)),
+    ...(app.mode === 'rule' ? [] : (app.processPaths ?? app.processes).map(process => `${app.processPaths ? 'PROCESS-PATH' : 'PROCESS-NAME'},${process},${app.mode === 'direct' ? 'DIRECT' : app.target}`)),
+  ])
 }
 
 /** 同一纯函数供即时配置和订阅覆写使用。旧记录默认沿用原规则，新策略可明确拒绝连接。 */
 export function effectiveApplications(apps: ManagedApplication[], names: string[]): ManagedApplication[] {
-  return apps.flatMap(app => app.mode === 'direct' || names.includes(app.target!) ? [app]
-    : app.missingTargetAction === 'block' ? [{ ...app, target: 'REJECT' }] : [])
+  return apps.flatMap(app => {
+    // 代理例外的目标消失时拒绝该域名连接，不能悄悄退回基础直连。
+    const domainExceptions = app.domainExceptions?.map(item => item.mode === 'proxy' && !names.includes(item.target!) ? { ...item, target: 'REJECT' } : item)
+    const current = { ...app, ...(domainExceptions ? { domainExceptions } : {}) }
+    return app.mode === 'direct' || names.includes(app.target!) ? [current]
+      : app.missingTargetAction === 'block' ? [{ ...current, target: 'REJECT' }] : domainExceptions?.length ? [{ ...current, mode: 'rule' as const }] : []
+  })
 }
 
 export function managedProcessMatches(app: ManagedApplication, metadata: { process?: string; processPath?: string }): boolean {
@@ -123,7 +131,7 @@ export function addManagedRules(config: Record<string, any>, apps: ManagedApplic
 
 /** 生成独立覆写；失效目标按明确策略处理，不让整个配置失效。 */
 export function overrideScript(apps: ManagedApplication[], strategy?: ProxyStrategy): string {
-  return `${scriptHeader}\n// AppRoute record: ${JSON.stringify({version:1,apps,strategy})}\nfunction main(input) {\n try {\n  var config = JSON.parse(JSON.stringify(input));\n  var key = ${JSON.stringify(markerKey)};\n  var old = config[key];\n  if (old && old.owner === ${JSON.stringify(ownerId)} && Array.isArray(old.rules)) {\n    if (!Array.isArray(config.rules) || !old.rules.every(function(r,i){return config.rules[i] === r})) return config;\n    config.rules = config.rules.slice(old.rules.length);\n    delete config[key];\n  }\n  config = (${reconcileProxyStrategy.toString()})(config, ${JSON.stringify(strategy) ?? 'undefined'}, ${JSON.stringify(strategyOwnership)}, ${JSON.stringify(strategyTestUrl)});\n  var apps = ${JSON.stringify(apps)};\n  var names = ['DIRECT'].concat((config.proxies || []).map(function(p){return p.name}), (config['proxy-groups'] || []).map(function(p){return p.name}));\n  apps = (${effectiveApplications.toString()})(apps, names);\n  var rules = [];\n  apps.forEach(function(app){\n    var target = app.mode === 'direct' ? 'DIRECT' : app.target;\n    if (target !== 'REJECT' && names.indexOf(target) < 0) return;\n    (app.processPaths || app.processes).forEach(function(p){rules.push((app.processPaths ? 'PROCESS-PATH,' : 'PROCESS-NAME,') + p + ',' + target)});\n  });\n  if (rules.length) {\n    config.rules = rules.concat(config.rules || []);\n    config[key] = {owner:${JSON.stringify(ownerId)},rules:rules};\n  }\n  return config;\n } catch (_) { return input; }\n}\n`
+  return `${scriptHeader}\n// AppRoute record: ${JSON.stringify({version:1,apps,strategy})}\nfunction main(input) {\n try {\n  var config = JSON.parse(JSON.stringify(input));\n  var key = ${JSON.stringify(markerKey)};\n  var old = config[key];\n  if (old && old.owner === ${JSON.stringify(ownerId)} && Array.isArray(old.rules)) {\n    if (!Array.isArray(config.rules) || !old.rules.every(function(r,i){return config.rules[i] === r})) return config;\n    config.rules = config.rules.slice(old.rules.length);\n    delete config[key];\n  }\n  config = (${reconcileProxyStrategy.toString()})(config, ${JSON.stringify(strategy) ?? 'undefined'}, ${JSON.stringify(strategyOwnership)}, ${JSON.stringify(strategyTestUrl)});\n  var apps = ${JSON.stringify(apps)};\n  var names = ['DIRECT'].concat((config.proxies || []).map(function(p){return p.name}), (config['proxy-groups'] || []).map(function(p){return p.name}));\n  apps = (${effectiveApplications.toString()})(apps, names);\n  var rules = (${ruleStrings.toString()})(apps);\n  if (rules.length) {\n    config.rules = rules.concat(config.rules || []);\n    config[key] = {owner:${JSON.stringify(ownerId)},rules:rules};\n  }\n  return config;\n } catch (_) { return input; }\n}\n`
 }
 
 export interface ProxyInfo { name: string; type: string; all?: string[]; now?: string; fixed?: string; udp?: boolean; alive?: boolean; history?: { time: string; delay: number }[] }

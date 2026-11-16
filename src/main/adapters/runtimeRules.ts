@@ -1,3 +1,4 @@
+import { canonicalRulePayload } from '../../core/domainExceptions.ts'
 import type { RuntimeRule } from './mihomoRuntime.ts'
 
 const normalizeType = (value: string) => value.replaceAll('-', '').toLowerCase().replace(/^ipcidr6$/, 'ipcidr')
@@ -15,6 +16,6 @@ export function configRuleSignature(rules: string[]): string {
     if (parts.at(-1) === 'no-resolve') parts.pop()
     const proxy = parts.pop() ?? ''
     const payload = type === 'geoip' ? parts.join(',').toLowerCase() : parts.join(',')
-    return [type, payload, proxy, false]
+    return [type, canonicalRulePayload(type, payload), proxy, false]
   }))
 }

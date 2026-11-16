@@ -149,9 +149,9 @@ async function verify() {
     service.options.probe = async () => runtime.delay('DIRECT', `http://127.0.0.1:${targetPort}/probe`).then(({ delay }) => { probeDelays.push(delay); return delay > 0 }, () => false)
     pending = await service.apply({ revision: (await service.state()).revision, applications: [application] })
     await service.confirm(pending.pending.id)
-    function connect(label) {
-      const code = `const http=require('node:http');const req=http.get({host:'127.0.0.1',port:${port},path:'http://127.0.0.1:${targetPort}/${label}',headers:{host:'127.0.0.1:${targetPort}'}},r=>{console.log('status',r.statusCode);r.resume()}).on('error',e=>{console.error(e.code);process.exit(2)});req.on('socket',s=>s.on('connect',()=>console.log('sourcePort',s.localPort)));`
-      const child = spawn(executable, ['-e', code], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    function connect(label, host = '127.0.0.1', program = executable) {
+      const code = `const http=require('node:http');const req=http.get({host:'127.0.0.1',port:${port},path:'http://${host}:${targetPort}/${label}',headers:{host:'${host}:${targetPort}'}},r=>{console.log('status',r.statusCode);r.resume()}).on('error',e=>{console.error(e.code);process.exit(2)});req.on('socket',s=>s.on('connect',()=>console.log('sourcePort',s.localPort)));`
+      const child = spawn(program, ['-e', code], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
       child.responseLog = ''; for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => { child.responseLog = (child.responseLog + chunk.toString()).slice(0, 500) })
       children.add(child); return child
     }
@@ -204,6 +204,31 @@ async function verify() {
     assert.deepEqual((await runtime.rules()).rules.map(rule => rule.payload), ['new-subscription.example', ''])
     assert.equal(await readOptional(path.join(root, 'temporary-monitor', 'ready.json')), null)
     results.push({ scenario: 'temporary-route-independent-expiry', passed: true, before: 'ProcessPath DIRECT', after: 'original Match DIRECT', boundary: 'separate watcher process, isolated executable and real core; no UI timer or daily routing' })
+    // 同一真实进程访问不同域名，另一个进程访问同域名；所有服务仅监听回环地址。
+    const domainConfig = { ...updated, hosts: { 'api.route.example': '127.0.0.1', 'shop.route.example': '127.0.0.1', 'other.example': '127.0.0.1' }, 'proxy-groups': [{ name: 'Test group', type: 'select', proxies: ['DIRECT'] }] }
+    await atomicWrite(path.join(party, 'work/config.yaml'), YAML.stringify(domainConfig)); await runtime.reload(YAML.stringify(domainConfig))
+    const initialDomain = await service.applyAutomatically({ revision: (await service.state()).revision, applications: [application], target: 'Test group', proxyGroup: 'Test group' })
+    assert.equal(initialDomain.outcome, 'applied', initialDomain.message)
+    const exceptions = [{ kind: 'suffix', domain: 'route.example', mode: 'proxy' }, { kind: 'exact', domain: 'api.route.example', mode: 'direct' }]
+    const appliedDomain = await service.setDomainExceptions({ revision: (await service.state()).revision, applicationId: application.id, exceptions })
+    assert.equal(appliedDomain.outcome, 'applied', appliedDomain.message)
+    assert.equal((await new RoutingService(options).status()).rulesLoaded, true, 'recreated service understands actual core AND payload')
+    for (const [host, ownProcess, expectedRule, expectedGroup] of [['api.route.example', true, 'and', false], ['shop.route.example', true, 'and', true], ['other.example', true, 'processpath', false], ['shop.route.example', false, 'match', false]]) {
+      const client = connect('domain-check', host, ownProcess ? executable : process.execPath)
+      let observed
+      await waitUntil(async () => {
+        const sourcePort = Number(/sourcePort (\d+)/.exec(client.responseLog)?.[1])
+        observed = (await runtime.connections()).connections.find(item => Number(item.metadata.sourcePort) === sourcePort && Number(item.metadata.destinationPort) === targetPort)
+        return Boolean(observed && client.responseLog.includes('status 200'))
+      })
+      assert.equal(observed.rule.toLowerCase(), expectedRule, host + ' process scope')
+      assert.equal(observed.chains.includes('Test group'), expectedGroup, host + ' routing target')
+      if (ownProcess) assert.ok((await service.status()).evidence.some(item => item.applicationId === application.id && item.destination === host && item.matched), 'actual connection must satisfy the selected exception')
+      await stop(client)
+    }
+    await service.recoverAll()
+    assert.deepEqual((await runtime.rules()).rules.map(rule => rule.payload), ['new-subscription.example', ''])
+    results.push({ scenario: 'application-domain-exceptions', passed: true, boundary: 'isolated real process, loopback domains and Mihomo AND rules; group selects DIRECT, no remote node claim' })
   } finally {
     for (const child of children) await stop(child)
     if (localServer) { localServer.closeAllConnections(); await new Promise(resolve => localServer.close(resolve)) }
