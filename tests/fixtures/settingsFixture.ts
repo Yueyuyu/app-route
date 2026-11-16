@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { SettingsTransferService } from '../../src/main/services/settingsTransfer.ts'
+import { SettingsScenarios } from '../../src/main/services/settingsScenarios.ts'
 import { UpgradeVerificationService } from '../../src/main/services/upgradeVerification.ts'
 import type { Application } from '../../src/shared/application.ts'
 import type { RoutingService } from '../../src/main/services/routingService.ts'
@@ -17,6 +18,7 @@ export async function createSettingsFixture(root: string, applications: Applicat
   } } as unknown as RoutingService
   const service = new SettingsTransferService(routing, async () => applications, async file => applications.some(app => app.path === file))
   const upgrade = new UpgradeVerificationService(service)
+  const scenarios = new SettingsScenarios(service)
   await service.inventory.write({ version: 1, applications, favorites: [applications[0].path!.toLowerCase()] })
   const history = path.join(profile, 'backups/state')
   await fs.mkdir(history, { recursive: true })
@@ -30,6 +32,11 @@ export async function createSettingsFixture(root: string, applications: Applicat
       case 'inventory.read': return service.inventory.read()
       case 'inventory.write': return service.inventory.write(body)
       case 'settings.snapshot': return service.snapshot()
+      case 'settings.scenarios': return scenarios.list()
+      case 'settings.scenario-prepare': return scenarios.prepare()
+      case 'settings.scenario-save': return scenarios.save(body)
+      case 'settings.scenario-preview': return scenarios.preview(body.id, body.fingerprint)
+      case 'settings.scenario-delete': return scenarios.remove(body.id, body.fingerprint)
       case 'settings.preview': return service.previewText(body.text)
       case 'settings.bind': return service.bind(body)
       case 'settings.import': return service.import(body)

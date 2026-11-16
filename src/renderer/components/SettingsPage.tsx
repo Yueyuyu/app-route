@@ -5,6 +5,7 @@ import { t, formatDateTime } from '../i18n'
 import { routeLabels } from '../types'
 import { settingsError } from '../settingsError'
 import { SettingsBackupsPanel } from './SettingsBackupsPanel'
+import { SettingsScenariosPanel } from './SettingsScenariosPanel'
 import { ImportDifferences, ImportGlobalDifferences } from './SettingsImportDetails'
 import type { ImportRow, SettingsImportResult, SettingsPreview } from '../../shared/settings'
 
@@ -77,6 +78,7 @@ export function SettingsPage({ busy, setBusy, onImported }: Props) {
       <div className="settings-transfer-card"><div><h2>{t('迁移设置')}</h2><p>{t('保存应用选择、收藏、语言和代理策略。文件包含本机程序路径，请妥善保管。')}</p></div>
         <Space><Button icon={<DownloadOutlined />} disabled={busy} onClick={() => void exportSettings()}>{t('导出设置')}</Button><Button type="primary" icon={<UploadOutlined />} disabled={busy} onClick={() => void pick()}>{t('导入设置')}</Button></Space>
       </div>
+      <SettingsScenariosPanel busy={busy} setBusy={setBusy} onPreview={showPreview} />
       <SettingsBackupsPanel busy={busy} setBusy={setBusy} revision={backupRevision} onPreview={showPreview} />
     </>}
     <Drawer title={t('导入预览')} open={Boolean(preview)} onClose={() => { if (!busy) setPreview(undefined) }} closable={!busy} maskClosable={!busy} keyboard={!busy} size={880} afterOpenChange={visible => { if (visible) previewClose.current?.focus() }}

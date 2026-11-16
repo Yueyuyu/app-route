@@ -422,3 +422,6 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .temporary-routing-fields label { display: flex; flex: 1 1 180px; flex-direction: column; gap: 8px; min-width: 0; }
 .temporary-routing-fields .ant-select { width: 100%; }
 .temporary-routing .ant-alert { margin-top: 12px; }
+.settings-scenarios { margin: 24px 0; }
+.scenario-applications .ant-select { width: 100%; }
+.settings-scenarios-table .ant-table-cell { overflow-wrap: anywhere; }

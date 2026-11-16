@@ -1,5 +1,8 @@
 // 精确替换只在临时副本发生。实现变化后匹配失败，要求重新审查破坏点，不能悄悄跳过。
 export const regressionCases = [
+  { id: 'scenario-stale-source', file: 'src/main/services/settingsScenarios.ts',
+    before: 'draft.fingerprint !== await this.fingerprint()', after: 'false',
+    test: 'tests/scenarios.test.ts', name: '方案拒绝过期来源、伪造条目、重复名称、临时状态及内容变化后的删除' },
   { id: 'temporary-manual-choice', file: 'src/main/services/routingService.ts',
     before: "source === 'helper' ? original?.temporary : undefined", after: 'true ? original?.temporary : undefined',
     test: 'tests/routingTransaction.test.ts', name: '临时续期保留最初选择，旧定时不能覆盖手动改选，策略变更不破坏恢复目标' },

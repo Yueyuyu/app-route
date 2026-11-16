@@ -18,6 +18,7 @@ import { inspectManagementRepair, repairManagementRecords } from '../src/main/se
 import { parseRoutingState, pruneCompletedTransactions } from '../src/main/storage/routingStateStore.ts'
 import { diagnosticExport } from '../src/main/services/diagnosticExport.ts'
 import { SettingsTransferService } from '../src/main/services/settingsTransfer.ts'
+import { SettingsScenarios } from '../src/main/services/settingsScenarios.ts'
 import { RoutingHistoryService } from '../src/main/services/routingHistory.ts'
 import { TemporaryRoutingService } from '../src/main/services/temporaryRouting.ts'
 import { watchTemporaryRouting } from '../src/main/recovery/temporaryGuardian.ts'
@@ -56,6 +57,28 @@ async function fixture(t: TestContext, overrides: ServiceOptions = {}) {
   const service = new RoutingService({ root, partyRoot: party, runtime: async () => runtime, validate: async () => {}, installKit: async () => {}, guardian: async () => { guardianStarted = true }, ...overrides })
   return { service, runtime, config, party, guardianStarted: () => guardianStarted }
 }
+
+test('场景确认应用复用恢复事务，只改所选应用，重载失败保留现有设置', async t => {
+  const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true })
+  const first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }, second = { ...first, id: 'second', path: 'C:\\Apps\\Second\\Second.exe', processes: ['Second.exe'] }
+  await f.service.applyAutomatically({ revision: 'initial', applications: [first, second], target: 'Group', proxyGroup: 'Group' })
+  const settings = new SettingsTransferService(f.service, async () => [first, second], async () => true), scenarios = new SettingsScenarios(settings)
+  const draft = await scenarios.prepare(), row = draft.rows.find(row => row.path === first.path)!
+  const saved = await scenarios.save({ token: draft.token, name: '工作', choices: [{ key: row.key, mode: 'proxy' }] })
+  const before = (await f.service.state()).managed
+  let preview = await scenarios.preview(saved.id, saved.fingerprint)
+  assert.deepEqual((await f.service.state()).managed, before, 'preview is read only')
+  f.runtime.failNextReload = true
+  await assert.rejects(settings.import({ token: preview.token, keys: ['0'], applyRouting: true, restoreStrategy: false, restoreLanguage: false }))
+  assert.deepEqual((await f.service.state()).managed, before)
+  preview = await scenarios.preview(saved.id, saved.fingerprint)
+  assert.equal((await settings.import({ token: preview.token, keys: ['0'], applyRouting: true, restoreStrategy: false, restoreLanguage: false })).routingApplied, true)
+  const after = (await f.service.state()).managed
+  assert.equal(after.find(item => item.id === first.id)!.mode, 'proxy')
+  assert.deepEqual(after.find(item => item.id === second.id), before.find(item => item.id === second.id))
+  assert.deepEqual(f.runtime.current.rules.slice(-f.config.rules.length), f.config.rules)
+  assert.equal(await fs.readFile(path.join(f.party, 'override/original.js'), 'utf8'), '// user-owned\nfunction main(c){return c}\n')
+})
 
 test('临时分流保存期限，重建后台后到期只恢复该应用，保留其他应用和原规则', async t => {
   let now = Date.now(), starts = 0

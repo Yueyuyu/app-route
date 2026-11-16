@@ -6,6 +6,7 @@ import { ApplicationIconService } from '../services/applicationIconService.ts'
 import { InventoryPreferencesStore } from '../services/inventoryPreferences.ts'
 import { RoutingService } from '../services/routingService.ts'
 import { SettingsTransferService } from '../services/settingsTransfer.ts'
+import { SettingsScenarios } from '../services/settingsScenarios.ts'
 import { UpgradeVerificationService } from '../services/upgradeVerification.ts'
 import { RoutingHistoryService } from '../services/routingHistory.ts'
 import { TemporaryRoutingService } from '../services/temporaryRouting.ts'
@@ -22,6 +23,7 @@ const service = new RoutingService({ kitBundle: path.join(resources, 'recovery.c
 const icons = new ApplicationIconService({ scan: () => scanApplications(path.join(resources, 'windows', 'scan-applications.ps1')) })
 const inventory = new InventoryPreferencesStore(service.root)
 const settings = new SettingsTransferService(service, async () => (await scan(true)).applications)
+const scenarios = new SettingsScenarios(settings)
 const upgrade = new UpgradeVerificationService(settings)
 const history = new RoutingHistoryService(service)
 const temporary = new TemporaryRoutingService(service)
@@ -45,6 +47,11 @@ async function dispatch(action: DesktopAction, body: any = {}) {
     case 'inventory.read': return inventory.read()
     case 'inventory.write': return inventory.write(body)
     case 'settings.snapshot': return settings.snapshot()
+    case 'settings.scenarios': return scenarios.list()
+    case 'settings.scenario-prepare': return scenarios.prepare()
+    case 'settings.scenario-save': return scenarios.save(body)
+    case 'settings.scenario-preview': return scenarios.preview(body.id, body.fingerprint)
+    case 'settings.scenario-delete': return scenarios.remove(body.id, body.fingerprint)
     case 'settings.preview': return settings.previewText(body.text)
     case 'settings.bind': return settings.bind(body)
     case 'settings.import': return settings.import(body)

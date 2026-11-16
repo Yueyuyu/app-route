@@ -46,6 +46,7 @@ process.on('message', async ({ id, action, body }) => {
   }
   let value
   if (action === 'updates.status') value = { state: 'none' }
+  else if (action === 'settings.scenarios') value = { items: [], unreadable: 0 }
   else if (action === 'integration.temporary') {
     const app = status.managed.find(item => item.id === body.application.id)
     if (!app || body.revision !== status.revision) { process.send?.({ id, error: '临时设置已变化，请刷新后重试。' }); return }
