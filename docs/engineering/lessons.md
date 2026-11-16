@@ -5,7 +5,7 @@
 | 编号 / 场景 | 已发生的问题与原因 | 后续拦截办法 | 证据与检查入口 |
 | --- | --- | --- | --- |
 | L01 异步回执 | 点击复制后立即读剪贴板，复制 IPC 尚未结束 | 等“复制成功”状态；每轮清空旧结果，注入延迟证明不会误通过 | [失败与修复记录](../VERIFICATION.md)、[四语验收](../../scripts/verify-localization.mjs) |
-| L02 窗口与布局 | 请求 1440 宽的原生窗口，Mac CI 实际只有 1024，误用宽屏高度标准 | 明确设置并核对内容视口、字体和布局；记录原生窗口与受控视口的区别 | [视口工具](../../scripts/lib/desktopViewport.mjs)、[验收记录](../VERIFICATION.md) |
+| L02 窗口与布局 | Mac CI 的实际窗口受屏幕限制；后来用网页视口模拟尺寸，又让较大的原生窗口右侧和底部留白，裁剪截图未发现 | 只调整真实 BrowserWindow；核对内容区与 DOM 尺寸、页面铺满、侧栏到底、最大化及还原，等待字体和布局；记录实际尺寸，不把请求值当作实测值 | [窗口工具](../../scripts/lib/desktopViewport.mjs)、[四语设置验收](../../scripts/verify-settings-ui.mjs)、[复现记录](../VERIFICATION.md) |
 | L03 脚本漏提交 | 本机存在新文件，暂存区仍缺失，云端引用失败 | 检查暂存 Git 树的工作流、包脚本与重命名引用，不以工作目录成功代替 | [门禁回归](../../.github/scripts/preflight.checks.mjs) |
 | L04 旧缓存覆盖 | 页面持有旧应用资料，导入后的新设置可能被延迟保存覆盖 | 保存带修订号，导入后刷新；拒绝过期写入 | [资料服务](../../src/main/services/inventoryPreferences.ts)、[导入回归](../../tests/settingsTransfer.test.ts) |
 | L05 代理组自动选择 | 内核重载会读回旧固定节点缓存，界面选择与实际出口分离 | 重载统一走 MihomoRuntime.reload；核对手动选择与自动状态，不直接调用重载 API | [内核验收](../../scripts/verify-runtime-selections.mjs)、[项目规则](../../AGENTS.md) |

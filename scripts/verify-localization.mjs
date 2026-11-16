@@ -6,7 +6,7 @@ import executablePath from 'electron'
 import { createDesktopSandbox } from './lib/testSandbox.mjs'
 import { startUiEvidence } from './lib/uiEvidence.mjs'
 import { resolveLocale, translate } from '../src/shared/i18n/index.ts'
-import { setDesktopViewport } from './lib/desktopViewport.mjs'
+import { assertDesktopWindowFilled, setDesktopViewport } from './lib/desktopViewport.mjs'
 
 // 使用真实的桌面主进程/preload/UI 与独立演示后台，不接触用户配置或真实代理。
 const root = process.cwd()
@@ -33,12 +33,22 @@ try {
    clipboard.writeText = async value => { await new Promise(resolve => setTimeout(resolve, 120)); globalThis.appRouteTestCopy = value }
  })
  await page.locator('.language-switcher').waitFor(); await page.locator('.application-table button.application-name').first().waitFor()
- await setDesktopViewport(page, { width: 1440, height: 1000 })
+ await setDesktopViewport(desktop, page, { width: 1440, height: 1000 })
  async function screenshot(name) { await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: path.join(output, name + '.png'), animations: 'disabled' }) }
  async function layout(label) {
+   const nativeWindow = await assertDesktopWindowFilled(desktop, page, label)
    const state = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth > innerWidth + 1,
      missingImages: [...document.images].filter(image => !image.complete || !image.naturalWidth).map(image => image.getAttribute('src')) }))
-   assert.equal(state.overflow, false, label + ' horizontal overflow'); assert.deepEqual(state.missingImages, [], label + ' images'); results.push({ label, ...state })
+   assert.equal(state.overflow, false, label + ' horizontal overflow'); assert.deepEqual(state.missingImages, [], label + ' images'); results.push({ label, ...state, nativeWindow })
+ }
+ async function applicationDensity(label) {
+   const density = await page.locator('.application-table').evaluate(element => ({
+     top: element.getBoundingClientRect().top, width: innerWidth, height: innerHeight,
+     rows: [...element.querySelectorAll('tbody tr.ant-table-row')].slice(0, 2).map(row => row.getBoundingClientRect().bottom),
+   }))
+   // 小屏的长语言需要换行；保留宽屏紧凑标准，小屏仍须完整展示至少两行应用。
+   if (density.width >= 1200) assert.ok(density.top < 390, `${label} compact application header: ${JSON.stringify(density)}`)
+   assert.ok(density.rows.length === 2 && density.rows[1] <= density.height + 1, `${label} first two applications must fit: ${JSON.stringify(density)}`)
  }
  for (const [locale, labels] of Object.entries(translations)) {
    await page.locator('.list-search input').fill('Chrome')
@@ -52,8 +62,7 @@ try {
    await page.getByRole('heading', { name: labels[1], exact: true }).waitFor()
    await layout(locale + '-apps'); await screenshot(locale + '-applications')
    assert.equal(await page.locator('.ant-breadcrumb').count(), 0)
-   const tableTop = await page.locator('.application-table').evaluate(element => element.getBoundingClientRect().top)
-   assert.ok(tableTop < 390, `${locale} compact application header: table top ${tableTop}, viewport ${JSON.stringify(page.viewportSize())}`)
+   await applicationDensity(locale)
    const about = page.locator('.sidebar .about-app-trigger')
    await about.click()
    await page.locator('.about-app-content').waitFor()
@@ -149,10 +158,10 @@ try {
        await page.locator('.ant-modal-container:visible').getByRole('button', { name: translate(locale, '确认撤销'), exact: true }).click()
        await history.getByText(translate(locale, '设置已变化，请刷新操作记录。'), { exact: true }).waitFor()
        await page.locator('.ant-modal-container:visible').waitFor({ state: 'hidden' })
-       await setDesktopViewport(page, { width: 1000, height: 760 })
+       await setDesktopViewport(desktop, page, { width: 1000, height: 760 })
        await layout(locale + '-history-narrow'); await screenshot(locale + '-history-narrow')
        await page.keyboard.press('Escape'); await history.waitFor({ state: 'hidden' })
-       await setDesktopViewport(page, { width: 1440, height: 1000 })
+       await setDesktopViewport(desktop, page, { width: 1440, height: 1000 })
      }
      if (slug === 'icons') {
        assert.equal(await page.locator('.icon-statistics strong').first().innerText(), '9', 'counts include the manual icon and exclude removed scan entries')
@@ -259,7 +268,7 @@ try {
    await exceptionModal.locator('.ant-select').last().click()
    await page.locator('.ant-select-item-option-content').getByText(translate(locale, '跟随代理组'), { exact: true }).click()
    await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
-   await setDesktopViewport(page, { width: 1000, height: 760 })
+   await setDesktopViewport(desktop, page, { width: 1000, height: 760 })
    assert.equal(await exceptionModal.locator('.ant-modal-footer button').evaluateAll(buttons => buttons.some(button => button.getBoundingClientRect().bottom > innerHeight || button.getBoundingClientRect().right > innerWidth)), false)
    await layout(locale + '-domain-exceptions'); await screenshot(locale + '-domain-exceptions')
    await exceptionModal.getByRole('button', { name: translate(locale, '应用例外'), exact: true }).click()
@@ -271,7 +280,7 @@ try {
    await exceptionModal.getByRole('button', { name: translate(locale, '应用例外'), exact: true }).click()
    await exceptionModal.waitFor({ state: 'hidden' })
    await exceptionSection.getByText(translate(locale, '所有目标沿用这个应用的联网方式。'), { exact: true }).waitFor()
-   await setDesktopViewport(page, { width: 1440, height: 1000 })
+   await setDesktopViewport(desktop, page, { width: 1440, height: 1000 })
    results.push({ label: locale + '-domain-exceptions-invalid-cancel-save-clear', passed: true })
 
    await page.keyboard.press('Escape'); await page.locator('.ant-drawer-body:visible').waitFor({ state: 'hidden' })
@@ -308,9 +317,10 @@ try {
    await page.locator('.heading-actions button').filter({ hasText: labels[9] }).click()
    await page.locator('.ant-drawer-body:visible').waitFor(); await screenshot(locale + '-add')
    await page.keyboard.press('Escape'); await page.locator('.ant-drawer-body:visible').waitFor({ state: 'hidden' })
-   await setDesktopViewport(page, { width: 1000, height: 760 })
+   await setDesktopViewport(desktop, page, { width: 1000, height: 760 })
+   await applicationDensity(locale + '-narrow')
    await layout(locale + '-narrow'); await screenshot(locale + '-narrow')
-   await setDesktopViewport(page, { width: 1440, height: 1000 })
+   await setDesktopViewport(desktop, page, { width: 1440, height: 1000 })
  }
  await sandbox.close(desktop); desktop = undefined
  desktop = await sandbox.launch(electron, executablePath)
@@ -332,7 +342,7 @@ try {
  assert.equal(requests.filter(action => action === 'integration.temporary').length, 4)
  assert.equal(requests.filter(action => action === 'integration.temporary-end').length, 4)
  assert.deepEqual(errors, [])
- await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'synthetic data; real desktop UI, IPC and language persistence; controlled content viewport, not native window sizing; no real routing changes', results, errors }, null, 2))
+ await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'synthetic data; real desktop UI, IPC, language persistence and native window sizing; dimensions measured from actual content area; no real routing changes', results, errors }, null, 2))
  console.log(JSON.stringify({ checks: results.length, output, errors }))
  passed = true
 } catch (error) {

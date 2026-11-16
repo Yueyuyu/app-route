@@ -8,7 +8,7 @@ import executablePath from 'electron'
 import { createDesktopSandbox } from './lib/testSandbox.mjs'
 import { startUiEvidence } from './lib/uiEvidence.mjs'
 import { translate } from '../src/shared/i18n/index.ts'
-import { setDesktopViewport } from './lib/desktopViewport.mjs'
+import { checkDesktopMaximizeRestore, setDesktopViewport } from './lib/desktopViewport.mjs'
 
 // 真实 Electron 主进程、文件对话框调用、IPC、设置存储；路由只记录到隔离夹具。
 const root = process.cwd()
@@ -28,14 +28,29 @@ const controlServer = http.createServer((req, res) => {
 await new Promise(resolve => controlServer.listen(0, '127.0.0.1', resolve))
 const controlContent = `external-controller: 127.0.0.1:${controlServer.address().port}\nsecret: ui-fixture-only`
 await fs.writeFile(controlFile, controlContent)
-const errors = [], checks = []
+const errors = [], checks = [], nativeWindows = []
 let desktop
 try {
   desktop = await sandbox.launch(electron, executablePath)
   const page = await desktop.firstWindow()
   page.on('pageerror', error => errors.push(error.message))
+  async function chooseBindingCandidate(modal, text) {
+    // 包括动画准备阶段；在缩放中的坐标打开下拉框会让弹层按错误宽度定位。
+    await modal.waitFor({ state: 'visible' })
+    await page.waitForFunction(() => {
+      const element = document.querySelector('.settings-binding-modal')
+      return element && ![...element.classList].some(name => /^ant-zoom-(appear|enter|leave)(-|$)/.test(name))
+        && getComputedStyle(element).transform === 'none' && !element.getAnimations().some(animation => animation.playState === 'running' || animation.pending)
+    })
+    await modal.locator('.import-candidate').click()
+    const option = page.locator('.ant-select-item-option-content').filter({ hasText: text })
+    const selectedLabel = await option.innerText()
+    await option.click()
+    await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+    await modal.locator('.import-candidate').getByText(selectedLabel, { exact: true }).waitFor()
+  }
   await page.locator('.application-table button.application-name').first().waitFor()
-  await setDesktopViewport(page, { width: 1440, height: 1000 })
+  await setDesktopViewport(desktop, page, { width: 1440, height: 1000 })
   await desktop.evaluate(({ dialog, net, shell }, files) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [files.importedFile] })
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: files.exportedFile })
@@ -78,12 +93,12 @@ try {
     assert.equal(await fs.readFile(controlFile, 'utf8'), controlContent)
     assert.equal(controlRequests.length, beforeInspection + 3)
     assert.ok(controlRequests.every(req => req.method === 'GET' && req.authenticated && ['/version', '/configs', '/connections'].includes(req.url)))
-    await setDesktopViewport(page, { width: 1000, height: 760 })
+    await setDesktopViewport(desktop, page, { width: 1000, height: 760 })
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false)
     await page.screenshot({ path: path.join(output, locale + '-mihomo-inspection.png'), animations: 'disabled' })
     await page.keyboard.press('Escape'); await inspectionModal.waitFor({ state: 'hidden' })
     await desktop.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }) }, importedFile)
-    await setDesktopViewport(page, { width: 1440, height: 1000 })
+    await setDesktopViewport(desktop, page, { width: 1440, height: 1000 })
     checks.push(locale + ': native file selection, cancel, readonly API check, credentials confined to main process and unknown persistence')
     if (locale === 'zh-CN') {
       for (const state of ['无法读取', '未完成事务']) {
@@ -117,8 +132,7 @@ try {
     assert.equal(await drawer.isVisible(), true, 'Escape closes only the mapping dialog')
     assert.equal(await drawer.locator('tbody input[type=checkbox]:checked').count(), 1)
     await missing.getByRole('button', { name: tr('绑定本机应用'), exact: true }).click()
-    await bindingModal.locator('.import-candidate').click()
-    await page.locator('.ant-select-item-option-content').filter({ hasText: bindingTarget.name + ' · ' + bindingTarget.path }).click()
+    await chooseBindingCandidate(bindingModal, bindingTarget.name + ' · ' + bindingTarget.path)
     await page.screenshot({ path: path.join(output, locale + '-binding.png'), animations: 'disabled' })
     await bindingModal.getByRole('button', { name: tr('确认绑定'), exact: true }).click()
     await bindingModal.waitFor({ state: 'hidden' })
@@ -128,7 +142,7 @@ try {
     assert.equal(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'inventory.json'), 'utf8'), beforeBinding, 'mapping only changes the preview')
     await drawer.locator('tr[data-row-key="0"] .ant-checkbox-wrapper').click()
     assert.equal(await drawer.locator('tbody input[type=checkbox]:checked').count(), 1)
-    await setDesktopViewport(page, { width: 1000, height: 760 })
+    await setDesktopViewport(desktop, page, { width: 1000, height: 760 })
     await page.waitForFunction(() => innerWidth === 1000 && [...document.querySelectorAll('.settings-import-footer button')].every(button => button.getBoundingClientRect().right <= innerWidth))
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false)
     const clippedButtons = await drawer.locator('.ant-drawer-footer button').evaluateAll(buttons => buttons.some(button => { const rect = button.getBoundingClientRect(); return rect.right > innerWidth || rect.left < 0 }))
@@ -200,8 +214,7 @@ try {
     await pathBinding.waitFor(); await page.keyboard.press('Escape')
     await pathBinding.waitFor({ state: 'hidden' }); await pathPreview.waitFor()
     await pathPreview.getByRole('button', { name: tr('绑定本机应用'), exact: true }).click()
-    await pathBinding.locator('.ant-select').click()
-    await page.locator('.ant-select-item-option-content').filter({ hasText: 'C:\\MovedDemo\\firefox.exe' }).click()
+    await chooseBindingCandidate(pathBinding, 'C:\\MovedDemo\\firefox.exe')
     await pathBinding.getByRole('button', { name: tr('确认绑定'), exact: true }).click()
     await pathBinding.waitFor({ state: 'hidden' })
     await pathPreview.getByText(tr('应用后替换失效路径'), { exact: true }).waitFor()
@@ -256,7 +269,11 @@ try {
     }
     await page.keyboard.press('Escape'); await page.locator('.about-app-modal').waitFor({ state: 'hidden' })
     checks.push(locale + ': stable/preview channels, plain notes, trusted download after real backup, no routing changes')
-    await setDesktopViewport(page, { width: 1440, height: 1000 })
+    await setDesktopViewport(desktop, page, { width: 1440, height: 1000 })
+    nativeWindows.push({ locale, ...await checkDesktopMaximizeRestore(desktop, page) })
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: path.join(output, locale + '-settings-native.png'), animations: 'disabled' })
+    checks.push(locale + ': native resize, maximize and restore fill the actual window without emulated viewport gaps')
   }
   const tr = source => translate('fr', source)
   await page.getByRole('button', { name: new RegExp(tr('导入设置')) }).click()
@@ -275,7 +292,7 @@ try {
   assert.equal(await page.locator('.ant-drawer-content-wrapper:visible').count(), 0)
   checks.push('invalid JSON is visible without opening preview')
   assert.deepEqual(errors, [])
-  await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'real desktop and storage; synthetic routing; controlled content viewport, not native window sizing; no user proxy changes', checks, errors }, null, 2))
+  await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify({ fixture: 'real desktop and storage; synthetic routing; measured native window resize, maximize and restore; no user proxy changes', checks, nativeWindows, errors }, null, 2))
   console.log(JSON.stringify({ checks, output }))
   passed = true
 } catch (error) {
