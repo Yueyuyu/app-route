@@ -16,6 +16,28 @@ import { settingsDifferences } from '../src/core/settingsDifferences.ts'
 const application: Application = { id: 'local-id', name: '本机音乐', path: 'C:\\Apps\\Music\\Music.exe', processes: ['Music.exe'], category: '音乐娱乐', mode: 'rule', source: 'scan' }
 const snapshot = (): SettingsSnapshot => ({ app: 'AppRoute', kind: 'approute-settings', version: 1, createdAt: '2026-11-12T00:00:00Z', applications: [{ name: '导入音乐', path: application.path, category: '音乐娱乐', mode: 'direct', favorite: true }], language: 'fr' })
 
+test('失效路径重绑拒绝已管理目标和临时应用，既有路径仍有效时不替换', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'approute-rebind-')); t.after(() => fs.rm(root, { recursive: true, force: true }))
+  const routing = new RoutingService({ root }), moved = { ...application, id: 'new', path: 'C:\\Moved\\Music.exe' }
+  routing.applyAutomatically = async () => { assert.fail('binding must not apply routing') }
+  let oldExists = false
+  const service = new SettingsTransferService(routing, async () => [moved], async file => file === application.path ? oldExists : true)
+  const old = { ...application, mode: 'direct' as const, processPaths: [application.path!] }
+  const other = { ...moved, mode: 'direct' as const, processPaths: [moved.path!] }
+  await routing.save({ revision: 'first', managed: [old, other] })
+  const preview = await service.previewMissingPaths()
+  const conflict = await service.bind({ token: preview.token, key: '0', candidate: preview.candidates[0].key })
+  assert.equal(conflict.rows[0].available, false); assert.match(conflict.rows[0].reason!, /目标应用已有分流/)
+  await routing.save({ revision: 'temporary', managed: [{ ...old, temporary: { id: randomUUID(), expiresAt: new Date(Date.now() + 60000).toISOString(), previous: { mode: 'rule' } } }] })
+  const timed = await service.previewMissingPaths()
+  const blocked = await service.bind({ token: timed.token, key: '0', candidate: timed.candidates[0].key })
+  assert.equal(blocked.rows[0].available, false); assert.match(blocked.rows[0].reason!, /先结束临时/)
+  await routing.save({ revision: 'available', managed: [old] })
+  const stale = await service.previewMissingPaths(); oldExists = true
+  const returned = await service.bind({ token: stale.token, key: '0', candidate: stale.candidates[0].key })
+  assert.equal(returned.rows[0].available, false); assert.match(returned.rows[0].reason!, /原程序路径仍可用/)
+})
+
 test('导入差异只包含实际变化，历史规则与缺省收藏保留当前资料', () => {
   const current = { ...snapshot().applications[0], mode: 'rule' as const, favorite: false }
   assert.deepEqual(settingsDifferences(current, snapshot().applications[0]).map(item => item.field), ['mode', 'favorite'])

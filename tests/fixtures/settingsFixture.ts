@@ -16,7 +16,10 @@ export async function createSettingsFixture(root: string, applications: Applicat
     await fs.writeFile(path.join(root, 'routing-request.json'), JSON.stringify(input))
     return { outcome: 'applied' }
   } } as unknown as RoutingService
-  const service = new SettingsTransferService(routing, async () => applications, async file => applications.some(app => app.path === file))
+  const moved = { ...applications[1], id: 'moved-demo', path: 'C:\\MovedDemo\\firefox.exe' }
+  const missingPrimary = () => fs.access(path.join(root, 'missing-primary')).then(() => true, () => false)
+  const service = new SettingsTransferService(routing, async () => await missingPrimary() ? [...applications, moved] : applications, async file =>
+    await missingPrimary() ? file !== applications[1].path && (file === moved.path || applications.some(app => app.path === file)) : applications.some(app => app.path === file))
   const upgrade = new UpgradeVerificationService(service)
   const scenarios = new SettingsScenarios(service)
   await service.inventory.write({ version: 1, applications, favorites: [applications[0].path!.toLowerCase()] })
@@ -38,6 +41,7 @@ export async function createSettingsFixture(root: string, applications: Applicat
       case 'settings.scenario-preview': return scenarios.preview(body.id, body.fingerprint)
       case 'settings.scenario-delete': return scenarios.remove(body.id, body.fingerprint)
       case 'settings.preview': return service.previewText(body.text)
+      case 'settings.path-preview': return service.previewMissingPaths()
       case 'settings.bind': return service.bind(body)
       case 'settings.import': return service.import(body)
       case 'settings.backups': return service.backups.list()

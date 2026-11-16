@@ -30,6 +30,15 @@ export function SettingsPage({ busy, setBusy, onImported }: Props) {
     catch (error) { setNotice({ error: true, text: settingsError(error, '导入失败，请重新预览。') }) }
     finally { setBusy(false) }
   }
+  async function checkPaths() {
+    setBusy(true); setNotice(undefined)
+    try {
+      const value = await window.appRoute!.request<SettingsPreview>('settings.path-preview')
+      if (value.rows.length) showPreview(value)
+      else setNotice({ error: false, text: '未发现失效的已管理程序路径。' })
+    } catch (error) { setNotice({ error: true, text: settingsError(error, '导入失败，请重新预览。') }) }
+    finally { setBusy(false) }
+  }
   async function bind() {
     if (!preview || !binding || !candidate) return
     setBusy(true); setBindingError('')
@@ -60,7 +69,7 @@ export function SettingsPage({ busy, setBusy, onImported }: Props) {
     }
   }
   function confirmRouting() {
-    modal.confirm({ title: t('应用所选分流设置？'), content: <><p>{t('仅修改勾选应用的联网方式，未勾选应用保持原样。失败时沿用现有恢复保护。')}</p>{restoreStrategy && <p>{t('恢复代理策略还会更新当前 {0} 个代理应用的跟随组。', [preview?.affectedProxyCount ?? 0])}</p>}</>, okText: t('导入并应用'), cancelText: t('取消'), onOk: () => importSettings(true) })
+    modal.confirm({ title: t('应用所选分流设置？'), content: <><p>{t('仅修改勾选应用的联网方式，未勾选应用保持原样。失败时沿用现有恢复保护。')}</p>{preview?.rows.some(row => keys.includes(row.key) && row.replacingPath) && <p>{t('重绑会替换所选应用的旧路径规则；辅助进程重新识别。')}</p>}{restoreStrategy && <p>{t('恢复代理策略还会更新当前 {0} 个代理应用的跟随组。', [preview?.affectedProxyCount ?? 0])}</p>}</>, okText: t('导入并应用'), cancelText: t('取消'), onOk: () => importSettings(true) })
   }
   const columns = [
     { title: t('应用'), dataIndex: 'name', render: (_: unknown, row: ImportRow) => <div><strong>{row.name}</strong><div className="settings-path" title={row.path}>{row.path ?? t('缺少程序路径')}</div></div> },
@@ -69,6 +78,7 @@ export function SettingsPage({ busy, setBusy, onImported }: Props) {
     { title: t('匹配结果'), width: 180, render: (_: unknown, row: ImportRow) => <>
       {row.available ? <><Tag color={row.configured ? 'blue' : 'green'}>{t(row.manualBinding ? '已手动绑定' : row.configured ? '已有设置，默认保留' : '可导入')}</Tag><div className="secondary-copy">{row.differences.length ? t('{0} 项变化', [row.differences.length]) : t('无变化')}</div></> : <span className="secondary-copy">{t(row.reason!)}</span>}
       {row.canBind && <Button size="small" type="link" disabled={busy} onClick={() => { setBinding(row); setCandidate(undefined); setBindingError('') }}>{t('绑定本机应用')}</Button>}
+      {row.replacingPath && <div className="secondary-copy">{t('应用后替换失效路径')}</div>}
     </> },
   ]
   return <section className="page-section settings-page">
@@ -79,9 +89,10 @@ export function SettingsPage({ busy, setBusy, onImported }: Props) {
         <Space><Button icon={<DownloadOutlined />} disabled={busy} onClick={() => void exportSettings()}>{t('导出设置')}</Button><Button type="primary" icon={<UploadOutlined />} disabled={busy} onClick={() => void pick()}>{t('导入设置')}</Button></Space>
       </div>
       <SettingsScenariosPanel busy={busy} setBusy={setBusy} onPreview={showPreview} />
+      <div className="settings-transfer-card"><div><h2>{t('程序路径检查')}</h2><p>{t('升级或搬家后，核对已管理应用的失效路径，再确认重绑。')}</p></div><Button disabled={busy} onClick={() => void checkPaths()}>{t('检查程序路径')}</Button></div>
       <SettingsBackupsPanel busy={busy} setBusy={setBusy} revision={backupRevision} onPreview={showPreview} />
     </>}
-    <Drawer title={t('导入预览')} open={Boolean(preview)} onClose={() => { if (!busy) setPreview(undefined) }} closable={!busy} maskClosable={!busy} keyboard={!busy} size={880} afterOpenChange={visible => { if (visible) previewClose.current?.focus() }}
+    <Drawer title={t('导入预览')} open={Boolean(preview)} onClose={() => { if (!busy && !binding) setPreview(undefined) }} closable={!busy && !binding} maskClosable={!busy && !binding} keyboard={!busy && !binding} size={880} afterOpenChange={visible => { if (visible) previewClose.current?.focus() }}
       footer={<div className="drawer-footer settings-import-footer"><span>{t('已选择 {0} 个应用', [keys.length])}</span><Button ref={previewClose} disabled={busy} onClick={() => setPreview(undefined)}>{t('取消')}</Button><Button disabled={busy || (!keys.length && !restoreLanguage) || keys.length > 100} onClick={() => void importSettings(false)}>{t('仅导入资料')}</Button><Button type="primary" disabled={busy || (!keys.length && !restoreStrategy) || keys.length > 100} loading={busy} onClick={confirmRouting}>{t('导入并应用')}</Button></div>}>
       {preview && <>
         <div className="settings-import-summary"><span>{t('来源时间：{0}', [formatDateTime(preview.createdAt)])}</span><p>{t('已有分流默认不勾选；路径不匹配的应用不会按名称猜测。每次最多选择 100 个。')}</p></div>
@@ -99,7 +110,7 @@ export function SettingsPage({ busy, setBusy, onImported }: Props) {
         </div>
       </>}
     </Drawer>
-    <Modal className="settings-binding-modal" title={t('绑定本机应用')} open={Boolean(binding)} onCancel={() => { if (!busy) setBinding(undefined) }} maskClosable={!busy} keyboard={!busy} closable={!busy} confirmLoading={busy} okButtonProps={{ disabled: !candidate || busy }} okText={t('确认绑定')} cancelText={t('取消')} onOk={() => void bind()}>
+    <Modal className="settings-binding-modal" title={t('绑定本机应用')} open={Boolean(binding)} onCancel={() => { if (!busy) setBinding(undefined) }} maskClosable={!busy} keyboard={!busy} closable={!busy} confirmLoading={busy} okButtonProps={{ disabled: !candidate || busy, 'aria-label': t('确认绑定') }} okText={t('确认绑定')} cancelText={t('取消')} onOk={() => void bind()}>
       <p><strong>{binding?.name}</strong></p><p className="settings-path">{binding?.path ?? t('缺少程序路径')}</p>
       <p>{t('只修改本次导入预览。绑定后重新勾选；不会立即改变联网方式。')}</p>
       <Select className="import-candidate" aria-label={t('本机程序')} placeholder={t('选择本机应用')} showSearch={{ optionFilterProp: 'label' }} value={candidate} disabled={busy} onChange={setCandidate} options={preview?.candidates.map(app => ({ value: app.key, label: app.name + ' · ' + app.path }))} />

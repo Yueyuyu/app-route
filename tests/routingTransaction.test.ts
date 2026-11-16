@@ -58,6 +58,54 @@ async function fixture(t: TestContext, overrides: ServiceOptions = {}) {
   return { service, runtime, config, party, guardianStarted: () => guardianStarted }
 }
 
+test('失效路径重绑需确认，失败保留旧规则，成功移除旧身份且不保留旧辅助路径', async t => {
+  const f = await fixture(t, { probe: async () => true, resolveFamily: async item => ({ ...item, processPaths: [item.path!] }) })
+  const first = { ...app, mode: 'proxy' as const, path: 'C:\\Apps\\Example\\Example.exe' }, second = { ...first, mode: 'direct' as const, id: 'second', path: 'C:\\Apps\\Second\\Second.exe', processes: ['Second.exe'] }
+  const moved = { ...first, id: 'scanned-new', path: 'C:\\Apps\\Example\\Example2.exe', processes: ['Example2.exe'] }
+  await f.service.applyAutomatically({ revision: 'initial', applications: [first, second], target: 'Group', proxyGroup: 'Group' })
+  const legacy = await f.service.state(); legacy.managed[0].missingTargetAction = 'block'; await f.service.save(legacy)
+  let oldExists = false
+  const settings = new SettingsTransferService(f.service, async () => [moved, second], async file => file === first.path ? oldExists : true)
+  await settings.inventory.write({ version: 1, applications: [first, moved, second], favorites: [first.path!.toLowerCase()] })
+  const before = (await f.service.state()).managed
+  async function bind() {
+    const preview = await settings.previewMissingPaths()
+    assert.equal(preview.rows.length, 1); assert.equal(preview.rows[0].available, false)
+    return settings.bind({ token: preview.token, key: '0', candidate: preview.candidates.find(item => item.path === moved.path)!.key })
+  }
+  let bound = await bind()
+  assert.equal(bound.rows[0].configured, true); assert.equal(bound.rows[0].replacingPath, first.path)
+  assert.deepEqual(bound.rows[0].differences.find(item => item.field === 'path'), { field: 'path', before: first.path, after: moved.path })
+  assert.deepEqual((await f.service.state()).managed, before)
+  await settings.import({ token: bound.token, keys: ['0'], applyRouting: false, restoreLanguage: false, restoreStrategy: false })
+  assert.deepEqual((await f.service.state()).managed, before, 'metadata import does not remove the old routing identity')
+  assert.ok((await settings.inventory.read()).applications.some(item => item.path === first.path))
+  bound = await bind(); oldExists = true
+  await assert.rejects(settings.import({ token: bound.token, keys: ['0'], applyRouting: true, restoreLanguage: false, restoreStrategy: false }), /原程序路径仍可用/)
+  oldExists = false; bound = await bind(); f.runtime.failNextReload = true
+  await assert.rejects(settings.import({ token: bound.token, keys: ['0'], applyRouting: true, restoreLanguage: false, restoreStrategy: false }))
+  assert.deepEqual((await f.service.state()).managed, before)
+  bound = await bind()
+  let suppliedPrevious: string[] | undefined
+  f.service.options.resolveFamily = async (item, previous) => {
+    suppliedPrevious = previous
+    assert.equal(item.path, moved.path)
+    return { ...item, processPaths: [item.path!] }
+  }
+  await settings.import({ token: bound.token, keys: ['0'], applyRouting: true, restoreLanguage: false, restoreStrategy: false })
+  assert.equal(suppliedPrevious, undefined, 'changed primary path must not reuse old helpers even in the same folder')
+  const after = (await f.service.state()).managed
+  assert.deepEqual(after.find(item => item.id === first.id)!.processPaths, [moved.path])
+  assert.equal(after.find(item => item.id === first.id)!.missingTargetAction, 'block', 'identity replacement preserves the app-specific failure policy')
+  assert.deepEqual(after.find(item => item.id === second.id), before.find(item => item.id === second.id))
+  assert.equal(f.runtime.current.rules.some((rule: string) => rule.includes(first.path!)), false)
+  const inventory = await settings.inventory.read()
+  assert.equal(inventory.applications.some(item => item.path === first.path), false)
+  assert.equal(inventory.applications.find(item => item.path === moved.path)!.id, first.id)
+  assert.ok(inventory.favorites.includes(moved.path!.toLowerCase()))
+  assert.deepEqual(f.runtime.current.rules.slice(-f.config.rules.length), f.config.rules)
+})
+
 test('场景确认应用复用恢复事务，只改所选应用，重载失败保留现有设置', async t => {
   const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true })
   const first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }, second = { ...first, id: 'second', path: 'C:\\Apps\\Second\\Second.exe', processes: ['Second.exe'] }

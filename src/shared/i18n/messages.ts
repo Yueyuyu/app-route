@@ -1,6 +1,16 @@
 /** 中文原句作为 gettext 风格键；译文顺序为 English、日本語、Français。
  * 修改原句时同步更新三种译文，保留 {0} 等插值参数。用户数据不进入此目录。 */
 export const messages: Record<string, readonly [string, string, string]> = {
+  '程序路径检查': ['Program path check', 'プログラムパスの確認', 'Vérification des chemins'],
+  '程序路径': ['Program path', 'プログラムパス', 'Chemin du programme'],
+  '检查程序路径': ['Check program paths', 'プログラムパスを確認', 'Vérifier les chemins'],
+  '升级或搬家后，核对已管理应用的失效路径，再确认重绑。': ['After an upgrade or move, review unavailable paths and confirm new bindings.', '更新や移動後、管理中アプリの無効なパスを確認し、再関連付けを承認します。', 'Après une mise à jour ou un déplacement, vérifiez les chemins indisponibles puis confirmez leur réassociation.'],
+  '未发现失效的已管理程序路径。': ['No unavailable managed program paths were found.', '管理中のプログラムに無効なパスは見つかりませんでした。', 'Aucun chemin de programme géré indisponible n’a été trouvé.'],
+  '请先结束临时分流，再重绑程序路径。': ['End temporary routing before rebinding the program path.', 'パスを再関連付けする前に一時設定を終了してください。', 'Terminez le routage temporaire avant de réassocier le chemin.'],
+  '原程序路径仍可用，不能作为失效路径替换。': ['The original path is still available and cannot be replaced as an unavailable path.', '元のパスはまだ利用可能なため、無効なパスとして置き換えられません。', 'Le chemin d’origine est encore disponible ; il ne peut pas être remplacé comme chemin invalide.'],
+  '目标应用已有分流，请先核对，不能覆盖另一应用。': ['The target app already has routing. Review it first; another app cannot be overwritten.', '対象アプリには既に設定があります。別アプリを上書きせず、先に確認してください。', 'L’application cible possède déjà un routage. Vérifiez-le ; une autre application ne peut pas être écrasée.'],
+  '应用后替换失效路径': ['Replace unavailable path on apply', '適用後に無効なパスを置換', 'Remplacer le chemin indisponible à l’application'],
+  '重绑会替换所选应用的旧路径规则；辅助进程重新识别。': ['Rebinding replaces the selected app’s old path rules; helper processes are identified again.', '選択したアプリの旧パス規則を置き換え、補助プロセスを再識別します。', 'La réassociation remplace les anciennes règles de chemin de l’application sélectionnée et réidentifie les processus auxiliaires.'],
   '场景方案': ['Routing scenarios', 'シナリオ', 'Scénarios de routage'],
   '新建方案': ['New scenario', 'シナリオを作成', 'Nouveau scénario'],
   '保存方案': ['Save scenario', 'シナリオを保存', 'Enregistrer le scénario'],

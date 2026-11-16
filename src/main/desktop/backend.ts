@@ -53,6 +53,7 @@ async function dispatch(action: DesktopAction, body: any = {}) {
     case 'settings.scenario-preview': return scenarios.preview(body.id, body.fingerprint)
     case 'settings.scenario-delete': return scenarios.remove(body.id, body.fingerprint)
     case 'settings.preview': return settings.previewText(body.text)
+    case 'settings.path-preview': return settings.previewMissingPaths()
     case 'settings.bind': return settings.bind(body)
     case 'settings.import': return settings.import(body)
     case 'settings.backups': return settings.backups.list()

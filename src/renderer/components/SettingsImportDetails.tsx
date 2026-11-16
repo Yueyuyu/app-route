@@ -5,7 +5,7 @@ import type { ImportRow, SettingsDifference, SettingsPreview } from '../../share
 import type { ProxyStrategy } from '../../shared/proxyStrategy'
 import { languageNames, type LanguagePreference } from '../../shared/i18n/language'
 
-const fieldNames = { name: '应用名称', category: '分类', mode: '联网方式', favorite: '收藏' }
+const fieldNames = { name: '应用名称', category: '分类', mode: '联网方式', favorite: '收藏', path: '程序路径' }
 function displayValue(field: SettingsDifference['field'], value: string | boolean) {
   if (field === 'mode') return t(routeLabels[value as keyof typeof routeLabels])
   if (field === 'favorite') return t(value ? '已收藏' : '未收藏')

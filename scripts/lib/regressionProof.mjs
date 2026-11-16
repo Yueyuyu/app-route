@@ -1,5 +1,8 @@
 // 精确替换只在临时副本发生。实现变化后匹配失败，要求重新审查破坏点，不能悄悄跳过。
 export const regressionCases = [
+  { id: 'rebind-stale-helpers', file: 'src/main/services/routingService.ts',
+    before: 'samePrimary ? previousPaths : undefined', after: 'previousPaths',
+    test: 'tests/routingTransaction.test.ts', name: '失效路径重绑需确认，失败保留旧规则，成功移除旧身份且不保留旧辅助路径' },
   { id: 'scenario-stale-source', file: 'src/main/services/settingsScenarios.ts',
     before: 'draft.fingerprint !== await this.fingerprint()', after: 'false',
     test: 'tests/scenarios.test.ts', name: '方案拒绝过期来源、伪造条目、重复名称、临时状态及内容变化后的删除' },

@@ -12,9 +12,10 @@ import { LanguagePreferencesStore } from '../desktop/languagePreferences.ts'
 import { SettingsBackupStore } from './settingsBackups.ts'
 import type { RoutingService } from './routingService.ts'
 import type { Application } from '../../shared/application.ts'
+import type { ManagedApplication } from '../../shared/integration.ts'
 import type { SettingsBindingRequest, SettingsImportRequest, SettingsImportResult, SettingsPreview, SettingsSnapshot } from '../../shared/settings.ts'
 
-interface ImportSession { snapshot: SettingsSnapshot; fingerprint: string; expires: number; applications: Map<string, Application>; preview: SettingsPreview; candidates: Map<string, Application>; bindings: Map<string, string> }
+interface ImportSession { snapshot: SettingsSnapshot; fingerprint: string; expires: number; applications: Map<string, Application>; preview: SettingsPreview; candidates: Map<string, Application>; bindings: Map<string, string>; replacements: Map<string, ManagedApplication> }
 export class SettingsTransferService {
   readonly inventory: InventoryPreferencesStore
   readonly language: LanguagePreferencesStore
@@ -48,6 +49,12 @@ export class SettingsTransferService {
       proxyStrategy: state.proxyStrategy ?? (state.proxyGroup ? { mode: 'existing', group: state.proxyGroup } : undefined), missingTargetAction: state.missingTargetAction })
   }
   async previewText(text: unknown) { return this.preview(parseSettingsText(text)) }
+  async previewMissingPaths() {
+    const state = await this.routing.state()
+    const missing = await Promise.all(state.managed.map(async app => app.processPaths?.[0] && !await this.available(app.processPaths[0]) ? app : undefined))
+    return this.preview({ app: 'AppRoute', kind: 'approute-settings', version: 1, scope: 'routing', createdAt: new Date().toISOString(),
+      applications: missing.filter((app): app is ManagedApplication => Boolean(app)).map(app => ({ name: app.name, path: app.processPaths![0], category: '已管理应用', mode: app.mode })) })
+  }
   async preview(snapshot: SettingsSnapshot, bindings = new Map<string, string>()): Promise<SettingsPreview> {
     snapshot = parseSettingsSnapshot(snapshot)
     const before = await this.fingerprint()
@@ -63,28 +70,34 @@ export class SettingsTransferService {
         candidates.set(digest(processPathKey(app.path!)), app)
       } catch { /* 共享宿主、无效路径不进入人工绑定候选。 */ }
     }))
-    const applications = new Map<string, Application>()
+    const applications = new Map<string, Application>(), replacements = new Map<string, ManagedApplication>()
     const rows = await Promise.all(snapshot.applications.map(async (item, i) => {
       const key = String(i), binding = bindings.get(key), found = binding ? local.get(binding) : item.path ? local.get(processPathKey(item.path)) : undefined
       const configured = found && state.managed.find(app => app.id === found.id || app.processPaths?.some(file => processPathKey(file) === processPathKey(found.path!)))
+      const old = item.path ? state.managed.find(app => app.processPaths?.[0] && processPathKey(app.processPaths[0]) === processPathKey(item.path!)) : undefined
+      const replacing = binding && old && found?.path && processPathKey(old.processPaths![0]) !== processPathKey(found.path) ? old : undefined
       let reason: string | undefined
       if (!found || !await this.available(found.path!)) reason = '本机未找到对应路径，请先扫描或添加应用。'
+      else if (replacing?.temporary) reason = '请先结束临时分流，再重绑程序路径。'
+      else if (replacing && await this.available(replacing.processPaths![0])) reason = '原程序路径仍可用，不能作为失效路径替换。'
+      else if (replacing && configured && configured.id !== replacing.id) reason = '目标应用已有分流，请先核对，不能覆盖另一应用。'
       else {
         // 导入 ID 和辅助进程不可信；只用本机确认的主程序，应用时后台再次识别组件。
         const application = { ...found, id: configured?.id ?? found.id, name: snapshot.scope === 'routing' ? found.name : item.name, category: snapshot.scope === 'routing' ? found.category : item.category, mode: item.mode, source: 'manual' as const, processPaths: undefined, processWarnings: undefined }
-        try { assertNoSystemHostRouting([application]); managedApplications([application], 'preview-target'); applications.set(key, application) }
+        try { assertNoSystemHostRouting([application]); managedApplications([application], 'preview-target'); applications.set(key, application); if (replacing) replacements.set(key, replacing) }
         catch { reason = '该应用属于受保护或共享进程，不能导入分流设置。' }
       }
-      const currentMode = configured?.mode ?? 'rule' as const
-      return { ...item, key, currentMode, configured: Boolean(configured), available: !reason,
+      const currentMode = (replacing ?? configured ?? old)?.mode ?? 'rule' as const
+      return { ...item, key, currentMode, configured: Boolean(configured || old), available: !reason,
+        ...(replacing ? { replacingPath: replacing.processPaths![0] } : {}),
         localPath: found?.path, manualBinding: Boolean(binding), canBind: Boolean(binding) || reason === '本机未找到对应路径，请先扫描或添加应用。',
-        differences: found && !reason ? settingsDifferences({ name: found.name, category: found.category || '其他应用', mode: currentMode, favorite: inventory.favorites.includes(processPathKey(found.path!)) }, item, snapshot.scope) : [], ...(reason ? { reason } : {}) }
+        differences: found && !reason ? [...settingsDifferences({ name: found.name, category: found.category || '其他应用', mode: currentMode, favorite: inventory.favorites.includes(processPathKey(found.path!)) }, item, snapshot.scope), ...(replacing ? [{ field: 'path' as const, before: replacing.processPaths![0], after: found.path! }] : [])] : [], ...(reason ? { reason } : {}) }
     }))
     if (before !== await this.fingerprint()) throw new Error('设置已变化，请重新预览。')
     const preview: SettingsPreview = { token: randomUUID(), createdAt: snapshot.createdAt, rows, language: snapshot.language, proxyStrategy: snapshot.proxyStrategy, currentGroup: state.proxyGroup, affectedProxyCount: state.managed.filter(app => app.mode === 'proxy').length,
       currentLanguage, currentStrategy: state.proxyStrategy ?? (state.proxyGroup ? { mode: 'existing', group: state.proxyGroup } : undefined),
       candidates: [...candidates].map(([key, app]) => ({ key, name: app.name, path: app.path! })).sort((a, b) => a.name.localeCompare(b.name)) }
-    this.session = { snapshot, fingerprint: before, expires: Date.now() + 10 * 60_000, applications, preview, candidates, bindings }
+    this.session = { snapshot, fingerprint: before, expires: Date.now() + 10 * 60_000, applications, preview, candidates, bindings, replacements }
     return preview
   }
   async bind(request: SettingsBindingRequest): Promise<SettingsPreview> {
@@ -115,13 +128,23 @@ export class SettingsTransferService {
       if (request.restoreLanguage && !session.snapshot.language) throw new Error('文件中没有可恢复的显示语言。')
       const state = await this.routing.state(), inventory = await this.inventory.read()
       if (state.pendingId) throw new Error('请等待分流操作或恢复检查完成。')
-      const selected = request.keys.map(key => session.applications.get(key)!)
+      const selected = request.keys.map(key => ({ ...session.applications.get(key)!, ...(request.applyRouting && session.replacements.has(key) ? { id: session.replacements.get(key)!.id } : {}) }))
       if (new Set(selected.map(app => processPathKey(app.path!))).size !== selected.length) throw new Error('该本机应用已对应其他导入项目。')
       for (const app of selected) if (!await this.available(app.path!)) throw new Error('应用路径已失效，请重新预览。')
+      if (request.applyRouting) for (const key of request.keys) {
+        const old = session.replacements.get(key)
+        if (old && await this.available(old.processPaths![0])) throw new Error('原程序路径仍可用，不能作为失效路径替换。')
+      }
       const candidate = new Map(inventory.applications.map(app => [app.path ? processPathKey(app.path) : app.id, app]))
       const favorites = new Set(inventory.favorites)
-      for (const key of request.keys) {
-        const app = session.applications.get(key)!, identity = processPathKey(app.path!)
+      for (const [index, key] of request.keys.entries()) {
+        const app = selected[index], identity = processPathKey(app.path!)
+        const replaced = request.applyRouting ? session.replacements.get(key) : undefined
+        if (replaced) {
+          const oldIdentity = processPathKey(replaced.processPaths![0])
+          candidate.delete(oldIdentity)
+          if (favorites.delete(oldIdentity)) favorites.add(identity)
+        }
         candidate.set(identity, { ...app, mode: 'rule' })
         // 只恢复用户明确选中的条目，未选中应用的收藏保持原样。
         const favorite = session.snapshot.applications[Number(key)].favorite

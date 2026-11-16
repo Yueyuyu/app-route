@@ -223,7 +223,10 @@ export class RoutingService {
       const resolveApplications = () => Promise.all(request.applications.map(async app => {
         const clean = { ...app, processPaths: undefined, processWarnings: undefined }
         if (app.mode === 'rule') return clean
-        return (this.options.resolveFamily ?? resolveProcessFamily)(clean, previous.managed.find(old => old.id === app.id)?.processPaths)
+        const previousPaths = previous.managed.find(old => old.id === app.id)?.processPaths
+        // 主程序身份改变时不续用旧辅助路径，即使仍在同一安装目录也需重新识别。
+        const samePrimary = previousPaths?.[0] && app.path && normalizeProcessPath(previousPaths[0]) === normalizeProcessPath(app.path)
+        return (this.options.resolveFamily ?? resolveProcessFamily)(clean, samePrimary ? previousPaths : undefined)
       }))
       const runtime = await this.runtime()
       const baseline = await runtime.proxies()
@@ -294,7 +297,7 @@ export class RoutingService {
         const original = previous.managed.find(old => old.id === app.id)
         const restoring = context.expiring?.applicationId === app.id ? original?.temporary?.previous : undefined
         const temporary = context.temporary?.applicationId === app.id ? context.temporary.value : source === 'helper' ? original?.temporary : undefined
-        return { ...app, appliedAt, ...(app.mode === 'proxy' ? { missingTargetAction: restoring?.missingTargetAction ?? missingTargetAction } : {}), ...(temporary ? { temporary } : {}) }
+        return { ...app, appliedAt, ...(app.mode === 'proxy' ? { missingTargetAction: restoring?.missingTargetAction ?? (!request.proxyGroup ? original?.missingTargetAction : undefined) ?? missingTargetAction } : {}), ...(temporary ? { temporary } : {}) }
       })
       assertNoSystemHostRouting(request.applications)
       const selectedIds = new Set(request.applications.map(app => app.id))

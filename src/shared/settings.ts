@@ -13,10 +13,10 @@ export interface SettingsSnapshot {
 }
 export interface ImportRow extends SettingsApplication {
   key: string; currentMode: RouteMode; configured: boolean; available: boolean; reason?: string
-  localPath?: string; manualBinding?: boolean; canBind?: boolean
+  localPath?: string; manualBinding?: boolean; canBind?: boolean; replacingPath?: string
   differences: SettingsDifference[]
 }
-export interface SettingsDifference { field: 'name' | 'category' | 'mode' | 'favorite'; before: string | boolean; after: string | boolean }
+export interface SettingsDifference { field: 'name' | 'category' | 'mode' | 'favorite' | 'path'; before: string | boolean; after: string | boolean }
 export interface ImportCandidate { key: string; name: string; path: string }
 export interface SettingsBindingRequest { token: string; key: string; candidate: string }
 export interface SettingsPreview {
