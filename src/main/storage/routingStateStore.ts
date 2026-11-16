@@ -5,6 +5,7 @@ import { atomicWrite, readOptional } from './localState.ts'
 import { assertNoProcessOverlap, managedApplications } from '../../core/managedRouting.ts'
 import { validateProxyStrategy } from '../../core/proxyStrategy.ts'
 import type { RoutingState } from '../services/routingService.ts'
+import { validateTemporaryRoute } from '../../core/temporaryRouting.ts'
 
 export const routingStateVersion = 1
 /** 旧版无版本号的记录只做内存迁移；高版本或损坏文件绝不静默清空。 */
@@ -18,6 +19,7 @@ export function parseRoutingState(text: string): RoutingState {
     if (!item || !['direct', 'proxy'].includes(item.mode)) throw new Error('本地管理记录需要核对。')
     managedApplications([{ ...item, source: 'manual', category: '' }], item.target)
     if (item.missingTargetAction !== undefined && !['block', 'original'].includes(item.missingTargetAction)) throw new Error('本地管理记录需要核对。')
+    if (item.temporary !== undefined) { validateTemporaryRoute(item.temporary); if (!item.processPaths?.length) throw new Error('临时分流缺少精确程序路径。') }
   })
   assertNoProcessOverlap(value.managed)
   if (value.proxyStrategy) validateProxyStrategy(value.proxyStrategy)

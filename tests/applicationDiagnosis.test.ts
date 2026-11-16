@@ -30,6 +30,16 @@ test('连接聚合只合并同一组件目标出口与匹配状态，不能合�
   assert.equal(grouped.find(item => item.count === 2)?.latestStartedAt, '2026-01-01T00:01:00Z')
   assert.equal(groupConnectionSamples([{ ...row, currentRuleMatched: true }, { ...row, currentRuleMatched: false }]).length, 2)
 })
+
+test('临时期限到达后诊断不能把旧连接通过解释成已恢复，旧报告随期限变为过期', () => {
+  const future = { ...status, managed: [{ ...status.managed[0], temporary: { id: 'test-lease', expiresAt: new Date(Date.now() + 60000).toISOString(), previous: { mode: 'rule' as const } } }], evidence: [{ applicationId: app.id, process: 'Fixture.exe', destination: 'example.invalid', outbound: 'DIRECT', matched: true, startedAt: new Date().toISOString() }] }
+  const expired = { ...future, managed: [{ ...future.managed[0], temporary: { ...future.managed[0].temporary, expiresAt: new Date(Date.now() - 1000).toISOString() } }] }
+  const report = diagnoseApplication(app, expired, running)
+  assert.equal(report.checks[2].state, 'wait'); assert.equal(report.checks[4].state, 'wait')
+  assert.match(report.next, /临时期限已到/)
+  assert.notEqual(diagnosisFingerprint(future, app.id), diagnosisFingerprint(expired, app.id))
+  for (const locale of ['en', 'ja', 'fr'] as const) assert.notEqual(translate(locale, report.next), report.next)
+})
 test('管理记录缺失或损坏不能被单应用诊断解释成沿用原规则', () => {
   for (const problem of [{ dataIssue: true }, { untrackedRuleCount: 121 }]) {
     const broken = { ...status, managed: [], ...problem }

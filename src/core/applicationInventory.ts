@@ -32,6 +32,7 @@ export function routingPresentation(app: Application, status?: IntegrationStatus
   if (!managed) return { label: '沿用原有规则', detail: '没有 AppRoute 专属规则。', color: 'default' }
   if (!status.rulesLoaded) return { label: '规则异常', detail: '运行规则与保存的设置不一致，请检查或恢复。', color: 'error' }
   if (status.pending) return { label: '自动检查中', detail: '独立恢复守护已启动，检查失败会自动恢复。', color: 'processing' }
+  if (managed.temporary && Date.parse(managed.temporary.expiresAt) <= Date.now()) return { label: '到期待恢复', detail: '临时期限已到，后台正在核对恢复。无法验证时保留当前设置，请在应用详情查看。', color: 'warning' }
   if (status.uncoveredProcesses?.some(item => item.applicationId === managed.id)) return { label: '发现新的辅助进程', detail: '正在核对进程归属并补充规则；未识别的流量暂时沿用原有规则。', color: 'warning' }
   const outlet = managed.mode === 'proxy' ? status.outlets?.[managed.target ?? ''] : undefined
   if (outlet?.kind === 'direct') return { label: '代理组当前直连', detail: '跟随组当前选择了 DIRECT，并未经过远端代理节点。', color: 'warning' }

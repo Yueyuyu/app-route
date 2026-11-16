@@ -23,6 +23,8 @@ import { OperationTimings } from './operationTimings.ts'
 import { sampleConnectionEvidence } from '../../core/connectionEvidence.ts'
 import type { RoutingOperationSource } from '../../shared/routingHistory.ts'
 import { historyStateSignature } from '../../core/routingHistory.ts'
+import type { TemporaryRoute } from '../../shared/temporaryRouting.ts'
+import { startTemporaryGuardian } from '../recovery/temporaryGuardian.ts'
 
 export interface RoutingState {
   version?: 1
@@ -59,6 +61,11 @@ export interface ServiceOptions {
   trialMs?: number
   resolveFamily?: (app: Application, previousPaths?: string[]) => Promise<Application>
   probe?: (runtime: MihomoRuntime, target: string, url: string) => Promise<boolean>
+  temporaryGuardian?: () => Promise<void>
+}
+interface RoutingMutationContext {
+  temporary?: { applicationId: string; value: TemporaryRoute }
+  expiring?: { applicationId: string; id: string }
 }
 
 export class RoutingService {
@@ -202,7 +209,7 @@ export class RoutingService {
     checks.push({ name: '独立离线恢复入口', ok: await fs.access(this.recoveryPath).then(() => true, () => false), detail: this.recoveryPath })
     return checks
   }
-  async applyAutomatically(request: ApplyRequest, source: RoutingOperationSource = 'application'): Promise<AutomaticApplyResult> {
+  async applyAutomatically(request: ApplyRequest, source: RoutingOperationSource = 'application', context: RoutingMutationContext = {}): Promise<AutomaticApplyResult> {
     const previous = await this.state()
     let transactionId: string | undefined
     try {
@@ -231,7 +238,7 @@ export class RoutingService {
       if (customStrategy && !candidateAvailable) throw new Error('候选节点探测均未通过，原策略保留。')
       if (applications.some(app => app.mode === 'direct') && !before[0]) throw new Error('当前直连出口不可用，暂未修改设置。')
       if (!customStrategy && (request.proxyGroup || applications.some(app => app.mode === 'proxy')) && !before.at(-1)) throw new Error('所选代理出口不可用，请更换出口。')
-      const pending = await this.apply({ ...request, applications }, source)
+      const pending = await this.apply({ ...request, applications }, source, context)
       transactionId = pending.pending?.id
       if (!transactionId) throw new Error('未取得恢复事务，不能确认应用。')
       if (customStrategy) {
@@ -270,7 +277,7 @@ export class RoutingService {
     return this.applyAutomatically({ revision: request.revision, target, proxyGroup: target, proxyStrategy: strategy, missingTargetAction: request.missingTargetAction ?? state.missingTargetAction,
       applications: state.managed.filter(app => app.mode === 'proxy').map(app => ({ ...app, path: app.processPaths?.[0], source: 'manual', category: '已管理应用' })) }, 'strategy')
   }
-  async apply(request: ApplyRequest, source: RoutingOperationSource = 'application'): Promise<IntegrationStatus> {
+  async apply(request: ApplyRequest, source: RoutingOperationSource = 'application', context: RoutingMutationContext = {}): Promise<IntegrationStatus> {
     await withLock(this.root, async () => {
       const previous = await this.state()
       if (request.missingTargetAction !== undefined && (!request.proxyGroup || !['block', 'original'].includes(request.missingTargetAction))) throw new Error('请在代理策略中统一设置失效行为。')
@@ -279,9 +286,16 @@ export class RoutingService {
       if (request.proxyStrategy !== undefined && (!request.proxyGroup || request.target !== (strategy!.mode === 'existing' ? strategy!.group : strategyOwnership.name))) throw new Error('代理策略必须同时更新全部代理应用。')
       if (previous.pendingId) throw new Error('请先保留或恢复上一轮试运行设置。')
       if (request.revision !== previous.revision) throw new Error('页面状态已过期，请刷新后重试。')
+      if (request.proxyGroup && previous.managed.some(app => app.temporary)) throw new Error('请先结束临时分流，再更换代理策略。')
+      if (context.expiring && previous.managed.find(app => app.id === context.expiring!.applicationId)?.temporary?.id !== context.expiring.id) throw new Error('临时设置已变化，请刷新后重试。')
       if (!Array.isArray(request.applications) || (!request.applications.length && !request.proxyGroup)) throw new Error('请先选择应用。')
       const appliedAt = new Date().toISOString()
-      const selected = managedApplications(request.applications, request.target).map(app => ({ ...app, appliedAt, ...(app.mode === 'proxy' ? { missingTargetAction } : {}) }))
+      const selected = managedApplications(request.applications, request.target).map(app => {
+        const original = previous.managed.find(old => old.id === app.id)
+        const restoring = context.expiring?.applicationId === app.id ? original?.temporary?.previous : undefined
+        const temporary = context.temporary?.applicationId === app.id ? context.temporary.value : source === 'helper' ? original?.temporary : undefined
+        return { ...app, appliedAt, ...(app.mode === 'proxy' ? { missingTargetAction: restoring?.missingTargetAction ?? missingTargetAction } : {}), ...(temporary ? { temporary } : {}) }
+      })
       assertNoSystemHostRouting(request.applications)
       const selectedIds = new Set(request.applications.map(app => app.id))
       const managed = [...previous.managed.filter(app => !selectedIds.has(app.id)), ...selected]
@@ -330,6 +344,7 @@ export class RoutingService {
       await this.save({ ...previous, revision: id, pendingId: id })
       try {
         if (this.options.guardian) await this.options.guardian(id); else await startGuardian(this.root, id)
+        if (selected.some(app => app.temporary)) await (this.options.temporaryGuardian ?? (() => startTemporaryGuardian(this.root, id)))()
         await this.party.assertSnapshot(snapshot)
         await this.timings.measure('规则写入', async () => { await writeIfUnchanged(this.party.scriptPath, snapshot.script, tx.nextScript); await this.party.register(snapshot) })
         await this.timings.measure('内核重载', () => runtime.reload(candidate))

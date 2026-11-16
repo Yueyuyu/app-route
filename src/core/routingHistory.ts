@@ -3,17 +3,17 @@ import type { ManagedApplication } from '../shared/integration.ts'
 import type { HistoryRoutingState, RoutingChange, RoutingOperationSource } from '../shared/routingHistory.ts'
 import { assertNoSystemHostRouting } from './managedRouting.ts'
 
-export const operationSources: RoutingOperationSource[] = ['application', 'strategy', 'import', 'helper', 'undo']
+export const operationSources: RoutingOperationSource[] = ['application', 'strategy', 'import', 'helper', 'undo', 'temporary', 'expiry']
 export function globalRoutingSignature(state: HistoryRoutingState) {
   return JSON.stringify([state.proxyGroup, state.proxyStrategy, state.missingTargetAction ?? 'original'])
 }
 export function historyStateSignature(state: HistoryRoutingState) {
   return JSON.stringify([globalRoutingSignature(state), [...state.managed].sort((a, b) => a.id.localeCompare(b.id))])
 }
-const routeSignature = (app?: ManagedApplication) => JSON.stringify(app && [app.mode, app.target, app.processes, app.processPaths])
+const routeSignature = (app?: ManagedApplication) => JSON.stringify(app && [app.mode, app.target, app.processes, app.processPaths, app.temporary])
 export function routingChanges(before: HistoryRoutingState, after: HistoryRoutingState): RoutingChange[] {
   const old = new Map(before.managed.map(app => [app.id, app])), next = new Map(after.managed.map(app => [app.id, app]))
-  const view = (app?: ManagedApplication) => ({ mode: app?.mode ?? 'rule' as const, target: app?.mode === 'proxy' ? app.target : undefined, processes: app?.processes.length ?? 0 })
+  const view = (app?: ManagedApplication) => ({ mode: app?.mode ?? 'rule' as const, target: app?.mode === 'proxy' ? app.target : undefined, processes: app?.processes.length ?? 0, ...(app?.temporary ? { expiresAt: app.temporary.expiresAt } : {}) })
   return [...new Set([...old.keys(), ...next.keys()])].filter(id => routeSignature(old.get(id)) !== routeSignature(next.get(id)))
     .map(id => ({ id, name: (next.get(id) ?? old.get(id))!.name, before: view(old.get(id)), after: view(next.get(id)) }))
 }
@@ -25,6 +25,7 @@ export function routingUndoPlan(tx: { phase: string; source?: RoutingOperationSo
   if (globalRoutingSignature(tx.previous) !== globalRoutingSignature(tx.after)) return blocked('这次涉及代理策略，请通过策略或备份预览恢复。')
   if (tx.source === 'helper' || tx.source === 'undo') return blocked('自动补充和撤销记录仅供查看。')
   if (tx.source !== 'application' && tx.source !== 'import') return blocked('这次操作不适合单步撤销，请通过备份预览恢复。')
+  if ([...tx.previous.managed, ...tx.after.managed].some(app => app.temporary)) return blocked('这次涉及临时分流，请在应用详情中结束临时设置。')
   const changes = routingChanges(tx.previous, tx.after).filter(change => change.before.mode !== change.after.mode || change.before.target !== change.after.target)
   if (!changes.length || changes.length > 100) return blocked('这次操作不适合单步撤销，请通过备份预览恢复。')
   if (changes.some(change => {

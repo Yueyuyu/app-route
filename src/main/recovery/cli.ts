@@ -1,14 +1,16 @@
 import { RoutingService } from '../services/routingService.ts'
 import { watchTransaction } from './watchTransaction.ts'
+import { watchTemporaryRouting } from './temporaryGuardian.ts'
 
 async function main() {
-  const service = new RoutingService()
+  const service = new RoutingService({ kitBundle: process.argv[1] })
   const command = process.argv[2]
   if (command === 'watch') {
     await watchTransaction(service, process.argv[3])
     return
   }
   if (command === 'doctor') { console.log(JSON.stringify(await service.diagnose(), null, 2)); return }
+  if (command === 'temporary-watch') { await watchTemporaryRouting(service); return }
   if (command === 'recover') {
     console.log('AppRoute 离线恢复：正在停用本工具的专属分流并重新加载原有配置。')
     const result = await service.recoverAll()

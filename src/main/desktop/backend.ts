@@ -8,6 +8,8 @@ import { RoutingService } from '../services/routingService.ts'
 import { SettingsTransferService } from '../services/settingsTransfer.ts'
 import { UpgradeVerificationService } from '../services/upgradeVerification.ts'
 import { RoutingHistoryService } from '../services/routingHistory.ts'
+import { TemporaryRoutingService } from '../services/temporaryRouting.ts'
+import { startTemporaryGuardian } from '../recovery/temporaryGuardian.ts'
 import { scanApplications } from '../platform/applications.ts'
 import { runningApplications } from '../platform/applications.ts'
 import { validateDesktopRequest } from './boundary.ts'
@@ -22,6 +24,7 @@ const inventory = new InventoryPreferencesStore(service.root)
 const settings = new SettingsTransferService(service, async () => (await scan(true)).applications)
 const upgrade = new UpgradeVerificationService(settings)
 const history = new RoutingHistoryService(service)
+const temporary = new TemporaryRoutingService(service)
 let cachedScan: ApplicationScanResult | undefined
 let lastScan = 0, mutations = 0, disconnected = false
 const attempts = new Set<string>()
@@ -31,6 +34,8 @@ async function scan(force = false) {
 }
 async function dispatch(action: DesktopAction, body: any = {}) {
   switch (action) {
+    case 'integration.temporary': return temporary.apply(body)
+    case 'integration.temporary-end': return temporary.end(body)
     case 'integration.history': return history.list()
     case 'integration.undo': return history.undo(body)
     case 'updates.prepare': return upgrade.prepare(body.fromVersion, body.targetVersion)
@@ -96,6 +101,8 @@ const monitor = setInterval(async () => {
   checking = true
   try {
     await service.reconcileInterrupted()
+    const state = await service.state()
+    if (state.managed.some(app => app.temporary)) await startTemporaryGuardian(service.root, state.revision)
     const status = await service.status()
     if (!status.connected || status.pending || !status.rulesLoaded) return
     const missing = status.uncoveredProcesses ?? []

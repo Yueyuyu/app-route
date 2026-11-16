@@ -32,6 +32,8 @@ const icons = { applications: applications.map(app => ({ key: app.id, applicatio
 icons.applications.push({ ...icons.applications[0], key: 'manual', applicationId: 'manual', name: 'Demo portable tool', origin: 'manual', needsAttention: true })
 icons.applications.push({ ...icons.applications[0], key: 'removed', applicationId: 'removed', name: 'Demo removed tool', available: false })
 let inventory = { version: 1, applications, favorites: [applications[0].path.toLowerCase()] }
+const temporaryOriginals = new Map()
+let temporarySequence = 0
 // 设置验收可注入真实资料/备份服务；注入模块只使用内存路由替身，禁止连接用户内核。
 const settingsFixture = fs.existsSync(path.join(root, 'settings-fixture.mjs'))
   ? await import('./settings-fixture.mjs').then(module => module.createSettingsFixture(root, applications, status)) : undefined
@@ -44,6 +46,27 @@ process.on('message', async ({ id, action, body }) => {
   }
   let value
   if (action === 'updates.status') value = { state: 'none' }
+  else if (action === 'integration.temporary') {
+    const app = status.managed.find(item => item.id === body.application.id)
+    if (!app || body.revision !== status.revision) { process.send?.({ id, error: '临时设置已变化，请刷新后重试。' }); return }
+    temporaryOriginals.set(app.id, { app: structuredClone(app), evidence: status.evidence.filter(item => item.applicationId === app.id) })
+    const previous = { mode: app.mode, target: app.target }
+    app.mode = body.application.mode; app.target = app.mode === 'direct' ? 'DIRECT' : status.proxyGroup
+    app.temporary = { id: 'demo-temporary-' + ++temporarySequence, expiresAt: new Date(Date.now() + body.minutes * 60000).toISOString(), previous }
+    status.evidence = status.evidence.filter(item => item.applicationId !== app.id)
+    status.revision = app.temporary.id
+    value = { outcome: 'applied', message: '临时分流已应用，新连接仍需验证。', status }
+  }
+  else if (action === 'integration.temporary-end') {
+    const index = status.managed.findIndex(item => item.id === body.applicationId && item.temporary?.id === body.id)
+    if (index < 0 || body.revision !== status.revision) { process.send?.({ id, error: '临时设置已变化，请刷新后重试。' }); return }
+    const original = temporaryOriginals.get(body.applicationId)
+    status.managed[index] = original.app
+    status.evidence.push(...original.evidence.map(item => ({ ...item, startedAt: new Date().toISOString() })))
+    temporaryOriginals.delete(body.applicationId)
+    status.revision = 'demo-ended-' + ++temporarySequence
+    value = { outcome: 'applied', message: '已结束临时分流，新连接仍需验证。', status }
+  }
   else if (action === 'integration.history') value = { revision: status.revision, unreadable: 0, items: [
     { id: 'demo-latest', at: '2026-11-16T04:05:00Z', source: 'application', phase: 'confirmed', strategyChanged: false, changes: [{ id: 'telegram', name: 'Telegram', before: { mode: 'direct', processes: 1 }, after: { mode: 'proxy', target: 'Demo group', processes: 2 } }] },
     { id: 'demo-previous', at: '2026-11-16T03:00:00Z', source: 'import', phase: 'confirmed', strategyChanged: false, undoReason: '此后已有新修改，不能覆盖当前选择。', changes: [{ id: 'firefox', name: 'Mozilla Firefox', before: { mode: 'rule', processes: 0 }, after: { mode: 'direct', processes: 1 } }] },
@@ -58,9 +81,10 @@ process.on('message', async ({ id, action, body }) => {
     if (scenario.node) { value.outlets['Demo group'].node = scenario.node; value.outlets['Demo group'].chain = ['Demo group', scenario.node] }
     if (scenario.mismatch) value.evidence[0].matched = false
     if (scenario.untracked) { value.managed = []; value.untrackedRuleCount = 121; value.rulesLoaded = false }
+    if (scenario.expired) for (const app of value.managed) if (app.temporary) app.temporary.expiresAt = new Date(Date.now() - 1000).toISOString()
     const observedAt = new Date().toISOString()
     value.observedAt = observedAt
-    value.observations = { telegram: { observedAt, latestStartedAt: value.evidence[0].startedAt, connectionCount: value.evidence.length, matchedCount: value.evidence.filter(item => item.matched).length, processes: [applications[2].processes[0]], allUseOldNode: false } }
+    value.observations = { telegram: { observedAt, latestStartedAt: value.evidence[0]?.startedAt ?? observedAt, connectionCount: value.evidence.length, matchedCount: value.evidence.filter(item => item.matched).length, processes: value.evidence.length ? [applications[2].processes[0]] : [], allUseOldNode: false } }
   }
   else if (action === 'applications.scan') {
     // 首屏验收人为延迟扫描，核对缓存列表是否仍可使用；不会延迟其他 IPC。

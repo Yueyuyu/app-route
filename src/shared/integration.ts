@@ -1,5 +1,6 @@
 import type { Application, RouteMode } from './application.ts'
 import type { ProxyStrategy, StrategyNode } from './proxyStrategy.ts'
+import type { TemporaryRoute } from './temporaryRouting.ts'
 
 export interface ManagedApplication {
   id: string
@@ -11,6 +12,7 @@ export interface ManagedApplication {
   mode: RouteMode
   target?: string
   missingTargetAction?: 'block' | 'original'
+  temporary?: TemporaryRoute
 }
 export interface ApplyRequest {
   applications: Application[]; target?: string; revision: string

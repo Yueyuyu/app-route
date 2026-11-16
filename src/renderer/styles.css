@@ -415,3 +415,10 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .routing-history-changes > div { display: grid; grid-template-columns: minmax(75px, 1fr) minmax(90px, 1fr) 16px minmax(90px, 1fr); gap: 8px; padding: 10px 0; border-bottom: 1px solid #edf0f5; font-size: 13px; }
 .routing-history-changes strong { overflow-wrap: anywhere; }
 .routing-history-drawer .ant-alert { margin-top: 12px; }
+
+.temporary-routing-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.temporary-routing-heading h3 { margin: 0; }
+.temporary-routing-fields { display: flex; flex-wrap: wrap; gap: 16px; margin: 16px 0; }
+.temporary-routing-fields label { display: flex; flex: 1 1 180px; flex-direction: column; gap: 8px; min-width: 0; }
+.temporary-routing-fields .ant-select { width: 100%; }
+.temporary-routing .ant-alert { margin-top: 12px; }

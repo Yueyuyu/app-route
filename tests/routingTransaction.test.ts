@@ -19,6 +19,8 @@ import { parseRoutingState, pruneCompletedTransactions } from '../src/main/stora
 import { diagnosticExport } from '../src/main/services/diagnosticExport.ts'
 import { SettingsTransferService } from '../src/main/services/settingsTransfer.ts'
 import { RoutingHistoryService } from '../src/main/services/routingHistory.ts'
+import { TemporaryRoutingService } from '../src/main/services/temporaryRouting.ts'
+import { watchTemporaryRouting } from '../src/main/recovery/temporaryGuardian.ts'
 
 class MockRuntime extends MihomoRuntime {
   current: any
@@ -54,6 +56,112 @@ async function fixture(t: TestContext, overrides: ServiceOptions = {}) {
   const service = new RoutingService({ root, partyRoot: party, runtime: async () => runtime, validate: async () => {}, installKit: async () => {}, guardian: async () => { guardianStarted = true }, ...overrides })
   return { service, runtime, config, party, guardianStarted: () => guardianStarted }
 }
+
+test('临时分流保存期限，重建后台后到期只恢复该应用，保留其他应用和原规则', async t => {
+  let now = Date.now(), starts = 0
+  const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true, temporaryGuardian: async () => { starts++ } })
+  const first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }, second = { ...first, id: 'second', path: 'C:\\Apps\\Second\\Second.exe', processes: ['Second.exe'] }
+  await f.service.applyAutomatically({ revision: 'initial', applications: [second] })
+  const result = await new TemporaryRoutingService(f.service, () => now, 1000).apply({ revision: (await f.service.state()).revision, application: first, minutes: 15 })
+  assert.equal(result.outcome, 'applied', result.message)
+  assert.equal(starts, 1)
+  const saved = (await f.service.state()).managed.find(item => item.id === first.id)!
+  assert.equal(saved.temporary!.previous.mode, 'rule')
+  assert.equal(Date.parse(saved.temporary!.expiresAt), now + 1000)
+  const recreated = new TemporaryRoutingService(new RoutingService(f.service.options), () => now)
+  assert.equal(await recreated.expireDue(), false)
+  now += 2000
+  assert.equal(await recreated.expireDue(), true)
+  assert.deepEqual((await f.service.state()).managed.map(item => item.id), ['second'])
+  assert.deepEqual(f.runtime.current.rules.slice(-f.config.rules.length), f.config.rules)
+  assert.equal(await fs.readFile(path.join(f.party, 'override/original.js'), 'utf8'), '// user-owned\nfunction main(c){return c}\n')
+})
+
+test('临时续期保留最初选择，旧定时不能覆盖手动改选，策略变更不破坏恢复目标', async t => {
+  let now = Date.now()
+  const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true, temporaryGuardian: async () => {} })
+  const first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }, temporary = new TemporaryRoutingService(f.service, () => now, 1000)
+  await f.service.applyAutomatically({ revision: 'initial', applications: [{ ...first, mode: 'proxy' }], target: 'Group', proxyGroup: 'Group' })
+  await temporary.apply({ revision: (await f.service.state()).revision, application: first, minutes: 15 })
+  const old = (await f.service.state()).managed[0].temporary!
+  await temporary.apply({ revision: (await f.service.state()).revision, application: first, minutes: 30 })
+  const renewed = (await f.service.state()).managed[0].temporary!
+  assert.notEqual(renewed.id, old.id); assert.deepEqual(renewed.previous, { mode: 'proxy', target: 'Group', missingTargetAction: 'original' })
+  await assert.rejects(temporary.end({ revision: (await f.service.state()).revision, applicationId: first.id, id: old.id }), /已变化/)
+  const rejected = await f.service.setProxyGroup({ revision: (await f.service.state()).revision, target: 'Group' })
+  assert.equal(rejected.outcome, 'unchanged'); assert.match(rejected.message, /先结束临时分流/)
+  await f.service.applyAutomatically({ revision: (await f.service.state()).revision, applications: [{ ...first, mode: 'proxy' }], target: 'Group' })
+  assert.equal((await f.service.state()).managed[0].temporary, undefined)
+  now += 2000
+  const before = await fs.readFile(f.service.statePath, 'utf8'), reloads = f.runtime.reloadCount
+  assert.equal(await temporary.expireDue(), false)
+  assert.equal(await fs.readFile(f.service.statePath, 'utf8'), before); assert.equal(f.runtime.reloadCount, reloads)
+})
+
+test('守护未就绪取消临时设置，到期恢复失败保留期限，重新连接再恢复且 helper 不丢期限', async t => {
+  let now = Date.now()
+  const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true, temporaryGuardian: async () => { throw new Error('模拟守护未就绪') } })
+  const first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }, temporary = new TemporaryRoutingService(f.service, () => now, 1000)
+  const failed = await temporary.apply({ revision: 'initial', application: first, minutes: 15 })
+  assert.notEqual(failed.outcome, 'applied'); assert.equal((await f.service.state()).managed.length, 0)
+  assert.deepEqual(f.runtime.current.rules, f.config.rules)
+  f.service.options.temporaryGuardian = async () => {}
+  assert.equal((await temporary.apply({ revision: (await f.service.state()).revision, application: first, minutes: 15 })).outcome, 'applied')
+  const lease = (await f.service.state()).managed[0].temporary
+  await f.service.applyAutomatically({ revision: (await f.service.state()).revision, applications: [first] }, 'helper')
+  assert.deepEqual((await f.service.state()).managed[0].temporary, lease)
+  now += 2000; f.runtime.failNextReload = true
+  assert.equal(await temporary.expireDue(), false)
+  assert.deepEqual((await f.service.state()).managed[0].temporary, lease)
+  assert.equal((await f.service.state()).pendingId, undefined)
+  assert.equal(await new TemporaryRoutingService(new RoutingService(f.service.options), () => now).expireDue(), true)
+  assert.equal((await f.service.state()).managed.length, 0)
+})
+
+test('期限守护用持久化状态恢复，失败退避，不依赖页面计时器', async t => {
+  let now = Date.now(), slept = 0
+  const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true, temporaryGuardian: async () => {} })
+  await new TemporaryRoutingService(f.service, () => now, 1000).apply({ revision: 'initial', application: { ...app, path: 'C:\\Apps\\Example\\Example.exe' }, minutes: 15 })
+  f.runtime.failNextReload = true
+  const intervals: number[] = []
+  await watchTemporaryRouting(new RoutingService(f.service.options), { now: () => now, sleep: async ms => { assert.ok(++slept < 10); intervals.push(ms); now += ms } })
+  assert.ok(intervals.includes(5000), 'failed recovery must back off')
+  assert.equal((await f.service.state()).managed.length, 0)
+  assert.equal(await readOptional(path.join(f.service.root, 'temporary-monitor', 'ready.json')), null)
+  assert.deepEqual(f.runtime.current.rules, f.config.rules)
+})
+
+test('单个期限恢复失败不饿死其他应用，旧应用独有的失效策略仍保持', async t => {
+  let now = Date.now()
+  const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true, temporaryGuardian: async () => {} })
+  const first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }, second = { ...first, id: 'second', processes: ['Second.exe'], path: 'C:\\Apps\\Second\\Second.exe' }
+  await f.service.applyAutomatically({ revision: 'initial', applications: [{ ...first, mode: 'proxy' }], target: 'Group', proxyGroup: 'Group' })
+  const original = await f.service.state(); original.managed[0].missingTargetAction = 'block'; await f.service.save(original)
+  const temporary = new TemporaryRoutingService(f.service, () => now, 1000)
+  await temporary.apply({ revision: original.revision, application: first, minutes: 15 })
+  await temporary.apply({ revision: (await f.service.state()).revision, application: second, minutes: 15 })
+  now += 2000; f.runtime.failNextReload = true
+  assert.equal(await temporary.expireDue(), false)
+  assert.equal(await temporary.expireDue(), true)
+  assert.deepEqual((await f.service.state()).managed.map(item => item.id), [first.id])
+  assert.equal(await temporary.expireDue(), true)
+  const restored = (await f.service.state()).managed[0]
+  assert.equal(restored.mode, 'proxy'); assert.equal(restored.target, 'Group'); assert.equal(restored.missingTargetAction, 'block'); assert.equal(restored.temporary, undefined)
+})
+
+test('临时入口拒绝无效期限、路径变化与过期请求；普通请求不能伪造期限', async t => {
+  const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true, temporaryGuardian: async () => {} })
+  const first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }, temporary = new TemporaryRoutingService(f.service)
+  await assert.rejects(temporary.apply({ revision: 'initial', application: first, minutes: -1 }), /有效时长/)
+  await f.service.applyAutomatically({ revision: 'initial', applications: [first] })
+  await assert.rejects(temporary.apply({ revision: (await f.service.state()).revision, application: { ...first, path: 'D:\\Moved\\Example.exe' }, minutes: 15 }), /身份已改变/)
+  const old = await temporary.apply({ revision: 'initial', application: first, minutes: 15 })
+  assert.equal(old.outcome, 'unchanged'); assert.equal((await f.service.state()).managed[0].temporary, undefined)
+  const forged = { ...first, temporary: { id: 'forged', expiresAt: 'invalid', previous: { mode: 'proxy' } } }
+  await f.service.applyAutomatically({ revision: (await f.service.state()).revision, applications: [forged] })
+  assert.equal((await f.service.state()).managed[0].temporary, undefined)
+  assert.throws(() => parseRoutingState(JSON.stringify({ revision: 'bad', managed: [forged] })), /记录|临时/)
+})
 
 test('操作记录只读且不泄露脚本，重建服务后撤销最近修改保留其他应用和原规则', async t => {
   const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true })

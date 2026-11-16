@@ -15,8 +15,9 @@ export function diagnosisFingerprint(status?: IntegrationStatus, applicationId?:
   const samples = status?.evidence.filter(item => item.applicationId === applicationId) ?? []
   const count = observed?.connectionCount ?? samples.length
   const connectionState = [count > 0, observed ? observed.matchedCount < count : samples.some(item => !item.matched), observed?.allUseOldNode ?? (count > 0 && samples.every(item => item.usesCurrentNode === false))]
+  const temporary = status?.managed.find(app => app.id === applicationId)?.temporary
   return JSON.stringify([status?.connected, status?.revision, status?.configurationFingerprint, status?.rulesLoaded, status?.dataIssue, status?.untrackedRuleCount, status?.pending?.id,
-    connectionState, Object.values(status?.outlets ?? {}).map(item => [item.target, item.node, item.kind, item.health]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))])
+    temporary && [temporary.id, temporary.expiresAt, Date.parse(temporary.expiresAt) <= Date.now()], connectionState, Object.values(status?.outlets ?? {}).map(item => [item.target, item.node, item.kind, item.health]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))])
 }
 /** 只解释已读取的数据，不发起探测流量、不启动应用、不重放规则。 */
 export function diagnoseApplication(app: Application, status?: IntegrationStatus, running?: RunningApplicationProcess[]): ApplicationDiagnosis {
@@ -28,13 +29,14 @@ export function diagnoseApplication(app: Application, status?: IntegrationStatus
   const old = observation?.allUseOldNode ?? (count > 0 && evidence.every(item => item.usesCurrentNode === false))
   const active = running === undefined ? undefined : isRunningApplication(app, running)
   const integrityIssue = Boolean(status?.dataIssue || status?.untrackedRuleCount)
+  const expiredTemporary = Boolean(managed?.temporary && Date.parse(managed.temporary.expiresAt) <= Date.now())
   const presentation = routingPresentation(app, status)
   const outlet = managed?.mode === 'proxy' ? status?.outlets?.[managed.target ?? ''] : undefined
   const outletUnconfirmed = managed?.mode === 'proxy' && (!outlet || ['direct', 'reject', 'missing', 'unknown'].includes(outlet.kind) || outlet.health === 'unhealthy')
   const outletDetail = outlet ? presentation.detail : '当前出口不可用或尚未确认，请检查 Clash Party 的组内选择或网络自检。'
-  const ruleState = !status?.connected || status.pending ? 'wait' : integrityIssue || (managed && !status.rulesLoaded) ? 'fail' : 'pass'
-  const ruleDetail = !status?.connected ? '规则尚未确认，请查看连接详情。' : integrityIssue ? presentation.detail : status.pending ? '当前修改仍在检查，请等待确认或恢复。' : !managed ? '当前沿用 Clash Party 原有规则。' : status.rulesLoaded ? '已确认 AppRoute 专属规则加载。' : '规则尚未确认，请查看连接详情。'
-  const contextUnconfirmed = !status?.connected || integrityIssue || status.pending || (managed && !status.rulesLoaded)
+  const ruleState = !status?.connected || status.pending ? 'wait' : integrityIssue || (managed && !status.rulesLoaded) ? 'fail' : expiredTemporary ? 'wait' : 'pass'
+  const ruleDetail = !status?.connected ? '规则尚未确认，请查看连接详情。' : integrityIssue ? presentation.detail : status.pending ? '当前修改仍在检查，请等待确认或恢复。' : expiredTemporary ? presentation.detail : !managed ? '当前沿用 Clash Party 原有规则。' : status.rulesLoaded ? '已确认 AppRoute 专属规则加载。' : '规则尚未确认，请查看连接详情。'
+  const contextUnconfirmed = !status?.connected || integrityIssue || status.pending || expiredTemporary || (managed && !status.rulesLoaded)
   const routeState = contextUnconfirmed ? 'wait' : outlet?.kind === 'missing' || outlet?.kind === 'reject' || mismatch ? 'fail' : outletUnconfirmed || !count || old ? 'wait' : 'pass'
   const routeDetail = contextUnconfirmed ? '等待新连接后再核对出口。' : outletUnconfirmed ? outletDetail : mismatch ? '存在不符合当前设置的连接，请核对规则。' : !count ? '等待新连接后再核对出口。' : old ? '仍有旧节点连接，请在应用内重新连接后检查。' : '已观察连接符合设置，其余组件仍待观察。'
   const checks: ApplicationDiagnosis['checks'] = [
@@ -44,7 +46,7 @@ export function diagnoseApplication(app: Application, status?: IntegrationStatus
     { name: '连接观察', state: status?.connected && count ? 'pass' : 'wait', detail: status?.connected && count ? '已观察到进入内核的新连接。' : '尚未观察到新连接；未进入 Clash 的流量无法在此验证。' },
     { name: '实际出口', state: routeState, detail: routeDetail },
   ]
-  const next = !status?.connected ? checks[0].detail : integrityIssue || status.pending || !managed || !status.rulesLoaded ? ruleDetail : outletUnconfirmed || mismatch ? routeDetail : active === undefined || !active ? checks[1].detail : !count ? '请在应用内重新播放或刷新，再检查；无需先恢复全部分流。' : routeDetail
+  const next = !status?.connected ? checks[0].detail : integrityIssue || status.pending || expiredTemporary || !managed || !status.rulesLoaded ? ruleDetail : outletUnconfirmed || mismatch ? routeDetail : active === undefined || !active ? checks[1].detail : !count ? '请在应用内重新播放或刷新，再检查；无需先恢复全部分流。' : routeDetail
   return { checkedAt: new Date().toISOString(), fingerprint: diagnosisFingerprint(status, managed?.id), checks, next }
 }
 
