@@ -31,6 +31,7 @@ export async function createSettingsFixture(root: string, applications: Applicat
       case 'inventory.write': return service.inventory.write(body)
       case 'settings.snapshot': return service.snapshot()
       case 'settings.preview': return service.previewText(body.text)
+      case 'settings.bind': return service.bind(body)
       case 'settings.import': return service.import(body)
       case 'settings.backups': return service.backups.list()
       case 'settings.backup-create': return { id: await service.backups.create(await service.snapshot(), 'manual') }

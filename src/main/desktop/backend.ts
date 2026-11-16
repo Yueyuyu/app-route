@@ -37,6 +37,7 @@ async function dispatch(action: DesktopAction, body: any = {}) {
     case 'inventory.write': return inventory.write(body)
     case 'settings.snapshot': return settings.snapshot()
     case 'settings.preview': return settings.previewText(body.text)
+    case 'settings.bind': return settings.bind(body)
     case 'settings.import': return settings.import(body)
     case 'settings.backups': return settings.backups.list()
     case 'settings.backup-create': return { id: await settings.backups.create(await settings.snapshot(), 'manual') }

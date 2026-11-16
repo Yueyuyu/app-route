@@ -1,5 +1,8 @@
 // 精确替换只在临时副本发生。实现变化后匹配失败，要求重新审查破坏点，不能悄悄跳过。
 export const regressionCases = [
+  { id: 'duplicate-import-binding', file: 'src/main/services/settingsTransfer.ts',
+    before: 'if ([...session.applications].some(([key, app]) => key !== row.key && processPathKey(app.path!) === identity))', after: 'if (false)',
+    test: 'tests/settingsTransfer.test.ts', name: '人工绑定只更新预览，拒绝任意路径、重复目标、共享宿主与旧预览，应用时重新核对路径' },
   { id: 'trusted-release-assets', file: 'src/core/releaseUpdates.ts',
     before: 'asset.browser_download_url !== downloadUrl', after: 'false',
     test: 'tests/releaseUpdates.test.ts', name: '下载必须匹配系统架构、固定仓库与校验摘要，缺失附件不能假报最新' },
@@ -19,7 +22,7 @@ export const regressionCases = [
     before: 'copy.rules = copy.rules.slice(marker.rules.length)', after: 'copy.rules = []',
     test: 'tests/managedRouting.test.ts', name: '应用与撤销仅增删带所有权标记的规则，原配置保持一致' },
   { id: 'stale-import-preview', file: 'src/main/services/settingsTransfer.ts',
-    before: "if (session.fingerprint !== await this.fingerprint()) throw new Error('设置已变化，请重新预览。')", after: '/* proof: removed stale-preview guard */',
+    before: "if (session.fingerprint !== await this.fingerprint()) throw new Error('设置已变化，请重新预览。')\n      if (request.restoreStrategy", after: '/* proof: removed stale-preview guard */\n      if (request.restoreStrategy',
     test: 'tests/settingsTransfer.test.ts', name: '路径缺失、共享宿主和预览后变更均不能偷偷写入' },
   { id: 'stale-backup-delete', file: 'src/main/services/settingsBackups.ts',
     before: 'if (!current.restorable || current.fingerprint !== fingerprint)', after: 'if (!current.restorable)',

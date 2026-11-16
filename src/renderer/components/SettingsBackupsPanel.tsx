@@ -47,6 +47,7 @@ export function SettingsBackupsPanel({ busy, setBusy, revision, onPreview }: Pro
         { title: t('备份时间'), dataIndex: 'createdAt', width: 190, render: value => formatDateTime(value) },
         { title: t('来源'), width: 120, render: (_, backup) => t(sourceLabels[backup.kind]) },
         { title: t('应用'), width: 70, render: (_, backup) => backup.valid ? backup.count : '—' },
+        { title: t('文件大小'), width: 100, render: (_, backup) => backup.valid ? `${(backup.bytes / 1024).toFixed(1)} KiB` : '—' },
         { title: t('状态'), width: 125, render: (_, backup) => <Tag color={backup.restorable ? 'blue' : 'default'}>{t(!backup.valid ? '无法读取' : backup.restorable ? '可恢复' : '未完成事务')}</Tag> },
         { title: t('操作'), width: 265, render: (_, backup) => <Space size={0} wrap><Button type="link" disabled={busy || !backup.restorable} onClick={() => void perform('preview', backup)}>{t('预览恢复')}</Button><Button type="text" disabled={busy || !backup.restorable} onClick={() => void perform('export', backup)}>{t('导出')}</Button><Button type="text" danger disabled={busy || !backup.restorable} onClick={() => remove(backup)}>{t('删除')}</Button></Space> },
       ]} />

@@ -398,3 +398,9 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .update-checksum { overflow-wrap: anywhere; user-select: text; }
 .update-panel > .ant-alert, .upgrade-verification { margin-top: 16px; }
 .upgrade-verification { border-top: 1px solid #e3eafa; padding-top: 16px; }
+.import-summary-counts { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.import-global-differences { margin-top: 16px; }
+.import-differences { padding: 4px 8px 8px; }
+.import-differences .ant-table-cell { overflow-wrap: anywhere; }
+.import-candidate { width: 100%; margin-block: 8px 16px; }
+.settings-binding-modal .ant-select-content { overflow: hidden; text-overflow: ellipsis; }

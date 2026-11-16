@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { parseSettingsText, parseSettingsSnapshot } from '../../core/settingsTransfer.ts'
+import { settingsDifferences } from '../../core/settingsDifferences.ts'
 import { assertNoSystemHostRouting, managedApplications } from '../../core/managedRouting.ts'
 import { strategyOwnership } from '../../core/proxyStrategy.ts'
 import { processPathKey } from '../../shared/applicationIdentity.ts'
@@ -11,9 +12,9 @@ import { LanguagePreferencesStore } from '../desktop/languagePreferences.ts'
 import { SettingsBackupStore } from './settingsBackups.ts'
 import type { RoutingService } from './routingService.ts'
 import type { Application } from '../../shared/application.ts'
-import type { SettingsImportRequest, SettingsImportResult, SettingsPreview, SettingsSnapshot } from '../../shared/settings.ts'
+import type { SettingsBindingRequest, SettingsImportRequest, SettingsImportResult, SettingsPreview, SettingsSnapshot } from '../../shared/settings.ts'
 
-interface ImportSession { snapshot: SettingsSnapshot; fingerprint: string; expires: number; applications: Map<string, Application>; preview: SettingsPreview }
+interface ImportSession { snapshot: SettingsSnapshot; fingerprint: string; expires: number; applications: Map<string, Application>; preview: SettingsPreview; candidates: Map<string, Application>; bindings: Map<string, string> }
 export class SettingsTransferService {
   readonly inventory: InventoryPreferencesStore
   readonly language: LanguagePreferencesStore
@@ -47,15 +48,24 @@ export class SettingsTransferService {
       proxyStrategy: state.proxyStrategy ?? (state.proxyGroup ? { mode: 'existing', group: state.proxyGroup } : undefined), missingTargetAction: state.missingTargetAction })
   }
   async previewText(text: unknown) { return this.preview(parseSettingsText(text)) }
-  async preview(snapshot: SettingsSnapshot): Promise<SettingsPreview> {
+  async preview(snapshot: SettingsSnapshot, bindings = new Map<string, string>()): Promise<SettingsPreview> {
     snapshot = parseSettingsSnapshot(snapshot)
     const before = await this.fingerprint()
-    const [state, inventory, scanned] = await Promise.all([this.routing.state(), this.inventory.read(), this.scan()])
+    const [state, inventory, scanned, currentLanguage] = await Promise.all([this.routing.state(), this.inventory.read(), this.scan(), this.language.read()])
     if (state.pendingId) throw new Error('请等待分流操作或恢复检查完成。')
     const local = new Map([...scanned, ...inventory.applications].filter(app => app.path).map(app => [processPathKey(app.path!), app]))
+    const candidates = new Map<string, Application>()
+    await Promise.all([...local.values()].map(async app => {
+      if (!await this.available(app.path!)) return
+      try {
+        const candidate = { ...app, mode: 'direct' as const, processPaths: undefined }
+        assertNoSystemHostRouting([candidate]); managedApplications([candidate], 'preview-target')
+        candidates.set(digest(processPathKey(app.path!)), app)
+      } catch { /* 共享宿主、无效路径不进入人工绑定候选。 */ }
+    }))
     const applications = new Map<string, Application>()
     const rows = await Promise.all(snapshot.applications.map(async (item, i) => {
-      const key = String(i), found = item.path ? local.get(processPathKey(item.path)) : undefined
+      const key = String(i), binding = bindings.get(key), found = binding ? local.get(binding) : item.path ? local.get(processPathKey(item.path)) : undefined
       const configured = found && state.managed.find(app => app.id === found.id || app.processPaths?.some(file => processPathKey(file) === processPathKey(found.path!)))
       let reason: string | undefined
       if (!found || !await this.available(found.path!)) reason = '本机未找到对应路径，请先扫描或添加应用。'
@@ -65,12 +75,33 @@ export class SettingsTransferService {
         try { assertNoSystemHostRouting([application]); managedApplications([application], 'preview-target'); applications.set(key, application) }
         catch { reason = '该应用属于受保护或共享进程，不能导入分流设置。' }
       }
-      return { ...item, key, currentMode: configured?.mode ?? 'rule' as const, configured: Boolean(configured), available: !reason, ...(reason ? { reason } : {}) }
+      const currentMode = configured?.mode ?? 'rule' as const
+      return { ...item, key, currentMode, configured: Boolean(configured), available: !reason,
+        localPath: found?.path, manualBinding: Boolean(binding), canBind: Boolean(binding) || reason === '本机未找到对应路径，请先扫描或添加应用。',
+        differences: found && !reason ? settingsDifferences({ name: found.name, category: found.category || '其他应用', mode: currentMode, favorite: inventory.favorites.includes(processPathKey(found.path!)) }, item, snapshot.scope) : [], ...(reason ? { reason } : {}) }
     }))
     if (before !== await this.fingerprint()) throw new Error('设置已变化，请重新预览。')
-    const preview: SettingsPreview = { token: randomUUID(), createdAt: snapshot.createdAt, rows, language: snapshot.language, proxyStrategy: snapshot.proxyStrategy, currentGroup: state.proxyGroup, affectedProxyCount: state.managed.filter(app => app.mode === 'proxy').length }
-    this.session = { snapshot, fingerprint: before, expires: Date.now() + 10 * 60_000, applications, preview }
+    const preview: SettingsPreview = { token: randomUUID(), createdAt: snapshot.createdAt, rows, language: snapshot.language, proxyStrategy: snapshot.proxyStrategy, currentGroup: state.proxyGroup, affectedProxyCount: state.managed.filter(app => app.mode === 'proxy').length,
+      currentLanguage, currentStrategy: state.proxyStrategy ?? (state.proxyGroup ? { mode: 'existing', group: state.proxyGroup } : undefined),
+      candidates: [...candidates].map(([key, app]) => ({ key, name: app.name, path: app.path! })).sort((a, b) => a.name.localeCompare(b.name)) }
+    this.session = { snapshot, fingerprint: before, expires: Date.now() + 10 * 60_000, applications, preview, candidates, bindings }
     return preview
+  }
+  async bind(request: SettingsBindingRequest): Promise<SettingsPreview> {
+    return withLock(path.join(this.routing.root, 'settings-lock'), async () => {
+      const session = this.session
+      if (!request || !session || request.token !== session.preview.token || session.expires < Date.now()) throw new Error('导入预览已过期，请重新选择文件。')
+      if (session.fingerprint !== await this.fingerprint()) throw new Error('设置已变化，请重新预览。')
+      const row = session.preview.rows.find(item => item.key === request.key), candidate = session.candidates.get(request.candidate)
+      if (!row?.canBind || !candidate?.path) throw new Error('请选择本机候选应用。')
+      const identity = processPathKey(candidate.path)
+      if ([...session.applications].some(([key, app]) => key !== row.key && processPathKey(app.path!) === identity)) throw new Error('该本机应用已对应其他导入项目。')
+      if (!await this.available(candidate.path)) throw new Error('应用路径已失效，请重新预览。')
+      // 绑定只重建内存预览；必须重新勾选并确认导入，不能直接写资料或分流。
+      const preview = await this.preview(session.snapshot, new Map([...session.bindings, [row.key, identity]]))
+      if (this.session?.fingerprint !== session.fingerprint) { this.session = undefined; throw new Error('设置已变化，请重新预览。') }
+      return preview
+    })
   }
   async import(request: SettingsImportRequest): Promise<SettingsImportResult> {
     return withLock(path.join(this.routing.root, 'settings-lock'), () => withLock(path.join(this.routing.root, 'inventory-lock'), async () => {
@@ -85,6 +116,7 @@ export class SettingsTransferService {
       const state = await this.routing.state(), inventory = await this.inventory.read()
       if (state.pendingId) throw new Error('请等待分流操作或恢复检查完成。')
       const selected = request.keys.map(key => session.applications.get(key)!)
+      if (new Set(selected.map(app => processPathKey(app.path!))).size !== selected.length) throw new Error('该本机应用已对应其他导入项目。')
       for (const app of selected) if (!await this.available(app.path!)) throw new Error('应用路径已失效，请重新预览。')
       const candidate = new Map(inventory.applications.map(app => [app.path ? processPathKey(app.path) : app.id, app]))
       const favorites = new Set(inventory.favorites)

@@ -11,9 +11,61 @@ import type { SettingsSnapshot } from '../src/shared/settings.ts'
 import type { Application } from '../src/shared/application.ts'
 import { randomUUID } from 'node:crypto'
 import { atomicWrite } from '../src/main/storage/localState.ts'
+import { settingsDifferences } from '../src/core/settingsDifferences.ts'
 
 const application: Application = { id: 'local-id', name: '本机音乐', path: 'C:\\Apps\\Music\\Music.exe', processes: ['Music.exe'], category: '音乐娱乐', mode: 'rule', source: 'scan' }
 const snapshot = (): SettingsSnapshot => ({ app: 'AppRoute', kind: 'approute-settings', version: 1, createdAt: '2026-11-12T00:00:00Z', applications: [{ name: '导入音乐', path: application.path, category: '音乐娱乐', mode: 'direct', favorite: true }], language: 'fr' })
+
+test('导入差异只包含实际变化，历史规则与缺省收藏保留当前资料', () => {
+  const current = { ...snapshot().applications[0], mode: 'rule' as const, favorite: false }
+  assert.deepEqual(settingsDifferences(current, snapshot().applications[0]).map(item => item.field), ['mode', 'favorite'])
+  assert.deepEqual(settingsDifferences(current, { ...current, favorite: undefined }), [])
+  assert.deepEqual(settingsDifferences(current, { ...snapshot().applications[0], name: 'ignored', category: 'ignored' }, 'routing').map(item => item.field), ['mode'])
+})
+
+test('人工绑定只更新预览，拒绝任意路径、重复目标、共享宿主与旧预览，应用时重新核对路径', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'approute-binding-')); t.after(() => fs.rm(root, { recursive: true, force: true }))
+  const routing = new RoutingService({ root }), host = { ...application, id: 'host', path: 'C:\\Windows\\System32\\control.exe', processes: ['control.exe'] }
+  let exists = true, requests = 0
+  routing.applyAutomatically = async () => { requests++; assert.fail('preview and metadata import cannot apply routing') }
+  const service = new SettingsTransferService(routing, async () => [application, host], async () => exists)
+  await service.inventory.write({ version: 1, applications: [application], favorites: [] })
+  const original = await fs.readFile(path.join(root, 'inventory.json'), 'utf8')
+  const data = snapshot(); data.applications[0].path = 'D:\\OldComputer\\Music.exe'
+  const preview = await service.preview(data)
+  assert.equal(preview.rows[0].available, false); assert.equal(preview.rows[0].canBind, true)
+  assert.equal(preview.candidates.length, 1); assert.equal(preview.candidates[0].path, application.path)
+  await assert.rejects(service.bind({ token: preview.token, key: '0', candidate: application.path! }), /本机候选/)
+  const bound = await service.bind({ token: preview.token, key: '0', candidate: preview.candidates[0].key })
+  assert.equal(bound.rows[0].localPath, application.path); assert.equal(bound.rows[0].manualBinding, true)
+  assert.equal(bound.rows[0].path, data.applications[0].path, 'source path stays visible separately')
+  assert.equal(requests, 0); assert.equal(await fs.readFile(path.join(root, 'inventory.json'), 'utf8'), original)
+  assert.equal(await fs.access(routing.statePath).then(() => true, () => false), false)
+  await assert.rejects(service.bind({ token: preview.token, key: '0', candidate: preview.candidates[0].key }), /预览已过期/)
+  exists = false
+  await assert.rejects(service.import({ token: bound.token, keys: ['0'], applyRouting: false, restoreLanguage: false, restoreStrategy: false }), /路径已失效/)
+  exists = true
+  const result = await service.import({ token: bound.token, keys: ['0'], applyRouting: false, restoreLanguage: false, restoreStrategy: false })
+  assert.equal(result.imported, 1); assert.equal(requests, 0)
+  const saved = await service.inventory.read(); assert.equal(saved.applications[0].path, application.path); assert.equal(saved.applications[0].id, application.id)
+  const routingPreview = await service.preview(data)
+  const routingBound = await service.bind({ token: routingPreview.token, key: '0', candidate: routingPreview.candidates[0].key })
+  routing.applyAutomatically = async request => {
+    requests++; assert.equal(request.applications.length, 1)
+    assert.equal(request.applications[0].path, application.path)
+    assert.equal(request.applications[0].id, application.id)
+    assert.equal(request.applications[0].processPaths, undefined, 'helpers must be rebuilt by the routing service')
+    return { outcome: 'applied', message: 'fixture', status: { connected: true, revision: 'fixture', choices: [], managed: [], rulesLoaded: true, evidence: [], recoveryReady: true, recoveryPath: 'fixture' } }
+  }
+  assert.equal((await service.import({ token: routingBound.token, keys: ['0'], applyRouting: true, restoreLanguage: false, restoreStrategy: false })).routingApplied, true)
+  assert.equal(requests, 1, 'routing is invoked only after explicit import confirmation')
+  const duplicates = snapshot(); duplicates.applications.push({ ...duplicates.applications[0], path: 'D:\\Other\\Music.exe' })
+  const duplicatePreview = await service.preview(duplicates)
+  await assert.rejects(service.bind({ token: duplicatePreview.token, key: '1', candidate: duplicatePreview.candidates[0].key }), /其他导入项目/)
+  const stale = await service.preview(data)
+  await service.language.write('ja')
+  await assert.rejects(service.bind({ token: stale.token, key: '0', candidate: stale.candidates[0].key }), /设置已变化/)
+})
 
 test('设置文件拒绝未知版本、重复路径、路径注入、超大文件并兼容历史导出', () => {
   assert.throws(() => parseSettingsSnapshot({ ...snapshot(), version: 9 }))

@@ -1,6 +1,22 @@
 /** 中文原句作为 gettext 风格键；译文顺序为 English、日本語、Français。
  * 修改原句时同步更新三种译文，保留 {0} 等插值参数。用户数据不进入此目录。 */
 export const messages: Record<string, readonly [string, string, string]> = {
+  "本机程序": ["Local executable","この端末のプログラム","Programme local"],
+  "字段": ["Field","項目","Champ"],
+  "未收藏": ["Not starred","未お気に入り","Non favori"],
+  "文件大小": ["File size","ファイルサイズ","Taille"],
+  "未匹配": ["Unmatched","未一致","Non associé"],
+  "有变化": ["Changed","変更あり","Modifié"],
+  "无变化": ["Unchanged","変更なし","Inchangé"],
+  "语言与策略差异": ["Language and strategy differences","言語と戦略の差分","Différences de langue et de stratégie"],
+  "选择本机应用": ["Select a local app","この端末のアプリを選択","Sélectionner une application locale"],
+  "确认绑定": ["Confirm mapping","関連付けを確認","Confirmer l’association"],
+  "绑定本机应用": ["Map to a local app","ローカルアプリに関連付け","Associer à une application locale"],
+  "已手动绑定": ["Manually mapped","手動で関連付け済み","Association manuelle"],
+  "{0} 项变化": ["{0} changed fields","{0} 項目の変更","{0} champs modifiés"],
+  "请选择本机候选应用。": ["Choose an app from the local candidates.","この端末の候補からアプリを選んでください。","Choisissez une application parmi les candidates locales."],
+  "该本机应用已对应其他导入项目。": ["This local app is already mapped to another import entry.","このアプリは別の項目に関連付けられています。","Cette application est déjà associée à une autre entrée."],
+  "只修改本次导入预览。绑定后重新勾选；不会立即改变联网方式。": ["Only this preview changes. Select entries again after mapping; routing is not applied yet.","このプレビューのみ変更します。関連付け後に再度選択してください。通信設定はまだ変わりません。","Seul cet aperçu change. Cochez à nouveau les entrées ; le routage n’est pas encore appliqué."],
   "最近发现": ["Recently found","最近見つかったアプリ","Découvertes récentes"],
   "查看新应用": ["View new apps","新しいアプリを見る","Voir les nouvelles applications"],
   "近 7 天新发现的应用": ["Apps first found in the past 7 days","過去 7 日間に見つかったアプリ","Applications découvertes depuis 7 jours"],
