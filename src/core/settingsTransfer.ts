@@ -1,5 +1,5 @@
 import { processPathKey } from '../shared/applicationIdentity.ts'
-import { isLanguagePreference } from '../shared/i18n/index.ts'
+import { isLanguagePreference } from '../shared/i18n/language.ts'
 import { validateProxyStrategy } from './proxyStrategy.ts'
 import { validProcessPath } from './processFamily.ts'
 import type { SettingsSnapshot } from '../shared/settings.ts'

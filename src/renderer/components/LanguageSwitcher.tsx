@@ -1,6 +1,6 @@
 import { App, Select } from 'antd'
 import { GlobalOutlined } from '@ant-design/icons'
-import { languageNames, type LanguagePreference } from '../../shared/i18n/index'
+import { languageNames, type LanguagePreference } from '../../shared/i18n/language'
 import { t, useLanguage } from '../i18n'
 
 export function LanguageSwitcher() {

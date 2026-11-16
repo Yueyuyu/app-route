@@ -6,6 +6,19 @@ import path from 'node:path'
 import { resolveLocale, translate, translateProxyOutlet, isLanguagePreference } from '../src/shared/i18n/index.ts'
 import { messages } from '../src/shared/i18n/messages.ts'
 import { LanguagePreferencesStore } from '../src/main/desktop/languagePreferences.ts'
+import { localeCatalog } from '../tooling/vite/localeCatalogs.ts'
+import { createTranslator } from '../src/shared/i18n/translator.ts'
+
+test('分语言资源只包含当前译文，保持完整句型匹配和用户名称', () => {
+  for (const [index, locale] of (['en', 'ja', 'fr'] as const).entries()) {
+    const catalog = localeCatalog(locale), text = createTranslator(catalog)
+    assert.equal(Object.keys(catalog).length, Object.keys(messages).length)
+    for (const [source, values] of Object.entries(messages)) assert.equal(text(source), values[index], source)
+    assert.equal(text('已选择 3 个应用'), translate(locale, '已选择 3 个应用'))
+    assert.equal(text('constructor'), 'constructor')
+    assert.equal(text('未登记的组名'), '未登记的组名')
+  }
+})
 
 test('首次跟随系统语言，支持地区变体，未支持语言回退简体中文', () => {
   assert.equal(resolveLocale('system', ['fr-CA']), 'fr')

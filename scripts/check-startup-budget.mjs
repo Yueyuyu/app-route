@@ -22,6 +22,24 @@ for (const component of ['SettingsPage', 'IconManagement', 'SecondaryPages', 'Ap
 }
 assert.ok(bytes <= 1_300_000, `Initial JavaScript ${bytes} exceeds the 1,300,000-byte budget`)
 const result = { initialJavaScriptBytes: bytes, gzipBytes: gzip, budgetBytes: 1_300_000, files }
+const localeBytes = {}
+for (const locale of ['en', 'ja', 'fr']) {
+  const key = `virtual:approute-locale/${locale}`
+  assert.ok(manifest[key]?.isDynamicEntry && !initial.has(key), `${locale} catalog must load on demand`)
+  const dependencies = new Set(initial)
+  function include(entry) {
+    if (dependencies.has(entry)) return
+    assert.ok(manifest[entry], `Missing locale dependency ${entry}`)
+    dependencies.add(entry)
+    for (const dependency of manifest[entry].imports ?? []) include(dependency)
+  }
+  include(key)
+  let total = 0
+  for (const file of new Set([...dependencies].map(entry => manifest[entry].file))) total += (await fs.stat(path.join(root, 'dist', file))).size
+  localeBytes[locale] = total
+  assert.ok(total <= 1_300_000, `${locale} initial JavaScript including its catalog ${total} exceeds budget`)
+}
+result.byLocale = { 'zh-CN': bytes, ...localeBytes }
 await fs.mkdir(path.join(root, 'output/startup'), { recursive: true })
 await fs.writeFile(path.join(root, 'output/startup/bundle.json'), JSON.stringify(result, null, 2))
 console.log(JSON.stringify(result))

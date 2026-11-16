@@ -3,7 +3,7 @@ import { t } from '../i18n'
 import { routeLabels } from '../types'
 import type { ImportRow, SettingsDifference, SettingsPreview } from '../../shared/settings'
 import type { ProxyStrategy } from '../../shared/proxyStrategy'
-import { languageNames, type LanguagePreference } from '../../shared/i18n/index'
+import { languageNames, type LanguagePreference } from '../../shared/i18n/language'
 
 const fieldNames = { name: '应用名称', category: '分类', mode: '联网方式', favorite: '收藏' }
 function displayValue(field: SettingsDifference['field'], value: string | boolean) {
