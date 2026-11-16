@@ -141,7 +141,9 @@ async function verify() {
     await stop(beforeUndo)
     const history = new RoutingHistoryService(new RoutingService(service.options)), list = await history.list()
     assert.equal(list.items[0].undoReason, undefined)
-    assert.equal((await history.undo({ id: list.items[0].id, revision: list.revision })).outcome, 'applied')
+    const undone = await history.undo({ id: list.items[0].id, revision: list.revision })
+    // 自动事务会将拒绝原因包装在结果中；断言必须保留原因，才能定位不同平台的真实失败。
+    assert.equal(undone.outcome, 'applied', undone.message)
     const afterUndo = connect('after')
     // 撤销后 strict 模式不一定读取进程路径；用子进程报告的真实 TCP 源端口关联同一连接。
     await waitUntil(async () => {
