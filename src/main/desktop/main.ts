@@ -9,7 +9,7 @@ import { fork, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { desktopAssetPath, desktopOrigin, isTrustedDesktopSender, validateDesktopRequest } from './boundary.ts'
-import type { DesktopAction } from '../../shared/desktop.ts'
+import type { DesktopAction, DesktopDestination } from '../../shared/desktop.ts'
 import type { SettingsImportResult } from '../../shared/settings.ts'
 import { settingsFileLimit } from '../../core/settingsTransfer.ts'
 
@@ -45,11 +45,18 @@ function request<T = any>(action: DesktopAction, body?: unknown): Promise<T> {
   })
 }
 function updateNativeLanguage() {
+    const navigate = (destination: DesktopDestination) => { showWindow(); window!.webContents.send('approute:navigate', destination) }
+    const shortcuts = () => [
+      { label: tr('查看已设置应用'), click: () => navigate('configured') },
+      { label: tr('查看正在运行'), click: () => navigate('running') },
+      { label: tr('查看连接检查'), click: () => navigate('connection') },
+    ]
     window?.setTitle(tr('AppRoute 应用分流'))
     tray!.setToolTip(tr("AppRoute 应用分流 · 双击打开"))
     tray!.setContextMenu(Menu.buildFromTemplate([
       { label: tr("打开 AppRoute"), click: showWindow },
       { label: tr("检查新应用"), click: () => { showWindow(); window!.webContents.send('approute:refresh') } },
+      ...shortcuts(),
       { type: 'separator' }, { label: tr("恢复网络…"), click: () => void restoreFromTray() },
       { label: tr("打开独立恢复工具目录"), click: () => void shell.openPath(path.join(appRouteDataDirectory(), 'recovery')) },
       { type: 'separator' }, { label: tr("退出 AppRoute（保留分流规则）"), click: () => app.quit() },
@@ -57,6 +64,7 @@ function updateNativeLanguage() {
     Menu.setApplicationMenu(Menu.buildFromTemplate([{ label: 'AppRoute', submenu: [
       { label: tr("收至托盘"), click: () => window?.hide() },
       { label: tr("打开托盘菜单"), click: () => tray?.popUpContextMenu() },
+      ...shortcuts(),
       { type: 'separator' }, { label: tr("退出（保留分流规则）"), accelerator: 'CommandOrControl+Q', click: () => app.quit() },
     ] }, { label: tr("编辑"), submenu: [{ label: tr("撤销"), role: 'undo' }, { label: tr("复制"), role: 'copy' }, { label: tr("粘贴"), role: 'paste' }, { label: tr("全选"), role: 'selectAll' }] }]))
 }

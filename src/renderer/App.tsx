@@ -67,6 +67,12 @@ export default function App() {
   function clearFilters() { setCategory('all'); setFilter('all'); setFavoritesOnly(false); setSelected([]) }
   function showView(next: ApplicationView) { setView(next); setSearch(''); clearFilters() }
   function showAll() { showView('all') }
+  useEffect(() => window.appRoute?.onNavigate?.(destination => {
+    if (settingsBusy || routing.groupBusy || routing.busyIds.length) return
+    setDetailId(undefined); setEditorOpen(false); setPage('apps'); setMenuOpen(false)
+    if (destination === 'connection') { setInspectionTab('recovery'); setInspectionOpen(true) }
+    else { setInspectionOpen(false); showView(destination) }
+  }), [settingsBusy, routing.groupBusy, routing.busyIds.length])
   function helpAction(action: 'find' | 'diagnose' | 'recovery' | 'backup') {
     if (action === 'backup') { setPage('settings'); return }
     setPage('apps'); showAll()

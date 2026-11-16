@@ -9,10 +9,12 @@ export const desktopActions = ['applications.scan', 'applications.running', 'inv
 export type DesktopAction = typeof desktopActions[number]
 export interface InventoryPreferences { version: 1; applications: Application[]; favorites: string[]; revision?: string }
 export interface RunningApplicationProcess { path: string; pid: number; parentPid: number }
+export type DesktopDestination = 'configured' | 'running' | 'connection'
 export interface DesktopBridge {
   platform?: string
   request<T>(action: DesktopAction, body?: unknown): Promise<T>
   onRefresh(callback: () => void): () => void
   onResume?(callback: () => void): () => void
+  onNavigate?(callback: (destination: DesktopDestination) => void): () => void
 }
 declare global { interface Window { appRoute?: DesktopBridge } }

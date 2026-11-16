@@ -246,6 +246,16 @@ try {
    await temporarySection.getByRole('button', { name: translate(locale, '设置期限'), exact: true }).waitFor()
    results.push({ label: locale + '-temporary-routing-cancel-apply-restore', passed: true })
    await page.keyboard.press('Escape'); await page.locator('.ant-drawer-body:visible').waitFor({ state: 'hidden' })
+   for (const [source, destination] of [['查看正在运行', '正在运行'], ['查看已设置应用', '已设置']]) {
+     await desktop.evaluate(({ Menu }, label) => { const item = Menu.getApplicationMenu().items[0].submenu.items.find(item => item.label === label); if (!item) throw new Error('Missing navigation item'); item.click() }, translate(locale, source))
+     await page.getByRole('tab', { name: new RegExp(translate(locale, destination)), selected: true }).waitFor()
+     assert.equal(await page.getByRole('tab', { name: new RegExp(translate(locale, destination)) }).getAttribute('aria-selected'), 'true')
+   }
+   await desktop.evaluate(({ Menu }, label) => Menu.getApplicationMenu().items[0].submenu.items.find(item => item.label === label).click(), translate(locale, '查看连接检查'))
+   await page.locator('.ant-drawer-body:visible').getByRole('tab', { name: translate(locale, '恢复与诊断'), exact: true, selected: true }).waitFor()
+   assert.equal(await page.locator('.ant-drawer-body:visible').getByRole('tab', { name: translate(locale, '恢复与诊断'), exact: true }).getAttribute('aria-selected'), 'true')
+   await page.keyboard.press('Escape'); await page.locator('.ant-drawer-body:visible').waitFor({ state: 'hidden' })
+   results.push({ label: locale + '-native-navigation-preload-routing', passed: true })
    await page.getByRole('button', { name: labels[5], exact: true }).click()
    await page.locator('.ant-drawer-body:visible').waitFor(); await screenshot(locale + '-connection')
    const connectionTabs = page.locator('.ant-drawer-body:visible [role=tab]')
