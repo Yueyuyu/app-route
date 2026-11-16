@@ -6,6 +6,7 @@
 | --- | --- | --- | --- |
 | 应用选择与队列 | [架构](../ARCHITECTURE.md)、[routingQueue](../../src/core/routingQueue.ts)、[routingService](../../src/main/services/routingService.ts) | 单个、批量、辅助进程、导入；排队不能显示已生效 | `npm test`；`tests/routingTransaction.test.ts` |
 | 分流与恢复 | [系统边界](../SYSTEM-BOUNDARIES.md)、[managedRouting](../../src/core/managedRouting.ts)、[recovery](../../src/main/recovery) | 正常确认、失败回退、离线恢复、配置重新生成；只改 AppRoute 所有的规则 | `npm run check:recovery-faults`；`node scripts/verify-runtime-selections.mjs` |
+| 操作记录与撤销 | [操作记录](../ROUTING-HISTORY.md)、[撤销范围](../../src/core/routingHistory.ts)、[历史服务](../../src/main/services/routingHistory.ts) | 并发变化、路径失效、确认中断、失败恢复；只恢复联网选择，不回放整个配置 | `tests/routingHistory.test.ts`；`tests/routingTransaction.test.ts`；`npm run check:recovery-faults` |
 | 设置与备份 | [设置迁移](../SETTINGS-TRANSFER.md)、[settingsTransfer](../../src/main/services/settingsTransfer.ts)、[settingsBackups](../../src/main/services/settingsBackups.ts) | 新旧格式、资料导入、恢复、删除、界面缓存；预览不写设置，未选条目保持 | `npm test`；`npm run check:settings-ui` |
 | 应用发现与身份 | [架构](../ARCHITECTURE.md)、[platform](../../src/main/platform/applications.ts)、[processFamily](../../src/core/processFamily.ts) | Windows / Mac、运行中/安装后、共享宿主、便携应用；名称不代替精确身份 | `npm test`；对应平台只读实测单独记录 |
 | 桌面与多语言 | [桌面](../DESKTOP.md)、[语言](../LOCALIZATION.md)、[main](../../src/main/desktop/main.ts)、[preload](../../src/preload/index.ts) | 页面、托盘、菜单、弹窗、Esc/焦点、四语、窄屏；不暴露任意文件与 shell | `npm run check:i18n` |

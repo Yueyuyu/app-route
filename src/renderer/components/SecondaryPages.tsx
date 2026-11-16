@@ -8,12 +8,16 @@ import { HelpTip } from './HelpTip'
 import type { IntegrationStatus } from '../../shared/integration'
 import { managedFor } from '../../core/applicationInventory'
 import { outletLabel } from '../i18n'
+import { useState } from 'react'
+import { deferredFeature } from './deferredFeature'
+const RoutingHistoryPanel = deferredFeature(() => import('./RoutingHistoryPanel').then(module => ({ default: module.RoutingHistoryPanel })))
 
-export function DraftPage({ applications, status, onExport, onDetails }: { applications: Application[]; status?: IntegrationStatus; onExport: () => void; onDetails: (app: Application) => void }) {
+export function DraftPage({ applications, status, onExport, onDetails, busy, setBusy, onChanged }: { applications: Application[]; status?: IntegrationStatus; onExport: () => void; onDetails: (app: Application) => void; busy: boolean; setBusy: (value: boolean) => void; onChanged: () => Promise<unknown> }) {
   const rules = applications.filter(app => app.mode !== 'rule')
   const hasUntrackedRules = Boolean(status?.untrackedRuleCount)
+  const [historyOpen, setHistoryOpen] = useState(false), [historyVisited, setHistoryVisited] = useState(false)
   return <section className="secondary-page">
-    <div className="page-heading"><div><h1>{t("分流规则")}</h1><p>{t("查看 AppRoute 已保存的专属设置。")}</p></div><Button icon={<ExportOutlined />} disabled={hasUntrackedRules} onClick={onExport}>{t("导出记录")}</Button></div>
+    <div className="page-heading"><div><h1>{t("分流规则")}</h1><p>{t("查看 AppRoute 已保存的专属设置。")}</p></div><div className="heading-actions"><Button disabled={!window.appRoute} onClick={() => { setHistoryVisited(true); setHistoryOpen(true) }}>{t('操作记录')}</Button><Button icon={<ExportOutlined />} disabled={hasUntrackedRules} onClick={onExport}>{t("导出记录")}</Button></div></div>
     {hasUntrackedRules && <Alert className="inventory-update" type="warning" showIcon title={t("存在历史运行规则，当前列表缺少对应管理记录")} description={t("请在应用管理的连接详情中核对。记录恢复前暂不可导出。")} />}
     <div className="rules-overview"><span><strong>{t(hasUntrackedRules ? "{0} 个应用有管理记录" : "{0} 个应用已设分流", [rules.length])}</strong></span><span><i className="legend-dot direct" />{t("直接联网")} · {rules.filter(app => app.mode === 'direct').length}</span><span><i className="legend-dot proxy" />{t("跟随代理组")} · {rules.filter(app => app.mode === 'proxy').length}</span><HelpTip title={t("分流规则")}><p>{t("这里只列出 AppRoute 管理的专属规则；未设置的应用继续沿用 Clash Party 原有规则。")}</p><p>{t("导出的是设置记录，不能直接作为 Clash 配置导入，也不是实际连接已验证的证明。")}</p></HelpTip></div>
     <Table className="rules-table" rowKey="id" pagination={rules.length > 12 ? { pageSize: 12, showSizeChanger: false } : false} dataSource={rules} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={hasUntrackedRules ? t("管理记录缺失，请先核对历史规则") : t("暂无专属规则，可在应用管理中设置")} /> }} columns={[
@@ -23,6 +27,7 @@ export function DraftPage({ applications, status, onExport, onDetails }: { appli
       { title: t("状态"), key: 'status', width: 180, responsive: ['md'], render: (_, app) => <ApplicationStatus application={app} status={status} onDetails={() => onDetails(app)} /> },
       { title: '', key: 'details', width: 70, render: (_, app) => <Button type="link" onClick={() => onDetails(app)}>{t("详情")}</Button> },
     ]} />
+    {historyVisited && <RoutingHistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} revision={status?.revision} connected={Boolean(status?.connected)} busy={busy} setBusy={setBusy} onChanged={onChanged} />}
   </section>
 }
 

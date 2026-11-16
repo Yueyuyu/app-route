@@ -21,6 +21,8 @@ import { effectiveApplications } from '../../core/managedRouting.ts'
 import { parseRoutingState, saveRoutingState, pruneCompletedTransactions } from '../storage/routingStateStore.ts'
 import { OperationTimings } from './operationTimings.ts'
 import { sampleConnectionEvidence } from '../../core/connectionEvidence.ts'
+import type { RoutingOperationSource } from '../../shared/routingHistory.ts'
+import { historyStateSignature } from '../../core/routingHistory.ts'
 
 export interface RoutingState {
   version?: 1
@@ -41,6 +43,10 @@ export interface Transaction {
   beforeScript: string | null
   nextScript: string
   error?: string
+  createdAt?: string
+  source?: RoutingOperationSource
+  proposed?: RoutingState
+  after?: RoutingState
 }
 export interface ServiceOptions {
   root?: string
@@ -196,7 +202,7 @@ export class RoutingService {
     checks.push({ name: '独立离线恢复入口', ok: await fs.access(this.recoveryPath).then(() => true, () => false), detail: this.recoveryPath })
     return checks
   }
-  async applyAutomatically(request: ApplyRequest): Promise<AutomaticApplyResult> {
+  async applyAutomatically(request: ApplyRequest, source: RoutingOperationSource = 'application'): Promise<AutomaticApplyResult> {
     const previous = await this.state()
     let transactionId: string | undefined
     try {
@@ -225,7 +231,7 @@ export class RoutingService {
       if (customStrategy && !candidateAvailable) throw new Error('候选节点探测均未通过，原策略保留。')
       if (applications.some(app => app.mode === 'direct') && !before[0]) throw new Error('当前直连出口不可用，暂未修改设置。')
       if (!customStrategy && (request.proxyGroup || applications.some(app => app.mode === 'proxy')) && !before.at(-1)) throw new Error('所选代理出口不可用，请更换出口。')
-      const pending = await this.apply({ ...request, applications })
+      const pending = await this.apply({ ...request, applications }, source)
       transactionId = pending.pending?.id
       if (!transactionId) throw new Error('未取得恢复事务，不能确认应用。')
       if (customStrategy) {
@@ -262,9 +268,9 @@ export class RoutingService {
     const state = await this.state()
     const target = strategy.mode === 'existing' ? strategy.group : strategyOwnership.name
     return this.applyAutomatically({ revision: request.revision, target, proxyGroup: target, proxyStrategy: strategy, missingTargetAction: request.missingTargetAction ?? state.missingTargetAction,
-      applications: state.managed.filter(app => app.mode === 'proxy').map(app => ({ ...app, path: app.processPaths?.[0], source: 'manual', category: '已管理应用' })) })
+      applications: state.managed.filter(app => app.mode === 'proxy').map(app => ({ ...app, path: app.processPaths?.[0], source: 'manual', category: '已管理应用' })) }, 'strategy')
   }
-  async apply(request: ApplyRequest): Promise<IntegrationStatus> {
+  async apply(request: ApplyRequest, source: RoutingOperationSource = 'application'): Promise<IntegrationStatus> {
     await withLock(this.root, async () => {
       const previous = await this.state()
       if (request.missingTargetAction !== undefined && (!request.proxyGroup || !['block', 'original'].includes(request.missingTargetAction))) throw new Error('请在代理策略中统一设置失效行为。')
@@ -316,7 +322,8 @@ export class RoutingService {
       await this.party.assertSnapshot(snapshot)
       if (digest(JSON.stringify({ cfg: await runtime.config(), rules: runtimeRuleSignature((await runtime.rules()).rules), groups: groupSignature((await runtime.proxies()).proxies) })) !== runtimeBefore) throw new Error('内核运行配置发生变化，已取消本次应用。')
       const id = randomUUID()
-      const tx: Transaction = { id, phase: 'prepared', deadline: Date.now() + (this.options.trialMs ?? 120000), previous, beforeScript: snapshot.script, nextScript: overrideScript(managed, strategy) }
+      const tx: Transaction = { id, phase: 'prepared', deadline: Date.now() + (this.options.trialMs ?? 120000), previous, beforeScript: snapshot.script, nextScript: overrideScript(managed, strategy),
+        createdAt: new Date().toISOString(), source, proposed: { revision: id, managed, proxyGroup: request.proxyGroup ?? previous.proxyGroup, proxyStrategy: strategy, missingTargetAction } }
       await atomicWrite(path.join(this.root, 'transactions', `${id}.baseline.yaml`), snapshot.workText)
       await atomicWrite(path.join(this.root, 'transactions', `${id}.registry.yaml`), snapshot.registry ?? 'items: []\n')
       await this.saveTransaction(tx)
@@ -345,8 +352,9 @@ export class RoutingService {
       if (Date.now() >= tx.deadline) { await this.rollbackInternal(tx); throw new Error('试运行已超时，设置已恢复。') }
       const runtime = await this.runtime()
       if ((await runtime.config()).mode !== 'rule' || !await this.matches(runtime, state.managed, state.proxyStrategy)) throw new Error('规则或策略状态异常，不能确认保留。')
+      tx.after = { ...state, revision: randomUUID(), pendingId: undefined }
       tx.phase = 'confirmed'; await this.saveTransaction(tx)
-      await this.save({ ...state, revision: randomUUID(), pendingId: undefined })
+      await this.save(tx.after)
       await pruneCompletedTransactions(this.root).catch(() => {})
     })
     return this.status()
@@ -388,7 +396,8 @@ export class RoutingService {
       if (tx.phase === 'confirmed') {
         const runtime = await this.runtime()
         if ((await runtime.config()).mode !== 'rule' || !await this.matches(runtime, state.managed, state.proxyStrategy)) throw new Error('已确认事务与当前内核不一致，请检查恢复状态。')
-        await this.save({ ...state, revision: randomUUID(), pendingId: undefined })
+        if (tx.after && historyStateSignature(tx.after) !== historyStateSignature(state)) throw new Error('已确认事务与管理记录不一致，请核对记录。')
+        await this.save({ ...state, revision: tx.after?.revision ?? randomUUID(), pendingId: undefined })
       } else if (tx.phase === 'rolled-back') {
         const runtime = await this.runtime()
         if (!await this.matches(runtime, tx.previous.managed, tx.previous.proxyStrategy)) throw new Error('恢复规则尚未确认，请使用离线恢复。')

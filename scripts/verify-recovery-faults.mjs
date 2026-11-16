@@ -2,6 +2,7 @@ import { appRouteDataDirectory, clashPartyDataDirectory } from '../src/main/plat
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import net from 'node:net'
+import http from 'node:http'
 import vm from 'node:vm'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
@@ -9,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { setTimeout as wait } from 'node:timers/promises'
 import YAML from 'yaml'
 import { RoutingService } from '../src/main/services/routingService.ts'
+import { RoutingHistoryService } from '../src/main/services/routingHistory.ts'
 import { MihomoRuntime } from '../src/main/adapters/mihomoRuntime.ts'
 import { findInstalledCore, validateWithCore } from '../src/main/adapters/clashPartyConfiguration.ts'
 import { installRecoveryKit } from '../src/main/recovery/recoveryKit.ts'
@@ -42,7 +44,7 @@ async function verify() {
   const manifest = path.join(folder, 'manifest.json')
   await fs.writeFile(manifest, JSON.stringify({ root, partyRoot: party, pipe }))
   const corePath = process.env.APPROUTE_TEST_CORE ?? await findInstalledCore(), children = new Set(), results = []
-  let core, guardian
+  let core, guardian, localServer
   async function stop(child) {
     if (!child || child.exitCode !== null || child.signalCode) return
     const exited = new Promise(resolve => child.once('exit', resolve)); child.kill(); await exited
@@ -108,8 +110,51 @@ async function verify() {
     assert.equal(await fs.readFile(service.statePath, 'utf8'), stable)
     results.push({ scenario: 'confirmed-real-core-restart-no-replay', passed: true })
     assert.equal((await service.recoverAll()).restored, true)
+
+    // 独立命名的测试进程产生真实连接；不接触任何用户应用或系统代理。
+    localServer = http.createServer((request, response) => {
+      if (request.url === '/probe') { response.writeHead(204); response.end(); return }
+      response.writeHead(200, { 'Content-Type': 'text/plain' }); response.write('isolated connection\n')
+    })
+    await new Promise(resolve => localServer.listen(0, '127.0.0.1', resolve))
+    const targetPort = localServer.address().port
+    const executable = path.join(folder, process.platform === 'win32' ? 'AppRouteHistoryProbe.exe' : 'AppRouteHistoryProbe.app/Contents/MacOS/Probe')
+    await fs.mkdir(path.dirname(executable), { recursive: true }); await fs.copyFile(process.execPath, executable)
+    if (process.platform !== 'win32') await fs.chmod(executable, 0o755)
+    const application = { id: 'history-probe', name: 'History probe', path: executable, processes: [path.basename(executable)], processPaths: [executable], category: '其他应用', source: 'manual', mode: 'direct' }
+    service.options.trialMs = 15000
+    service.options.probe = async () => runtime.delay('DIRECT', `http://127.0.0.1:${targetPort}/probe`).then(() => true, () => false)
+    pending = await service.apply({ revision: (await service.state()).revision, applications: [application] })
+    await service.confirm(pending.pending.id)
+    function connect(label) {
+      const code = `const http=require('node:http');const req=http.get({host:'127.0.0.1',port:${port},path:'http://127.0.0.1:${targetPort}/${label}',headers:{host:'127.0.0.1:${targetPort}'}},r=>{console.log('status',r.statusCode);r.resume()}).on('error',e=>{console.error(e.code);process.exit(2)});req.on('socket',s=>s.on('connect',()=>console.log('sourcePort',s.localPort)));`
+      const child = spawn(executable, ['-e', code], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+      child.responseLog = ''; for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => { child.responseLog = (child.responseLog + chunk.toString()).slice(0, 500) })
+      children.add(child); return child
+    }
+    const beforeUndo = connect('before')
+    try { await waitUntil(async () => (await service.status()).evidence.some(item => item.applicationId === application.id && item.matched)) }
+    catch (error) {
+      await fs.writeFile(path.join(folder, 'connection-failure.json'), JSON.stringify({ childExit: beforeUndo.exitCode, childSignal: beforeUndo.signalCode, response: beforeUndo.responseLog, status: await service.status(), connections: await runtime.connections() }, null, 2))
+      throw error
+    }
+    await stop(beforeUndo)
+    const history = new RoutingHistoryService(new RoutingService(service.options)), list = await history.list()
+    assert.equal(list.items[0].undoReason, undefined)
+    assert.equal((await history.undo({ id: list.items[0].id, revision: list.revision })).outcome, 'applied')
+    const afterUndo = connect('after')
+    // 撤销后 strict 模式不一定读取进程路径；用子进程报告的真实 TCP 源端口关联同一连接。
+    await waitUntil(async () => {
+      const sourcePort = Number(/sourcePort (\d+)/.exec(afterUndo.responseLog)?.[1])
+      return Number.isSafeInteger(sourcePort) && (await runtime.connections()).connections.some(connection => Number(connection.metadata.sourcePort) === sourcePort && Number(connection.metadata.destinationPort) === targetPort && connection.rule === 'Match' && connection.chains.includes('DIRECT'))
+    })
+    await stop(afterUndo)
+    assert.deepEqual((await runtime.rules()).rules.map(rule => rule.payload), ['new-subscription.example', ''])
+    assert.equal((await service.state()).managed.length, 0)
+    results.push({ scenario: 'history-undo-real-process-connection', passed: true, before: 'ProcessPath DIRECT', after: 'original Match DIRECT', boundary: 'isolated executable, loopback server and Mihomo core; not daily app traffic' })
   } finally {
     for (const child of children) await stop(child)
+    if (localServer) { localServer.closeAllConnections(); await new Promise(resolve => localServer.close(resolve)) }
     const unchanged = JSON.stringify(await hashProtected()) === JSON.stringify(before)
     const report = { checkedAt: new Date().toISOString(), platform: process.platform, arch: process.arch, results, originalConfigurationUnchanged: unchanged, physicalSleepTested: false }
     await fs.writeFile(path.join(folder, 'result.json'), JSON.stringify(report, null, 2))

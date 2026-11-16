@@ -44,6 +44,11 @@ process.on('message', async ({ id, action, body }) => {
   }
   let value
   if (action === 'updates.status') value = { state: 'none' }
+  else if (action === 'integration.history') value = { revision: status.revision, unreadable: 0, items: [
+    { id: 'demo-latest', at: '2026-11-16T04:05:00Z', source: 'application', phase: 'confirmed', strategyChanged: false, changes: [{ id: 'telegram', name: 'Telegram', before: { mode: 'direct', processes: 1 }, after: { mode: 'proxy', target: 'Demo group', processes: 2 } }] },
+    { id: 'demo-previous', at: '2026-11-16T03:00:00Z', source: 'import', phase: 'confirmed', strategyChanged: false, undoReason: '此后已有新修改，不能覆盖当前选择。', changes: [{ id: 'firefox', name: 'Mozilla Firefox', before: { mode: 'rule', processes: 0 }, after: { mode: 'direct', processes: 1 } }] },
+  ] }
+  else if (action === 'integration.undo') { process.send?.({ id, error: '设置已变化，请刷新操作记录。' }); return }
   else if (action === 'integration.status') {
     value = structuredClone(status)
     const scenarioPath = path.join(root, 'scenario.json')

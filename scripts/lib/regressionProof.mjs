@@ -1,5 +1,8 @@
 // 精确替换只在临时副本发生。实现变化后匹配失败，要求重新审查破坏点，不能悄悄跳过。
 export const regressionCases = [
+  { id: 'stale-routing-undo', file: 'src/core/routingHistory.ts',
+    before: 'tx.after.revision !== current.revision || historyStateSignature(tx.after) !== historyStateSignature(current)', after: 'false',
+    test: 'tests/routingTransaction.test.ts', name: '撤销拒绝后续新修改和过期页面，不重放旧选择' },
   { id: 'duplicate-import-binding', file: 'src/main/services/settingsTransfer.ts',
     before: 'if ([...session.applications].some(([key, app]) => key !== row.key && processPathKey(app.path!) === identity))', after: 'if (false)',
     test: 'tests/settingsTransfer.test.ts', name: '人工绑定只更新预览，拒绝任意路径、重复目标、共享宿主与旧预览，应用时重新核对路径' },

@@ -18,6 +18,7 @@ import { inspectManagementRepair, repairManagementRecords } from '../src/main/se
 import { parseRoutingState, pruneCompletedTransactions } from '../src/main/storage/routingStateStore.ts'
 import { diagnosticExport } from '../src/main/services/diagnosticExport.ts'
 import { SettingsTransferService } from '../src/main/services/settingsTransfer.ts'
+import { RoutingHistoryService } from '../src/main/services/routingHistory.ts'
 
 class MockRuntime extends MihomoRuntime {
   current: any
@@ -53,6 +54,80 @@ async function fixture(t: TestContext, overrides: ServiceOptions = {}) {
   const service = new RoutingService({ root, partyRoot: party, runtime: async () => runtime, validate: async () => {}, installKit: async () => {}, guardian: async () => { guardianStarted = true }, ...overrides })
   return { service, runtime, config, party, guardianStarted: () => guardianStarted }
 }
+
+test('操作记录只读且不泄露脚本，重建服务后撤销最近修改保留其他应用和原规则', async t => {
+  const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true })
+  const first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }, second = { ...app, id: 'new', name: '新程序', processes: ['New.exe'], path: 'C:\\Apps\\New\\New.exe' }
+  assert.equal((await f.service.applyAutomatically({ revision: 'initial', applications: [first], target: 'Group', proxyGroup: 'Group' })).outcome, 'applied')
+  const applied = await f.service.applyAutomatically({ revision: (await f.service.state()).revision, applications: [second] }, 'import')
+  assert.equal(applied.outcome, 'applied')
+  const recreated = new RoutingService(f.service.options), history = new RoutingHistoryService(recreated, async () => true)
+  const stateBefore = await fs.readFile(f.service.statePath, 'utf8'), reloads = f.runtime.reloadCount
+  const listed = await history.list(), last = listed.items.find(item => item.source === 'import')!
+  assert.equal(last.undoReason, undefined)
+  assert.deepEqual(last.changes.map(item => [item.name, item.before.mode, item.after.mode]), [['新程序', 'rule', 'direct']])
+  assert.equal(await fs.readFile(f.service.statePath, 'utf8'), stateBefore)
+  assert.equal(f.runtime.reloadCount, reloads)
+  for (const forbidden of ['beforeScript', 'nextScript', 'user-owned', 'processPaths', first.path]) assert.equal(JSON.stringify(listed).includes(forbidden), false)
+  const undone = await history.undo({ id: last.id, revision: listed.revision })
+  assert.equal(undone.outcome, 'applied')
+  assert.deepEqual((await recreated.state()).managed.map(item => item.id), [first.id])
+  assert.deepEqual(f.runtime.current.rules.slice(-f.config.rules.length), f.config.rules)
+  assert.equal(await fs.readFile(path.join(f.party, 'override/original.js'), 'utf8'), '// user-owned\nfunction main(c){return c}\n')
+  assert.ok((await history.list()).items.find(item => item.source === 'undo')?.undoReason)
+})
+
+test('撤销拒绝后续新修改和过期页面，不重放旧选择', async t => {
+  const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true })
+  const history = new RoutingHistoryService(f.service, async () => true), first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }
+  await f.service.applyAutomatically({ revision: 'initial', applications: [first] })
+  const initial = await history.list(), id = initial.items[0].id
+  const second = { ...first, id: 'second', path: 'C:\\Apps\\Second\\Second.exe', processes: ['Second.exe'] }
+  await f.service.applyAutomatically({ revision: initial.revision, applications: [second] })
+  const after = await f.service.state(), reloads = f.runtime.reloadCount
+  await assert.rejects(history.undo({ id, revision: initial.revision }), /设置已变化/)
+  await assert.rejects(history.undo({ id, revision: after.revision }), /此后已有新修改/)
+  assert.deepEqual(await f.service.state(), after)
+  assert.equal(f.runtime.reloadCount, reloads)
+})
+
+test('撤销重新核对路径，重载失败恢复当前分流，损坏历史不被覆盖', async t => {
+  const f = await fixture(t, { resolveFamily: async item => ({ ...item, processPaths: [item.path!] }), probe: async () => true })
+  await f.service.setProxyGroup({ target: 'Group', revision: 'initial' })
+  const first = { ...app, path: 'C:\\Apps\\Example\\Example.exe' }
+  await f.service.applyAutomatically({ revision: (await f.service.state()).revision, applications: [first] })
+  await f.service.applyAutomatically({ revision: (await f.service.state()).revision, applications: [{ ...first, mode: 'proxy' }], target: 'Group' })
+  const history = new RoutingHistoryService(f.service, async () => true), listed = await history.list(), latest = listed.items[0]
+  assert.equal(latest.undoReason, undefined)
+  const reloads = f.runtime.reloadCount
+  await assert.rejects(new RoutingHistoryService(f.service, async () => false).undo({ id: latest.id, revision: listed.revision }), /路径已失效/)
+  assert.equal(f.runtime.reloadCount, reloads)
+  f.runtime.failNextReload = true
+  const result = await history.undo({ id: latest.id, revision: listed.revision })
+  assert.equal(result.outcome, 'restored')
+  assert.equal((await f.service.state()).managed[0].mode, 'proxy')
+  assert.deepEqual(f.runtime.current.rules.slice(-f.config.rules.length), f.config.rules)
+  const broken = path.join(f.service.root, 'transactions', '00000000-0000-0000-0000-000000000000.json')
+  await fs.writeFile(broken, '{broken')
+  assert.equal((await history.list()).unreadable, 1)
+  assert.equal(await fs.readFile(broken, 'utf8'), '{broken')
+  await assert.rejects(history.undo({ id: '../state', revision: (await f.service.state()).revision }), /编号无效/)
+})
+
+test('确认写入中断后使用同一成功快照恢复，操作记录仍可核对', async t => {
+  const f = await fixture(t)
+  const pending = await f.service.apply({ revision: 'initial', applications: [app] })
+  const originalSave = f.service.save.bind(f.service)
+  f.service.save = async state => { if (!state.pendingId) throw new Error('模拟确认保存中断'); return originalSave(state) }
+  await assert.rejects(f.service.confirm(pending.pending!.id), /模拟确认保存中断/)
+  const tx = await f.service.transaction(pending.pending!.id)
+  assert.equal(tx.phase, 'confirmed')
+  const recreated = new RoutingService(f.service.options)
+  await recreated.reconcileInterrupted()
+  assert.equal((await recreated.state()).revision, tx.after!.revision)
+  assert.equal((await recreated.state()).pendingId, undefined)
+  assert.equal((await new RoutingHistoryService(recreated).list()).items[0].id, tx.id)
+})
 
 test('设置导入复用安全事务，保留未选应用与原规则；重载失败不导入资料', async t => {
   const f = await fixture(t, { resolveFamily: async app => ({ ...app, processPaths: [app.path!] }), probe: async () => true })

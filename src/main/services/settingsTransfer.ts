@@ -140,7 +140,7 @@ export class SettingsTransferService {
         const migrated = strategy ? state.managed.filter(app => app.mode === 'proxy' && !selected.some(item => item.id === app.id)).map(app => ({ ...app, path: app.processPaths?.[0], source: 'manual' as const, category: '已管理应用' })) : []
         if (selected.length + migrated.length > 100) throw new Error('同时应用的项目超过 100 个，请分批导入或单独恢复代理策略。')
         const result = await this.routing.applyAutomatically({ applications: [...selected, ...migrated], revision: state.revision, target,
-          ...(strategy ? { proxyStrategy: strategy, proxyGroup: target, missingTargetAction: session.snapshot.missingTargetAction ?? state.missingTargetAction } : {}) })
+          ...(strategy ? { proxyStrategy: strategy, proxyGroup: target, missingTargetAction: session.snapshot.missingTargetAction ?? state.missingTargetAction } : {}) }, 'import')
         if (result.outcome !== 'applied') throw new Error(result.message)
         routingApplied = true
       }
