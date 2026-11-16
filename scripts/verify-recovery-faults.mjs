@@ -14,6 +14,7 @@ import { RoutingHistoryService } from '../src/main/services/routingHistory.ts'
 import { TemporaryRoutingService } from '../src/main/services/temporaryRouting.ts'
 import { watchTemporaryRouting } from '../src/main/recovery/temporaryGuardian.ts'
 import { MihomoRuntime } from '../src/main/adapters/mihomoRuntime.ts'
+import { inspectMihomoFile, MihomoEndpointInspector } from '../src/main/adapters/mihomoEndpointInspector.ts'
 import { findInstalledCore, validateWithCore } from '../src/main/adapters/clashPartyConfiguration.ts'
 import { installRecoveryKit } from '../src/main/recovery/recoveryKit.ts'
 import { watchTransaction } from '../src/main/recovery/watchTransaction.ts'
@@ -229,6 +230,22 @@ async function verify() {
     await service.recoverAll()
     assert.deepEqual((await runtime.rules()).rules.map(rule => rule.payload), ['new-subscription.example', ''])
     results.push({ scenario: 'application-domain-exceptions', passed: true, boundary: 'isolated real process, loopback domains and Mihomo AND rules; group selects DIRECT, no remote node claim' })
+    const inspectionRoot = path.join(folder, 'inspection-core'), inspectionFile = path.join(inspectionRoot, 'config.yaml')
+    const controlReservation = net.createServer(); await new Promise(resolve => controlReservation.listen(0, '127.0.0.1', resolve))
+    const controlPort = controlReservation.address().port; await new Promise(resolve => controlReservation.close(resolve))
+    const inspectionConfig = YAML.stringify({ mode: 'rule', 'external-controller': `127.0.0.1:${controlPort}`, secret: 'isolated-inspection-only', 'find-process-mode': 'strict', dns: { enable: false }, tun: { enable: false }, 'log-level': 'silent', rules: ['MATCH,DIRECT'] })
+    await atomicWrite(inspectionFile, inspectionConfig)
+    const inspectionCore = spawn(corePath, ['-d', inspectionRoot, '-f', inspectionFile], { windowsHide: true, stdio: 'ignore' }); children.add(inspectionCore)
+    let inspection
+    await waitUntil(async () => { inspection = await inspectMihomoFile(inspectionFile); return inspection.state === 'needs-setup' })
+    assert.equal(inspection.capabilities.processRules, 'supported')
+    assert.equal(inspection.capabilities.connectionInspection, 'supported')
+    assert.equal(inspection.capabilities.persistentRules, 'unknown')
+    assert.equal(inspection.capabilities.udp, 'unknown')
+    assert.equal((await new MihomoEndpointInspector({ port: controlPort }).inspect()).state, 'unavailable')
+    assert.equal(await fs.readFile(inspectionFile, 'utf8'), inspectionConfig)
+    await stop(inspectionCore)
+    results.push({ scenario: 'read-only-mihomo-capabilities', passed: true, boundary: 'separate authenticated loopback core; no client configuration ownership or persistence claim' })
   } finally {
     for (const child of children) await stop(child)
     if (localServer) { localServer.closeAllConnections(); await new Promise(resolve => localServer.close(resolve)) }

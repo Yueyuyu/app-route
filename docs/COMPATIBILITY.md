@@ -42,8 +42,8 @@ Mihomo 提供 `PROCESS-NAME`、`PROCESS-PATH` 等规则，sing-box 提供 `proce
 | --- | --- | --- |
 | Clash Party 2.0.4 + Mihomo v1.19.32 | Windows 标准模式、稳定内核；真实应用/恢复与连接观测；重载保留自动组选择 | 正常重启、两份订阅往返切换及设置确认后的睡眠唤醒已验收；成功远程刷新、未确认事务跨睡眠及完整矩阵待验收 |
 | Clash Party macOS 实验性适配 | 原生应用包扫描、当前用户 Unix socket、精确路径与独立恢复 | 无 Mac 用户实机；见 [Mac 验收边界](MACOS.md) |
-| 其他 Mihomo 客户端 | 架构扩展点 | 确定具体客户端与版本，再适配配置所有者 |
-| 独立 Mihomo | 架构扩展点 | 控制端点、长期配置归属、进程接管 |
+| Clash Verge Rev（下一适配目标） | [通用只读控制接口检查](MIHOMO-INSPECTION.md)，未开放写入 | 固定版本，适配配置所有者，验证订阅/重启/冲突/恢复 |
+| 其他客户端 / 独立 Mihomo | [本机控制 API 能力检查](MIHOMO-INSPECTION.md) | 长期配置归属、进程接管、UDP 均需独立验证 |
 | sing-box | 类型候选，未实现 | 不同配置/控制能力、进程识别、重载 |
 | HTTP/SOCKS5 + 接管组件 | 类型候选，未实现 | 组件选择、许可证、权限、TCP/UDP、冲突和回环 |
 

@@ -2,6 +2,7 @@ import { appRouteDataDirectory, nodeExecutableName } from '../platform/paths.ts'
 import { readMacApplication } from '../platform/macos/applications.ts'
 import { resolveLocale, translate, type LanguagePreference } from '../../shared/i18n/index.ts'
 import { LanguagePreferencesStore } from './languagePreferences.ts'
+import { inspectMihomoFile } from '../adapters/mihomoEndpointInspector.ts'
 import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, protocol, session, shell, nativeImage, powerMonitor, clipboard, net } from 'electron'
 import { ReleaseUpdateService } from './releaseUpdates.ts'
 import { projectLink, versionSummary, type BuildInfo } from '../../shared/appInfo.ts'
@@ -126,6 +127,13 @@ else {
         const result = await request(action, { fromVersion: installedBuild.version, targetVersion: release.version })
         await shell.openExternal(release.downloadUrl)
         return { ...result, opened: true }
+      }
+      if (action === 'backend.pick-mihomo') {
+        try {
+          const chosen = await dialog.showOpenDialog(window!, { title: tr('选择运行配置并检查'), filters: [{ name: 'YAML / JSON', extensions: ['yaml', 'yml', 'json'] }], properties: ['openFile'] })
+          if (chosen.canceled || !chosen.filePaths[0]) return null
+          return await inspectMihomoFile(chosen.filePaths[0])
+        } catch { throw new Error(tr('操作失败')) }
       }
       if (action === 'settings.pick-import') {
         const chosen = await dialog.showOpenDialog(window!, { title: tr('导入设置'), filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] })

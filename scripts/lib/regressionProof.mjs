@@ -1,5 +1,7 @@
 // 精确替换只在临时副本发生。实现变化后匹配失败，要求重新审查破坏点，不能悄悄跳过。
 export const regressionCases = [
+  { id: 'mihomo-capability-boundary', file: 'src/main/adapters/mihomoEndpointInspector.ts', before: "state: 'needs-setup'", after: "state: 'ready'",
+    test: 'tests/mihomoInspection.test.ts', name: 'Mihomo 探测仅发固定回环 GET，接口可读不能宣称配置可写或 UDP 可用' },
   { id: 'remove-failed-domain-proxy', file: 'src/main/services/routingService.ts',
     before: "request.applications.flatMap(app => app.mode === 'rule' ? [] : context.exceptions?.get(app.id)", after: 'request.applications.flatMap(app => context.exceptions?.get(app.id)',
     test: 'tests/routingTransaction.test.ts', name: '代理例外出口失效后仍能撤销应用专属规则' },

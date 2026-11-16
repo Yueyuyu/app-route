@@ -4,6 +4,7 @@
 
 | 任务 | 契约与实现入口 | 必查同类入口 / 不变边界 | 现有检查 |
 | --- | --- | --- | --- |
+| 其他 Mihomo 只读检查 | [能力边界](../MIHOMO-INSPECTION.md)、[控制接口检查](../../src/main/adapters/mihomoEndpointInspector.ts) | 固定回环 GET、原生文件选择、凭据留在主进程；接口成功不开放配置写入 | `tests/mihomoInspection.test.ts`；`npm run check:settings-ui`；`npm run check:recovery-faults` |
 | 应用选择与队列 | [架构](../ARCHITECTURE.md)、[routingQueue](../../src/core/routingQueue.ts)、[routingService](../../src/main/services/routingService.ts) | 单个、批量、辅助进程、导入；排队不能显示已生效 | `npm test`；`tests/routingTransaction.test.ts` |
 | 分流与恢复 | [系统边界](../SYSTEM-BOUNDARIES.md)、[managedRouting](../../src/core/managedRouting.ts)、[recovery](../../src/main/recovery) | 正常确认、失败回退、离线恢复、配置重新生成；只改 AppRoute 所有的规则 | `npm run check:recovery-faults`；`node scripts/verify-runtime-selections.mjs` |
 | 域名例外 | [匹配与恢复契约](../DOMAIN-EXCEPTIONS.md)、[域名校验](../../src/core/domainExceptions.ts)、[规则生成](../../src/core/managedRouting.ts) | 精确/后缀优先级、主辅程序、组迁移、导入/历史/重绑；只匹配本应用，旧预览不能覆盖新设置 | `tests/domainExceptions.test.ts`；`tests/routingTransaction.test.ts`；`npm run check:recovery-faults` |

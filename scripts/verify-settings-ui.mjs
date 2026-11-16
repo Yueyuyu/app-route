@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import assert from 'node:assert/strict'
+import http from 'node:http'
 import { build } from 'rolldown'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
@@ -18,6 +19,15 @@ const finishEvidence = await startUiEvidence('settings')
 let passed = false
 await build({ input: 'tests/fixtures/settingsFixture.ts', platform: 'node', output: { file: path.join(fixture, 'settings-fixture.mjs'), format: 'esm' } })
 const importedFile = path.join(fixture, 'import.json'), exportedFile = path.join(fixture, 'export.json')
+const controlRequests = [], controlFile = path.join(fixture, 'inspection.yaml')
+const controlServer = http.createServer((req, res) => {
+  controlRequests.push({ method: req.method, url: req.url, authenticated: req.headers.authorization === 'Bearer ui-fixture-only' })
+  if (req.headers.authorization !== 'Bearer ui-fixture-only') { res.writeHead(401); res.end(); return }
+  res.end(JSON.stringify(req.url === '/version' ? { meta: true, version: 'v1.19.32' } : req.url === '/configs' ? { mode: 'rule', 'find-process-mode': 'strict' } : { connections: [] }))
+})
+await new Promise(resolve => controlServer.listen(0, '127.0.0.1', resolve))
+const controlContent = `external-controller: 127.0.0.1:${controlServer.address().port}\nsecret: ui-fixture-only`
+await fs.writeFile(controlFile, controlContent)
 const errors = [], checks = []
 let desktop
 try {
@@ -44,6 +54,37 @@ try {
     await page.locator('.ant-select-item-option-content').getByText(label, { exact: true }).click()
     await page.locator('.sidebar').getByText(tr('设置与备份'), { exact: true }).click()
     await page.getByRole('heading', { name: tr('设置与备份'), exact: true }).waitFor()
+    const beforeInspection = controlRequests.length
+    await page.getByRole('button', { name: tr('检查兼容性'), exact: true }).click()
+    const inspectionModal = page.locator('.mihomo-inspector-modal')
+    await inspectionModal.waitFor()
+    await page.keyboard.press('Escape'); await inspectionModal.waitFor({ state: 'hidden' })
+    assert.equal(controlRequests.length, beforeInspection, 'opening and closing the inspector has no network request')
+    await page.getByRole('button', { name: tr('检查兼容性'), exact: true }).click()
+    await desktop.evaluate(({ dialog }) => { dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] }) })
+    await inspectionModal.getByRole('button', { name: tr('选择运行配置并检查'), exact: true }).click()
+    await page.waitForFunction(() => !document.querySelector('.mihomo-inspector-modal .ant-btn-loading'))
+    assert.equal(controlRequests.length, beforeInspection, 'native file cancellation has no network request')
+    await desktop.evaluate(({ dialog }) => { dialog.showOpenDialog = async () => { throw new Error('private-native-file-error') } })
+    await inspectionModal.getByRole('button', { name: tr('选择运行配置并检查'), exact: true }).click()
+    await inspectionModal.getByText(tr('操作失败'), { exact: true }).waitFor()
+    assert.doesNotMatch(await inspectionModal.innerText(), /private-native-file-error/)
+    assert.equal(controlRequests.length, beforeInspection, 'native dialog failure is translated and does not inspect a file')
+    await desktop.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }) }, controlFile)
+    await inspectionModal.getByRole('button', { name: tr('选择运行配置并检查'), exact: true }).click()
+    await inspectionModal.getByText(tr('已识别内核；其他客户端的配置所有权尚未验证，仅供查看。'), { exact: true }).waitFor()
+    assert.equal(await inspectionModal.getByText(tr('未验证'), { exact: true }).count(), 2)
+    assert.doesNotMatch(await inspectionModal.innerText(), /ui-fixture-only|inspection.yaml/)
+    assert.equal(await fs.readFile(controlFile, 'utf8'), controlContent)
+    assert.equal(controlRequests.length, beforeInspection + 3)
+    assert.ok(controlRequests.every(req => req.method === 'GET' && req.authenticated && ['/version', '/configs', '/connections'].includes(req.url)))
+    await setDesktopViewport(page, { width: 1000, height: 760 })
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false)
+    await page.screenshot({ path: path.join(output, locale + '-mihomo-inspection.png'), animations: 'disabled' })
+    await page.keyboard.press('Escape'); await inspectionModal.waitFor({ state: 'hidden' })
+    await desktop.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }) }, importedFile)
+    await setDesktopViewport(page, { width: 1440, height: 1000 })
+    checks.push(locale + ': native file selection, cancel, readonly API check, credentials confined to main process and unknown persistence')
     if (locale === 'zh-CN') {
       for (const state of ['无法读取', '未完成事务']) {
         const row = page.locator('.settings-backups-table tbody tr').filter({ hasText: tr(state) })
@@ -245,6 +286,7 @@ try {
   }).catch(() => {})
   throw error
 } finally {
+  controlServer.closeAllConnections(); await new Promise(resolve => controlServer.close(resolve))
   try { await sandbox.dispose() } catch (error) { passed = false; throw error }
   finally { await finishEvidence(passed) }
 }

@@ -4,6 +4,7 @@ import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'
 import { t, formatDateTime } from '../i18n'
 import { routeLabels } from '../types'
 import { settingsError } from '../settingsError'
+import { MihomoInspectorPanel } from './MihomoInspectorPanel'
 import { SettingsBackupsPanel } from './SettingsBackupsPanel'
 import { SettingsScenariosPanel } from './SettingsScenariosPanel'
 import { ImportDifferences, ImportGlobalDifferences } from './SettingsImportDetails'
@@ -90,6 +91,7 @@ export function SettingsPage({ busy, setBusy, onImported }: Props) {
       </div>
       <SettingsScenariosPanel busy={busy} setBusy={setBusy} onPreview={showPreview} />
       <div className="settings-transfer-card"><div><h2>{t('程序路径检查')}</h2><p>{t('升级或搬家后，核对已管理应用的失效路径，再确认重绑。')}</p></div><Button disabled={busy} onClick={() => void checkPaths()}>{t('检查程序路径')}</Button></div>
+      <MihomoInspectorPanel busy={busy} />
       <SettingsBackupsPanel busy={busy} setBusy={setBusy} revision={backupRevision} onPreview={showPreview} />
     </>}
     <Drawer title={t('导入预览')} open={Boolean(preview)} onClose={() => { if (!busy && !binding) setPreview(undefined) }} closable={!busy && !binding} maskClosable={!busy && !binding} keyboard={!busy && !binding} size={880} afterOpenChange={visible => { if (visible) previewClose.current?.focus() }}

@@ -1,6 +1,6 @@
 import type { Application } from './application.ts'
 
-export const desktopActions = ['applications.scan', 'applications.running', 'inventory.read', 'inventory.write',
+export const desktopActions = ['backend.pick-mihomo', 'applications.scan', 'applications.running', 'inventory.read', 'inventory.write',
   'settings.pick-import', 'settings.export', 'settings.snapshot', 'settings.preview', 'settings.path-preview', 'settings.bind', 'settings.import',
   'settings.scenarios', 'settings.scenario-prepare', 'settings.scenario-save', 'settings.scenario-preview', 'settings.scenario-delete',
   'settings.backups', 'settings.backup-create', 'settings.backup-preview', 'settings.backup-delete', 'settings.backup-export',
