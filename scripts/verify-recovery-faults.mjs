@@ -113,7 +113,11 @@ async function verify() {
 
     // 独立命名的测试进程产生真实连接；不接触任何用户应用或系统代理。
     localServer = http.createServer((request, response) => {
-      if (request.url === '/probe') { response.writeHead(204); response.end(); return }
+      if (request.url === '/probe') {
+        // Mihomo v1.19.32 的测速 API 将 0 ms 视为失败；快速 Mac 回环请求可能不足 1 ms。
+        // 只延迟测试服务器响应，让真实测速产生可表示的非零值，不伪造探测成功。
+        setTimeout(() => { response.writeHead(204); response.end() }, 20); return
+      }
       response.writeHead(200, { 'Content-Type': 'text/plain' }); response.write('isolated connection\n')
     })
     await new Promise(resolve => localServer.listen(0, '127.0.0.1', resolve))
@@ -123,7 +127,8 @@ async function verify() {
     if (process.platform !== 'win32') await fs.chmod(executable, 0o755)
     const application = { id: 'history-probe', name: 'History probe', path: executable, processes: [path.basename(executable)], processPaths: [executable], category: '其他应用', source: 'manual', mode: 'direct' }
     service.options.trialMs = 15000
-    service.options.probe = async () => runtime.delay('DIRECT', `http://127.0.0.1:${targetPort}/probe`).then(() => true, () => false)
+    const probeDelays = []
+    service.options.probe = async () => runtime.delay('DIRECT', `http://127.0.0.1:${targetPort}/probe`).then(({ delay }) => { probeDelays.push(delay); return delay > 0 }, () => false)
     pending = await service.apply({ revision: (await service.state()).revision, applications: [application] })
     await service.confirm(pending.pending.id)
     function connect(label) {
@@ -153,7 +158,8 @@ async function verify() {
     await stop(afterUndo)
     assert.deepEqual((await runtime.rules()).rules.map(rule => rule.payload), ['new-subscription.example', ''])
     assert.equal((await service.state()).managed.length, 0)
-    results.push({ scenario: 'history-undo-real-process-connection', passed: true, before: 'ProcessPath DIRECT', after: 'original Match DIRECT', boundary: 'isolated executable, loopback server and Mihomo core; not daily app traffic' })
+    assert.equal(probeDelays.length, 4); assert.ok(probeDelays.every(delay => delay > 0))
+    results.push({ scenario: 'history-undo-real-process-connection', passed: true, before: 'ProcessPath DIRECT', after: 'original Match DIRECT', probeDelaysMs: probeDelays, boundary: 'isolated executable, loopback server and Mihomo core; not daily app traffic' })
   } finally {
     for (const child of children) await stop(child)
     if (localServer) { localServer.closeAllConnections(); await new Promise(resolve => localServer.close(resolve)) }

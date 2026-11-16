@@ -10,5 +10,6 @@
 | L04 旧缓存覆盖 | 页面持有旧应用资料，导入后的新设置可能被延迟保存覆盖 | 保存带修订号，导入后刷新；拒绝过期写入 | [资料服务](../../src/main/services/inventoryPreferences.ts)、[导入回归](../../tests/settingsTransfer.test.ts) |
 | L05 代理组自动选择 | 内核重载会读回旧固定节点缓存，界面选择与实际出口分离 | 重载统一走 MihomoRuntime.reload；核对手动选择与自动状态，不直接调用重载 API | [内核验收](../../scripts/verify-runtime-selections.mjs)、[项目规则](../../AGENTS.md) |
 | L06 安装进程派生 | NSIS 入口结束不代表实际卸载结束 | 等真正卸载流程，检查安装文件和用户数据；不手动删文件伪造成功 | [CI 历史记录](../CI.md)、[安装验收](../../scripts/verify-clean-install.ps1) |
+| L07 回环测速精度 | Mac 隔离撤销检查在网络基线处拒绝，快速回环请求可不足 1 ms；Mihomo v1.19.32 的测速 API 将 0 ms 视为失败 | 测试服务器延迟 20 ms 响应，记录实际非零测速；仍核对真实进程撤销前后的规则命中，不放宽产品检查 | [失败日志](https://github.com/Yueyuyu/app-route/actions/runs/43850579695)、[内核判断](https://github.com/MetaCubeX/mihomo/blob/v1.19.32/hub/route/proxies.go#L125)、[隔离验收](../../scripts/verify-recovery-faults.mjs) |
 
 新增条目需要可核对的复现、修复或提交链接。机器环境问题与产品缺陷分别描述；没有复现的猜测不升级成固定规则。
