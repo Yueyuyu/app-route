@@ -52,6 +52,8 @@ Les captures utilisent l’interface Electron réelle et des données de démons
 - **Restaurer hors ligne** : accès dans l’application et entrée indépendante, en conservant les abonnements et règles d’origine.
 - **Utiliser une application de bureau** : zone de notification, icônes et quatre langues. Au premier lancement, la langue suit le système.
 
+Le code de développement comprend aussi le [diagnostic par application, le routage temporaire et les exceptions par domaine](docs/guide/fr/quickstart.md), ainsi que les [imports, sauvegardes, scénarios, annulations et contrôles de mise à jour](docs/guide/fr/maintenance.md). Ces ajouts ne figurent pas dans les installateurs 0.2.0-preview.2 ci-dessus. Les autres clients Mihomo sont limités à une inspection en lecture seule ; l’écriture de configuration et la restauration avec Clash Verge Rev restent à implémenter et à valider.
+
 ## Modes de connexion
 
 | Option | Effet sur les nouvelles connexions identifiées et prises en charge |

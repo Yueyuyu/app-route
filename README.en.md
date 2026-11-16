@@ -52,6 +52,8 @@ Screenshots use the real Electron interface with isolated demo data. They illust
 - **Recover offline:** use in-app recovery or an independent entry while preserving original subscriptions and rules.
 - **Use a desktop app:** tray controls, icon management, and Chinese, English, Japanese and French. First launch follows the system language.
 
+Development source also includes [per-app diagnosis, temporary routing and domain exceptions](docs/guide/en/quickstart.md), plus [imports, backups, scenarios, undo and update checks](docs/guide/en/maintenance.md). These additions are not in the 0.2.0-preview.2 installers above. Other Mihomo clients currently support read-only inspection only; Clash Verge Rev configuration writes and recovery remain to be implemented and validated.
+
 ## Connection methods
 
 | Option | Meaning for identified, captured new connections |

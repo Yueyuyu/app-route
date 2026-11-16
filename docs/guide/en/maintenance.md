@@ -32,11 +32,23 @@ The independent entry is named AppRoute - Restore Network (.cmd on Windows, .com
 
 ## Transfer settings (source development version)
 
-These additions are not included in the published 0.2.0-preview.2 installer. Use Settings and backups to export JSON, then preview an import and select apps. Existing routing is unchecked by default; unmatched paths cannot be imported.
+These additions are not included in the published 0.2.0-preview.2 installer. Use Settings and backups to export JSON, then review differences and select apps. Existing routing is unchecked by default. For an unmatched item, bind it to the correct local app, review the rebuilt preview and select it again. Unbound items cannot be imported; names alone are never used to guess a match.
 
 Import details only merges app details and favorites. Import and apply requires confirmation and uses the existing rollback protection. Proxy apps follow the current group unless you explicitly restore the saved strategy; doing so also migrates existing proxy apps. Language restoration is optional. Each import creates a backup first. Files contain local paths and node names: keep them private.
 
 Local backups lets you create, preview, export or confirm deletion of one snapshot. Manual and pre-import backups contain full settings; routing history restores rules and strategy while preserving current favorites and categories. Damaged or unfinished records cannot be restored directly. Restoration still requires selecting apps. Deletion does not change current routing or the offline recovery tool.
+
+## Scenarios, undo and program updates (source version)
+
+- **Reuse several choices:** create a Routing scenario in Settings and backups, selecting apps and their modes. Saving or deleting a scenario does not change the network. Preview its differences, then select and confirm the apps to apply. Scenarios use the current proxy group; they do not store nodes, global strategy, language or temporary deadlines.
+- **Undo a recent choice:** open Routing rules → Activity history to inspect time, source and differences. Only an eligible latest successful change can be previewed and undone. Later changes, strategy changes, temporary routing or domain exceptions prevent an unsafe overwrite. Use backup previews or app details for other recovery needs.
+- **Handle a moved program:** choose Check program paths in Settings and backups. Only a missing old path can be rebound to a confirmed local program. Review both paths and select the app again. Applying replaces that app's old-path rules with rollback on failure; it never changes program files or shortcuts.
+
+## Other Mihomo clients (source version)
+
+Settings and backups → Other Mihomo clients → Check compatibility reads the chosen runtime configuration's local control endpoint, then checks process-detection settings and connection-list access. Cancel performs no check. Credentials are neither displayed nor stored. The file must describe an enabled, accessible local HTTP control endpoint; this check does not enable it for you.
+
+A successful check does not enable routing integration: Clash Party still executes AppRoute's rules. Clash Verge Rev is the next priority, but its write and recovery adapter still needs implementation, followed by subscription-update and restart-persistence checks. Do not disable authentication or replace existing client configuration for this check.
 
 ## Uninstall
 

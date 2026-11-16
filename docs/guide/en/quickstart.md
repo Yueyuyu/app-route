@@ -26,3 +26,16 @@ Make the app perform a fresh network operation, such as playing uncached audio. 
 The first persistent override registration may require fully quitting and reopening Clash Party, then checking persistence again. Proxy access may briefly stop during that restart. Read the actual result rather than assuming a dismissed message means success.
 
 If no connection is observed, see [FAQ](faq.md). For network problems, use [recovery](maintenance.md#recovery).
+
+## Per-app checks and options (source development version)
+
+These features are not included in the published 0.2.0-preview.2 installer.
+
+Open App details and choose Check this app. This reads status without changing routing; expand each result for its explanation. Connection samples show the component, destination, matched rule, route chain and start time. The group's current choice is separate from the observed connection. No fresh connection means awaiting observation; check again after settings or connections change. Samples do not represent all traffic.
+
+App details also offers two optional settings:
+
+- **Temporary routing:** choose 15, 30 or 60 minutes. After confirmation, the app uses that mode until its previous choice is restored, or you end it early. An independent watcher continues after quitting the UI; reopen AppRoute after a computer restart. An offline core or failed check shows recovery pending, not success.
+- **Domain exceptions:** first choose direct or proxy routing, then Edit exceptions. For example, keep the app direct but send `example.com` through the proxy. Up to 20 exact-domain or domain-suffix entries are supported; suffixes include subdomains. Entries apply only to this app's recognized program paths. Other destinations keep its base mode, and proxy entries follow the shared group. A missing group rejects the exception's connection instead of silently making it direct.
+
+Temporary routing and domain exceptions cannot be enabled together. Returning to Clash rules removes this app's dedicated settings and exceptions. Cancel or Esc discards editing; existing connections are not forcibly switched. See [Maintenance](maintenance.md) for scenarios, activity history and changed program paths.

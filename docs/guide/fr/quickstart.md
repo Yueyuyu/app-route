@@ -22,3 +22,16 @@ Déclenchez une nouvelle opération réseau, par exemple un morceau non mis en c
 Le premier enregistrement de la surcharge persistante peut nécessiter de quitter complètement puis de rouvrir Clash Party et de vérifier la persistance. La connexion proxy peut être brièvement interrompue. Lisez le résultat réel du contrôle.
 
 Sans connexion observée, consultez la [FAQ](faq.md). En cas de problème réseau, utilisez la [restauration](maintenance.md#recovery).
+
+## Vérification et options par application (version source)
+
+Ces fonctions ne figurent pas dans l’installateur publié 0.2.0-preview.2.
+
+Ouvrez Détails de l’application puis Vérifier cette application. Ce contrôle lit l’état sans modifier le routage ; développez chaque résultat pour en connaître la raison. Les échantillons montrent le composant, la destination, la règle appliquée, la chaîne de sortie et l’heure de début. Le choix actuel du groupe est distinct de la connexion observée. Sans nouvelle connexion, le résultat reste en attente d’observation. Recommencez après un changement de réglage ou de connexion ; les échantillons ne représentent pas tout le trafic.
+
+Deux réglages facultatifs sont également proposés :
+
+- **Routage temporaire** : choisissez 15, 30 ou 60 minutes et confirmez. Le choix précédent est rétabli à l’échéance, ou plus tôt si vous terminez l’opération. Un processus indépendant continue après la fermeture de l’interface ; rouvrez AppRoute après un redémarrage de l’ordinateur. Si le moteur est hors ligne ou si le contrôle échoue, la restauration reste en attente.
+- **Exceptions par domaine** : choisissez d’abord le mode direct ou proxy de l’application, puis Modifier les exceptions. Par exemple, gardez le mode direct en envoyant seulement `example.com` au proxy. Jusqu’à 20 domaines exacts ou suffixes incluant les sous-domaines sont acceptés. Chaque entrée concerne uniquement les chemins reconnus de cette application. Les autres destinations conservent son mode de base ; les exceptions proxy suivent le groupe commun. Si ce groupe disparaît, leur connexion est refusée au lieu de passer silencieusement en direct.
+
+Le routage temporaire et les exceptions ne peuvent pas être actifs ensemble. Revenir aux règles Clash supprime les réglages dédiés et les exceptions de cette application. Annuler ou Échap n’applique pas les modifications ; les connexions existantes ne sont pas forcées à changer. Consultez la [maintenance](maintenance.md) pour les scénarios, l’historique et les changements de chemin.

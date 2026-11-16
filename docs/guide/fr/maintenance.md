@@ -32,11 +32,23 @@ L’entrée indépendante s’appelle AppRoute - Restore Network (.cmd sous Wind
 
 ## Transférer les paramètres (version de développement source)
 
-Ces ajouts ne figurent pas dans l’installateur publié 0.2.0-preview.2. Exportez un JSON dans Paramètres et sauvegardes, puis prévisualisez l’import et sélectionnez les applications. Les routages existants sont décochés par défaut ; les chemins sans correspondance ne sont pas importables.
+Ces ajouts ne figurent pas dans l’installateur publié 0.2.0-preview.2. Exportez un JSON dans Paramètres et sauvegardes, puis examinez les différences et sélectionnez les applications. Les routages existants sont décochés par défaut. Une entrée sans correspondance peut être associée à la bonne application locale : vérifiez le nouvel aperçu et sélectionnez-la de nouveau. Aucune importation n’est possible avant l’association ; le nom seul ne sert jamais à deviner la cible.
 
 L’import des informations seules fusionne les informations et les favoris. L’import avec application demande une confirmation et utilise la protection de restauration existante. Le groupe proxy actuel reste utilisé sauf restauration explicite de la stratégie enregistrée, qui migre aussi les applications proxy existantes. La langue est facultative. Une sauvegarde précède chaque import. Le fichier contient des chemins locaux et des noms de nœuds : gardez-le privé.
 
 Sauvegardes locales permet de créer, prévisualiser, exporter ou confirmer la suppression d’un instantané. Les sauvegardes manuelles et préalables contiennent tous les paramètres ; l’historique restaure uniquement les règles et la stratégie, en conservant favoris et catégories actuels. Les enregistrements endommagés ou inachevés ne sont pas directement restaurables. Sélectionnez toujours les applications à restaurer. La suppression ne change ni le routage actuel ni l’outil de restauration hors ligne.
+
+## Scénarios, annulation et programmes déplacés (version source)
+
+- **Réutiliser plusieurs choix** : créez un scénario dans Paramètres et sauvegardes, avec les applications et leurs modes. Enregistrer ou supprimer un scénario ne change pas le réseau. Prévisualisez les différences, puis sélectionnez et confirmez les applications. Le groupe proxy actuel est utilisé ; les nœuds, la stratégie globale, la langue et les échéances temporaires ne sont pas enregistrés.
+- **Annuler un choix récent** : ouvrez Règles de routage → Historique des opérations pour consulter la date, l’origine et les différences. Seule la dernière opération réussie admissible peut être prévisualisée puis annulée. Les changements ultérieurs, changements de stratégie, réglages temporaires ou exceptions empêchent un écrasement forcé. Pour les autres restaurations, utilisez les sauvegardes ou les détails de l’application.
+- **Traiter un programme déplacé** : vérifiez les chemins dans Paramètres et sauvegardes. Seul un ancien chemin devenu indisponible peut être réassocié à un programme local confirmé. Comparez les deux chemins et sélectionnez de nouveau l’application. L’application remplace ses anciennes règles avec restauration en cas d’échec ; les fichiers du programme et les raccourcis restent intacts.
+
+## Autres clients Mihomo (version source)
+
+Paramètres et sauvegardes → Autres clients Mihomo → Vérifier la compatibilité lit le point de contrôle local du fichier d’exécution choisi, puis vérifie la détection des processus et l’accès aux connexions. Annuler ne déclenche aucun contrôle. Les identifiants ne sont ni affichés ni enregistrés. Le fichier doit décrire une API HTTP locale active et accessible ; le contrôle ne l’active pas automatiquement.
+
+Un résultat positif n’active pas l’intégration du routage : Clash Party continue d’exécuter les règles AppRoute. Clash Verge Rev est la prochaine priorité, mais son adaptateur d’écriture et de restauration reste à implémenter, puis à vérifier lors des mises à jour d’abonnement et des redémarrages. Ne désactivez pas l’authentification et ne remplacez pas votre configuration pour ce contrôle.
 
 ## Désinstallation
 

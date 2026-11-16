@@ -8,6 +8,8 @@
 
 2026-11-12 已完成最终 Windows 桌面交互复验；当前远程订阅返回 HTTP 403，失败保留检查通过，但不得当作成功更新验收。后续先查 `docs/VERIFICATION.md`，区分远端拒绝、配置再生成与真实睡眠证据，不重复改写用户配置来掩盖验收缺口。
 
+2026-11-16 产品完善源码与三平台自动验收见 `docs/ITERATION-PLAN.md`、`docs/VERIFICATION.md`；本轮没有更新日常安装版或公开 Release。第二个客户端优先 Clash Verge Rev，当前仅实现 `docs/MIHOMO-INSPECTION.md` 中的只读检查，配置所有者写入与恢复仍待实现及固定版本验收，不得把接口连通写成已支持分流。
+
 重载必须通过 `MihomoRuntime.reload`：它先同步已经处于自动状态的组，避免 Mihomo 读回失效前的固定节点缓存；明确固定及手选组不改动。不要绕过此入口直接写 `/configs`。隔离回归脚本为 `scripts/verify-runtime-selections.mjs`，原始 API 只用于独立实例的问题对照。
 
 涉及品牌图标、艺术字或复用视觉效果时，先读 `docs/design/README.md`、`docs/design/app-icon.md` 和 `docs/design/wordmark.md`。AppRoute 沿用已确认原图；跨项目的通用风格按字标规范中的 UI Design Lab 来源提交、ID 与版本读取，不把字标图片当作可安装字体。

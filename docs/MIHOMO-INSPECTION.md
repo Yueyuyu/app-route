@@ -19,7 +19,7 @@
 
 2026-11-16 用户选择其作为第二个客户端。已核对上游 main 分支的 [配置路径](https://github.com/clash-verge-rev/clash-verge-rev/blob/main/src-tauri/src/utils/dirs.rs)、[订阅配置与保存](https://github.com/clash-verge-rev/clash-verge-rev/blob/main/src-tauri/src/config/profiles.rs)及 [运行配置](https://github.com/clash-verge-rev/clash-verge-rev/blob/main/src-tauri/src/config/runtime.rs)。上游会维护内存状态和独立的配置生成流程，因此不能仅改磁盘文件并调用 Mihomo 重载就宣称已持久保存。
 
-正式写入适配须固定版本，增加独立配置所有者：只管理专属条目，保留原规则和脚本；验证用户在客户端修改配置时的冲突、订阅切换/成功刷新、重启、失败回退及 AppRoute 离线恢复。当前机器未发现其标准用户数据目录，尚未进行该客户端实机写入验收。这些工作仍在兼容矩阵中标为待验证。
+正式写入适配尚未实现。需先固定版本，增加独立配置所有者：只管理专属条目，保留原规则和脚本；验证用户在客户端修改配置时的冲突、订阅切换/成功刷新、重启、失败回退及 AppRoute 离线恢复。当前机器未发现其标准用户数据目录，尚未进行该客户端实机写入验收。这些工作仍在兼容矩阵中标为待完成。
 
 实现入口：`src/main/adapters/mihomoEndpointInspector.ts`；界面 `MihomoInspectorPanel` 仅接收白名单能力结果。单位测试使用本机 HTTP 夹具；设置 UI 验证真实原生选择器调用链和四语展示；隔离故障脚本另启动带鉴权的真实 Mihomo 核对 API，不能替代 Clash Verge Rev 的配置持久化验收。
 
