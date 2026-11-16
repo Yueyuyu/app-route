@@ -20,6 +20,7 @@ import { strategyOwnership, strategyTestUrl, validateProxyStrategy } from '../..
 import { effectiveApplications } from '../../core/managedRouting.ts'
 import { parseRoutingState, saveRoutingState, pruneCompletedTransactions } from '../storage/routingStateStore.ts'
 import { OperationTimings } from './operationTimings.ts'
+import { sampleConnectionEvidence } from '../../core/connectionEvidence.ts'
 
 export interface RoutingState {
   version?: 1
@@ -141,7 +142,8 @@ export class RoutingService {
       const targets = new Set([...state.managed.filter(app => app.mode === 'proxy').map(app => app.target!), ...groupChoices.map(p => p.name), ...(state.proxyGroup ? [state.proxyGroup] : [])])
       const outlets = Object.fromEntries([...targets].map(target => [target, resolveProxyOutlet(target, proxies.proxies)]))
       const changedTarget = state.managed.some(app => app.mode === 'proxy' && (!declared.has(app.target!) || ['missing', 'unknown'].includes(outlets[app.target!].kind)))
-      const evidence = connections.connections.flatMap(connection => {
+      const observedAt = new Date().toISOString()
+      const { evidence, observations } = sampleConnectionEvidence(connections.connections.flatMap(connection => {
         const app = state.managed.find(app => managedProcessMatches(app, connection.metadata))
         if (!app || Date.parse(connection.start) < Date.parse(app.appliedAt ?? state.appliedAt ?? new Date().toISOString())) return []
         const chains = connection.chains ?? []
@@ -153,7 +155,7 @@ export class RoutingService {
         const currentNode = app.mode === 'direct' ? 'DIRECT' : outlets[app.target!]?.node
         return [{ applicationId: app.id, process: connection.metadata.process ?? '', destination: connection.metadata.host || connection.metadata.destinationIP || '未知目标', outbound: chains.join(' ← '), matched, currentRuleMatched, node,
           usesCurrentNode: currentNode && node ? currentNode === node : undefined, startedAt: connection.start }]
-      }).sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt)).slice(0, 50)
+      }), observedAt)
       const uncoveredProcesses = connections.connections.flatMap(connection => {
         if (!connection.metadata.processPath) return []
         // 共享目录中的其他程序不是辅助进程，不能因其建立连接而反复自动应用。
@@ -162,7 +164,7 @@ export class RoutingService {
         return [{ applicationId: app.id, process: processBasename(connection.metadata.processPath) }]
       }).filter((item, index, items) => items.findIndex(other => other.applicationId === item.applicationId && other.process === item.process) === index)
       return { ...base, configurationFingerprint: digest(snapshot.profileId + '\n' + snapshot.workText), connected: true, version: version.version, mode: config.mode, tun: config.tun?.enable ?? false, processMode: config['find-process-mode'], choices, rulesLoaded: rulesLoaded && config.mode === 'rule' && !untrackedRuleCount && !dataIssue, evidence, untrackedRuleCount,
-        uncoveredProcesses, groupChoices, outlets, strategyNodes, strategyLoaded, strategyWarning,
+        observedAt, observations, uncoveredProcesses, groupChoices, outlets, strategyNodes, strategyLoaded, strategyWarning,
         // 只有唯一组时才推荐；多个独立选择不能猜成同一个“当前代理”。已保存组失效时也不静默换组。
         suggestedTarget: state.proxyGroup ?? (groupChoices.length === 1 ? groupChoices[0].name : undefined),
         persistenceObserved,

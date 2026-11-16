@@ -39,8 +39,10 @@ export function routingPresentation(app: Application, status?: IntegrationStatus
   if (outlet?.health === 'unhealthy') return { label: '节点探测失败', detail: '代理组仍存在；手动组需要换节点，自动组由 Mihomo 继续探测。', color: 'warning' }
   if (outlet?.kind === 'reject' || outlet?.kind === 'unknown') return { label: '代理组待检查', detail: '当前出口不可用或尚未确认，请检查 Clash Party 的组内选择或网络自检。', color: 'warning' }
   const evidence = status.evidence.filter(item => item.applicationId === managed.id)
-  if (evidence.some(item => !item.matched)) return { label: '连接不符合设置', detail: '已观察到不符合当前规则的新连接，请检查或恢复。', color: 'error' }
-  if (evidence.length && evidence.every(item => item.usesCurrentNode === false)) return { label: '等待新节点连接', detail: '当前观察到的连接仍用其他节点；已有连接不会强制断开，新建连接交给组当前选择。', color: 'warning' }
-  if (evidence.length) return { label: '已验证新连接', detail: `已验证 ${[...new Set(evidence.map(item => item.process))].join('、')} 的 ${evidence.length} 条新连接；其余进程仍待观测。`, color: 'success' }
+  const observation = status.observations?.[managed.id]
+  const count = observation?.connectionCount ?? evidence.length
+  if (observation ? observation.matchedCount < count : evidence.some(item => !item.matched)) return { label: '连接不符合设置', detail: '已观察到不符合当前规则的新连接，请检查或恢复。', color: 'error' }
+  if (count && (observation?.allUseOldNode ?? evidence.every(item => item.usesCurrentNode === false))) return { label: '等待新节点连接', detail: '当前观察到的连接仍用其他节点；已有连接不会强制断开，新建连接交给组当前选择。', color: 'warning' }
+  if (count) return { label: '已验证新连接', detail: `已验证 ${(observation?.processes ?? [...new Set(evidence.map(item => item.process))]).join('、')} 的 ${count} 条新连接；其余进程仍待观测。`, color: 'success' }
   return { label: '规则已就绪', detail: '规则已写入并在内核加载，尚未观察到新连接。打开应用并建立新连接后才能验证实际出口；现有连接不会自动切换。', color: 'blue' }
 }

@@ -1,5 +1,11 @@
 // 精确替换只在临时副本发生。实现变化后匹配失败，要求重新审查破坏点，不能悄悄跳过。
 export const regressionCases = [
+  { id: 'single-flight-status', file: 'src/core/statusRefresh.ts',
+    before: 'if (this.pending) return this.pending', after: '/* proof: duplicate pending reads */',
+    test: 'tests/statusRefresh.test.ts', name: '慢状态请求合并，完成后下一次读取仍访问新状态' },
+  { id: 'fair-connection-evidence', file: 'src/core/connectionEvidence.ts',
+    before: 'return { evidence: selected, observations }', after: 'return { evidence: evidence.slice(0, 50), observations }',
+    test: 'tests/statusRefresh.test.ts', name: '繁忙应用不能挤掉其他应用证据，采样不隐藏任何应用的异常' },
   { id: 'preserve-user-rules', file: 'src/core/managedRouting.ts',
     before: 'copy.rules = copy.rules.slice(marker.rules.length)', after: 'copy.rules = []',
     test: 'tests/managedRouting.test.ts', name: '应用与撤销仅增删带所有权标记的规则，原配置保持一致' },

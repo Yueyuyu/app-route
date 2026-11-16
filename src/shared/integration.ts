@@ -46,7 +46,17 @@ export interface ConnectionEvidence {
   node?: string
   usesCurrentNode?: boolean
 }
+export interface ConnectionObservation {
+  observedAt: string
+  latestStartedAt: string
+  connectionCount: number
+  matchedCount: number
+  processes: string[]
+  allUseOldNode: boolean
+}
 export interface IntegrationStatus {
+  observedAt?: string
+  observations?: Record<string, ConnectionObservation>
   /** 当前客户端配置的指纹；用于识别同名组/节点下的订阅变化，不含配置原文。 */
   configurationFingerprint?: string
   dataIssue?: boolean

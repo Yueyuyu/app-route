@@ -3,6 +3,7 @@ import type { AutomaticApplyResult, IntegrationStatus } from '../../shared/integ
 import type { Application, RouteMode } from '../../shared/application.ts'
 import { RoutingQueue, type PendingRoute } from '../../core/routingQueue.ts'
 import type { ProxyStrategy } from '../../shared/proxyStrategy.ts'
+import { SingleFlight, startStatusPolling } from '../../core/statusRefresh.ts'
 
 let token: string | undefined
 export async function integrationRequest<T>(action: string, body?: unknown): Promise<T> {
@@ -33,12 +34,13 @@ export function useRoutingIntegration() {
   const noticeSequence = useRef(0)
   const familyAttempts = useRef(new Set<string>())
   const requestSequence = useRef(0)
-  const refresh = useCallback(async () => {
+  const refreshFlight = useRef(new SingleFlight<IntegrationStatus | undefined>())
+  const refresh = useCallback(() => refreshFlight.current.run(async () => {
     const sequence = ++requestSequence.current
     try {
       const next = await integrationRequest<IntegrationStatus>('status')
       if (sequence === requestSequence.current) { currentStatus.current = next; setStatus(next); setError('') }
-      return next
+      return currentStatus.current
     } catch (error) {
       if (sequence === requestSequence.current) {
         setError(error instanceof Error ? error.message : '连接失败')
@@ -47,7 +49,7 @@ export function useRoutingIntegration() {
         setStatus(previous => previous ? { ...previous, connected: false } : undefined)
       }
     }
-  }, [])
+  }), [])
   const queue = useRef<RoutingQueue>(undefined)
   queue.current ??= new RoutingQueue({
     onChange: setPendingRoutes,
@@ -69,7 +71,11 @@ export function useRoutingIntegration() {
       setNotice({ sequence: ++noticeSequence.current, type: 'error', text })
     },
   })
-  useEffect(() => { void refresh(); const timer = window.setInterval(() => void refresh(), 5000); return () => { window.clearInterval(timer); requestSequence.current++; queue.current?.cancelWaiting() } }, [refresh])
+  useEffect(() => {
+    const polling = startStatusPolling({ read: async () => Boolean((await refresh())?.connected), visible: () => document.visibilityState === 'visible' })
+    document.addEventListener('visibilitychange', polling.wake)
+    return () => { polling.stop(); document.removeEventListener('visibilitychange', polling.wake); requestSequence.current++; queue.current?.cancelWaiting() }
+  }, [refresh])
   function apply(applications: Application[], mode: RouteMode, target?: string) {
     if (strategyBusy.current) return
     setFailures(current => Object.fromEntries(Object.entries(current).filter(([id]) => !applications.some(app => app.id === id))))

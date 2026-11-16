@@ -431,7 +431,10 @@ test('辅助进程遗漏会提示；只验证应用后的精确路径、规则�
   assert.equal(status.evidence[0].matched, true)
   assert.deepEqual(status.uncoveredProcesses, [{ applicationId: pathApp.id, process: 'late.exe' }])
   f.runtime.activeConnections.push(connection(pathApp.path, { rule: 'DomainSuffix', rulePayload: 'example' }))
-  assert.equal((await f.service.status()).evidence.at(-1)?.matched, false, '出口碰巧直连也不能冒充应用规则命中')
+  const observed = await f.service.status()
+  assert.equal(observed.evidence.find(item => item.process === 'Example.exe')?.matched, false, '出口碰巧直连也不能冒充应用规则命中')
+  assert.equal(observed.observations?.[pathApp.id].matchedCount, 1)
+  assert.equal(observed.observations?.[pathApp.id].connectionCount, 2)
 })
 
 test('复用解析仍读取当前配置，外部修改及文件删除必须使缓存失效', async t => {
