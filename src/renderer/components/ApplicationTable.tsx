@@ -7,7 +7,7 @@ import { ApplicationIcon } from './ApplicationIcon'
 import { RouteSelector } from './RouteSelector'
 import type { IntegrationStatus } from '../../shared/integration'
 import { managedFor } from '../../core/applicationInventory'
-import { applicationKey } from '../../core/applicationViews'
+import { applicationKey, isRecentlyDiscovered } from '../../core/applicationViews'
 import type { PendingRoute } from '../../core/routingQueue'
 import { ApplicationStatus } from './ApplicationStatus'
 import { HelpTip } from './HelpTip'
@@ -49,7 +49,7 @@ export function ApplicationTable({ applications, selected, setSelected, changeMo
     columns={[
       { title: t("应用"), key: 'name', render: (_, app) => <div><button className="application-name" onClick={() => details(app)} aria-label={t("查看 {0} 详情", [app.name])}>
         <ApplicationIcon name={app.name} icon={app.icon} application={app} />
-        <span className="application-label"><strong>{app.name}{app.discoveredAt && Date.now() - Date.parse(app.discoveredAt) < 7 * 86400000 && <Tag color="blue">{t("新发现")}</Tag>}</strong><span className="process-label">{app.processes[0]}{app.processes.length > 1 && ` +${app.processes.length - 1}`}</span></span>
+        <span className="application-label"><strong>{app.name}{isRecentlyDiscovered(app) && <Tag color="blue">{t("新发现")}</Tag>}</strong><span className="process-label">{app.processes[0]}{app.processes.length > 1 && ` +${app.processes.length - 1}`}</span></span>
       </button><div className="compact-row-status">{feedback(app)}</div><div className="mobile-route">{selector(app)}</div></div> },
       { title: t("状态"), key: 'status', width: 174, responsive: ['xl'], render: (_, app) => feedback(app) },
       { title: <span>{t("联网方式")}<HelpTip title={t("点击即应用")}><p>{t("选择后自动应用，可连续操作。等待中的选项尚未生效，失败会恢复上一版。")}</p><p>{t("按 Clash 规则：沿用原有规则。直接联网：不经远端节点。跟随代理组：由顶部策略选择出口。")}</p></HelpTip></span>, key: 'mode', width: 322, responsive: ['md'], render: (_, app) => selector(app) },

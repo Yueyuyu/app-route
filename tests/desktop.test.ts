@@ -3,12 +3,28 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { applicationKey, applicationView, filterApplications, isSystemTool, isRunningApplication, mergeScannedApplications } from '../src/core/applicationViews.ts'
+import { applicationKey, applicationView, filterApplications, isSystemTool, isRunningApplication, isRecentlyDiscovered, mergeScannedApplications } from '../src/core/applicationViews.ts'
 import { desktopAssetPath, isTrustedDesktopSender, validateDesktopRequest } from '../src/main/desktop/boundary.ts'
 import { InventoryPreferencesStore } from '../src/main/services/inventoryPreferences.ts'
 import type { Application } from '../src/shared/application.ts'
 
 const app = (id: string, file: string, mode: Application['mode'] = 'rule'): Application => ({ id, name: id, path: file, processes: [path.win32.basename(file)], mode, source: 'scan', category: '其他应用' })
+
+test('最近发现按七天窗口和发现时间排序，不混入首扫、未来时间或无效记录', async t => {
+  const now = Date.parse('2026-11-16T00:00:00Z'), day = 86400000
+  const recent = { ...app('recent', 'C:\\Demo\\recent.exe'), discoveredAt: new Date(now - day).toISOString() }
+  const newest = { ...app('newest', 'C:\\Demo\\newest.exe'), discoveredAt: new Date(now - 1000).toISOString() }
+  const older = { ...recent, id: 'older', discoveredAt: new Date(now - 7 * day).toISOString() }
+  const first = app('first', 'C:\\Demo\\first.exe')
+  const invalid = { ...recent, id: 'invalid', discoveredAt: 'invalid' }, future = { ...recent, id: 'future', discoveredAt: new Date(now + day).toISOString() }
+  assert.deepEqual(applicationView([recent, newest, older, first, invalid, future], 'recent', [applicationKey(recent)], [], now).map(item => item.id), ['newest', 'recent'])
+  assert.equal(isRecentlyDiscovered(recent, now + 7 * day), false)
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'approute-recent-')); t.after(() => fs.rm(root, { recursive: true, force: true }))
+  await new InventoryPreferencesStore(root).write({ version: 1, applications: [recent], favorites: [] })
+  const saved = await new InventoryPreferencesStore(root).read()
+  assert.equal(saved.applications[0].discoveredAt, recent.discoveredAt)
+  assert.equal(saved.applications[0].mode, 'rule')
+})
 test('已设置只包含实际专属分流，收藏独立筛选，正在运行只按精确路径匹配', () => {
   const apps = [app('music', 'C:\\Apps\\Music\\music.exe', 'direct'), app('browser', 'C:\\Apps\\Browser\\browser.exe'), app('other', 'D:\\Tools\\browser.exe')]
   const favorites = [applicationKey(apps[1])]

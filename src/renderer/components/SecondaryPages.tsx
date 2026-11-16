@@ -26,7 +26,7 @@ export function DraftPage({ applications, status, onExport, onDetails }: { appli
   </section>
 }
 
-export function HelpPage() {
+export function HelpPage({ onAction }: { onAction: (action: 'find' | 'diagnose' | 'recovery' | 'backup') => void }) {
   const entries = [
     { mode: 'rule' as const, icon: <ApartmentOutlined />, description: t("保持原样，让 Clash Party 的原有规则决定每条连接的出口。"), example: t("适合：不需要单独设置的应用") },
     { mode: 'direct' as const, icon: <HomeOutlined />, description: t("识别并进入 Clash 的新连接使用本地网络，不经远端代理节点。"), example: t("例如：QQ 音乐、国内网盘") },
@@ -41,6 +41,9 @@ export function HelpPage() {
     { key: 'recovery', label: t("如果断网，怎么恢复？"), children: <><p>{t("页面可用时点击“恢复网络”，停用 AppRoute 专属规则，保留原有订阅、代理组及系统网络设置。")}</p><p>{t("页面打不开时，双击桌面的 AppRoute - Restore Network，无需网络或 ChatGPT。应用失败会自动回退，意外中断由独立守护兜底。")}</p><p>{t("当前仍为预览版；客户端重启、订阅切换的持久化验收状态见“连接详情”。")}</p></> },
   ]
   return <section className="secondary-page help-page"><div className="page-heading"><div><h1>{t("使用帮助")}</h1><p>{t("选应用、选联网方式，再看状态。")}</p></div></div>
+    <div className="help-actions">{([
+      ['find', '查找或添加应用'], ['diagnose', '检查应用连接'], ['recovery', '打开恢复工具'], ['backup', '备份或迁移设置'],
+    ] as const).map(([action, label]) => <Button key={action} onClick={() => onAction(action)}>{t(label)}</Button>)}</div>
     <div className="quick-start"><span><b>1</b>{t("找到或收藏应用")}</span><span><b>2</b>{t("点击联网方式")}</span><span><b>3</b>{t("查看加载与连接状态")}</span></div>
     <div className="help-cards">{entries.map(entry => <article className={'help-card help-' + entry.mode} key={entry.mode}><div className="help-icon">{entry.icon}</div><h2>{t(routeLabels[entry.mode])}</h2><p>{entry.description}</p><small>{entry.example}</small></article>)}</div>
     <h2 className="section-heading">{t("常见问题")}</h2><Collapse className="help-questions" items={questions} />

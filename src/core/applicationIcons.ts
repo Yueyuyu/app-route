@@ -1,4 +1,10 @@
 import catalog from '../../resources/application-icons/catalog.json' with { type: 'json' }
+import type { ApplicationIconView } from '../shared/applicationIcon.ts'
+
+/** 图标列表与统计共用范围：可用扫描条目 + 手动条目；排除旧示例及已卸载扫描记录。 */
+export function listedApplicationIcons(applications: ApplicationIconView[]) {
+  return applications.filter(app => app.origin === 'manual' || (app.origin === 'scan' && app.available))
+}
 
 export const applicationIconCatalog = catalog
 export type CatalogApplication = typeof catalog.applications[number]

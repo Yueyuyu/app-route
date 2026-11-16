@@ -2,7 +2,13 @@ import type { Application } from '../shared/application.ts'
 import type { RunningApplicationProcess } from '../shared/desktop.ts'
 import { processPathKey } from '../shared/applicationIdentity.ts'
 
-export type ApplicationView = 'configured' | 'running' | 'all'
+export type ApplicationView = 'configured' | 'running' | 'all' | 'recent'
+const recentDiscoveryWindow = 7 * 24 * 60 * 60 * 1000
+/** 首次扫描的存量应用不算新安装；这里只使用后续扫描记录的发现时间。 */
+export function isRecentlyDiscovered(app: Application, now = Date.now()): boolean {
+  const discovered = app.discoveredAt ? Date.parse(app.discoveredAt) : NaN
+  return Number.isFinite(discovered) && discovered <= now && now - discovered < recentDiscoveryWindow
+}
 export const applicationKey = (app: Application) => processPathKey(app.path || app.id)
 export function isRunningApplication(app: Application, running: RunningApplicationProcess[]): boolean {
   const paths = new Set([app.path, ...(app.processPaths ?? [])].filter(Boolean).map(p => processPathKey(p!)))
@@ -15,9 +21,9 @@ export function isSystemTool(app: Application): boolean {
     /^(?:control|regedit|mmc|msconfig|taskmgr|eventvwr|services|perfmon|resmon|appverif|cmd|powershell|pwsh)\.exe$/.test(executable) ||
     /(?:uninstall|unins\d*|installer|installmanager|updater|bugreport|crashreport|diagnostic)/i.test(executable)
 }
-export function applicationView(apps: Application[], view: ApplicationView, favorites: string[], running: RunningApplicationProcess[]) {
-  return apps.filter(app => view === 'all' || (view === 'configured' ? app.mode !== 'rule' : isRunningApplication(app, running)))
-    .sort((a, b) => Number(favorites.includes(applicationKey(b))) - Number(favorites.includes(applicationKey(a))) || a.name.localeCompare(b.name, 'zh-CN'))
+export function applicationView(apps: Application[], view: ApplicationView, favorites: string[], running: RunningApplicationProcess[], now = Date.now()) {
+  return apps.filter(app => view === 'all' || (view === 'recent' ? isRecentlyDiscovered(app, now) : view === 'configured' ? app.mode !== 'rule' : isRunningApplication(app, running)))
+    .sort((a, b) => (view === 'recent' ? Date.parse(b.discoveredAt!) - Date.parse(a.discoveredAt!) : Number(favorites.includes(applicationKey(b))) - Number(favorites.includes(applicationKey(a)))) || a.name.localeCompare(b.name, 'zh-CN'))
 }
 
 const searchText = (value: string) => value.normalize('NFKC').toLowerCase().replace(/[\s_-]+/g, '')

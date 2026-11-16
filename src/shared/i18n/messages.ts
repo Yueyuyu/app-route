@@ -1,6 +1,20 @@
 /** 中文原句作为 gettext 风格键；译文顺序为 English、日本語、Français。
  * 修改原句时同步更新三种译文，保留 {0} 等插值参数。用户数据不进入此目录。 */
 export const messages: Record<string, readonly [string, string, string]> = {
+  "最近发现": ["Recently found","最近見つかったアプリ","Découvertes récentes"],
+  "查看新应用": ["View new apps","新しいアプリを見る","Voir les nouvelles applications"],
+  "近 7 天新发现的应用": ["Apps first found in the past 7 days","過去 7 日間に見つかったアプリ","Applications découvertes depuis 7 jours"],
+  "首次扫描的已有应用不计入。后续新发现的应用保留 7 天记录，不自动设置分流。": ["The initial inventory is excluded. Newly found apps stay here for 7 days; routing is not set automatically.","初回スキャンの既存アプリは含みません。新たに見つかったアプリを 7 日間表示します。分流は自動設定しません。","L’inventaire initial est exclu. Les nouvelles découvertes restent ici 7 jours, sans routage automatique."],
+  "列表应用": ["Listed apps","一覧のアプリ","Applications listées"],
+  "查看待完善图标": ["Review icons needing attention","要確認のアイコンを見る","Voir les icônes à vérifier"],
+  "统计范围": ["Count scope","集計範囲","Périmètre des statistiques"],
+  "统计包含当前扫描及手动添加的图标条目，不等于分流应用数。": ["Counts include scanned and manually added icon entries, not routed apps.","現在のスキャンと手動追加のアイコンを集計しています。分流アプリ数とは異なります。","Le total comprend les icônes détectées et ajoutées manuellement, pas les applications routées."],
+  "辅助程序可能各有图标；分流列表会合并同一应用的辅助程序。两页数量可能不同。": ["Helpers may have their own icons. Routing combines helpers belonging to one app, so the counts may differ.","補助プログラムには個別のアイコンがあります。分流一覧では同じアプリにまとめるため、件数が異なる場合があります。","Les processus auxiliaires peuvent avoir leurs propres icônes. Le routage les regroupe par application ; les totaux peuvent donc différer."],
+  "点击应用名称，再选择“检查这个应用”。": ["Click an app name, then choose Check this app.","アプリ名をクリックし、「このアプリを確認」を選んでください。","Cliquez sur un nom, puis sur Vérifier cette application."],
+  "查找或添加应用": ["Find or add an app","アプリの検索・追加","Trouver ou ajouter une application"],
+  "检查应用连接": ["Check an app connection","アプリの接続を確認","Vérifier une connexion"],
+  "打开恢复工具": ["Open recovery tools","復旧ツールを開く","Ouvrir les outils de restauration"],
+  "备份或迁移设置": ["Back up or transfer settings","設定の保存・移行","Sauvegarder ou transférer"],
   "版本更新": ["App updates","アプリの更新","Mises à jour"],
   "收起更新信息": ["Hide updates","更新情報を閉じる","Masquer les mises à jour"],
   "更新通道": ["Update channel","更新チャンネル","Canal de mise à jour"],

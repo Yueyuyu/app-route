@@ -58,11 +58,21 @@ export default function App() {
 
   const views = useMemo(() => ({ configured: applicationView(applications, 'configured', inventory.favorites, inventory.running),
     running: applicationView(applications, 'running', inventory.favorites, inventory.running),
+    recent: applicationView(applications, 'recent', inventory.favorites, inventory.running),
     all: applicationView(applications, 'all', inventory.favorites, inventory.running) }), [applications, inventory.favorites, inventory.running])
   const visible = useMemo(() => filterApplications(applications, { view, favorites: inventory.favorites, running: inventory.running, query: search, mode: filter, category, favoritesOnly }), [applications, view, inventory.favorites, inventory.running, filter, category, search, favoritesOnly])
-  const folded = searching ? [] : visible.filter(app => isSystemTool(app) && !inventory.favorites.includes(applicationKey(app)) && app.mode === 'rule')
+  const folded = searching || view === 'recent' ? [] : visible.filter(app => isSystemTool(app) && !inventory.favorites.includes(applicationKey(app)) && app.mode === 'rule')
   const primary = visible.filter(app => !folded.includes(app))
-  function showAll() { setView('all'); setSearch(''); setCategory('all'); setFilter('all'); setFavoritesOnly(false); setSelected([]) }
+  const hasFilters = filter !== 'all' || category !== 'all' || favoritesOnly
+  function clearFilters() { setCategory('all'); setFilter('all'); setFavoritesOnly(false); setSelected([]) }
+  function showView(next: ApplicationView) { setView(next); setSearch(''); clearFilters() }
+  function showAll() { showView('all') }
+  function helpAction(action: 'find' | 'diagnose' | 'recovery' | 'backup') {
+    if (action === 'backup') { setPage('settings'); return }
+    setPage('apps'); showAll()
+    if (action === 'recovery') { setInspectionTab('recovery'); setInspectionOpen(true) }
+    else if (action === 'diagnose') void message.info(t('点击应用名称，再选择“检查这个应用”。'))
+  }
 
   function changeMode(ids: string[], mode: RouteMode) {
     const chosen = applications.filter(app => ids.includes(app.id))
@@ -102,26 +112,27 @@ export default function App() {
           <div className="page-heading"><div><h1>{t("应用管理")}</h1><p>{t("为常用应用选择联网方式。")}</p></div><div className="heading-actions"><Button icon={<PlusOutlined />} onClick={() => { setEditing(undefined); setEditorOpen(true) }}>{t("添加应用")}</Button><Button icon={<ScanOutlined />} loading={inventory.loading} disabled={applying} onClick={() => void inventory.scan(true)}>{t("扫描应用")}</Button></div></div>
           <RoutingPanel status={routing.status} error={routing.error} refresh={routing.refresh} busy={applying} setProxyStrategy={routing.setProxyStrategy} inspectionOpen={inspectionOpen} setInspectionOpen={setInspectionOpen} tab={inspectionTab} setTab={setInspectionTab} diagnostics={diagnostics} />
           {inventory.error && <Alert type="warning" showIcon title={t(inventory.error)} action={<Button onClick={() => void inventory.scan(true)}>{t("重试扫描")}</Button>} />}
-          {inventory.newCount > 0 && <Alert className="inventory-update" type="success" showIcon title={t("发现 {0} 个新应用，已加入全部应用，联网方式沿用原有规则。", [inventory.newCount])} action={<Button size="small" onClick={showAll}>{t("查看全部")}</Button>} />}
+          {inventory.newCount > 0 && <Alert className="inventory-update" type="success" showIcon title={t("发现 {0} 个新应用，已加入全部应用，联网方式沿用原有规则。", [inventory.newCount])} action={<Button size="small" onClick={() => showView('recent')}>{t('查看新应用')}</Button>} />}
           <div className="list-toolbar"><Tabs activeKey={searching ? 'search' : view} onChange={key => { if (key === 'search') return; setSearch(''); setView(key as ApplicationView); setSelected([]); void inventory.refreshRunning() }} items={[
             { key: 'configured', label: <span>{t("已设置")}<b>{views.configured.length}</b></span> },
             { key: 'running', label: <span>{t("正在运行")}<b>{views.running.length}</b></span> },
             { key: 'all', label: <span>{t("全部应用")}<b>{views.all.length}</b></span> },
+            { key: 'recent', label: <span>{t('最近发现')}<b>{views.recent.length}</b></span> },
             ...(searching ? [{ key: 'search', label: <span>{t("搜索结果")}<b>{visible.length}</b></span> }] : []),
           ]} /><div className="list-search"><Input prefix={<SearchOutlined />} aria-label={t("搜索全部应用")} placeholder={t("搜索全部应用")} value={search} onChange={event => { setSearch(event.target.value); setSelected([]) }} allowClear /></div></div>
-          <div className="view-filters"><span>{searching ? t("全部应用中找到 {0} 项", [visible.length]) : view === 'configured' ? t("仅显示已设置专属分流的应用") : view === 'running' ? t("当前运行的应用") : t("本机 {0} 个应用", [applications.length])}<HelpTip title={searching ? t("搜索范围") : t("应用列表")}><p>{searching ? t("按名称、主进程、辅助进程和路径搜索全部应用，不受当前标签或系统工具折叠限制。下方筛选条件仍生效。") : t("选择直接联网或跟随代理组的应用显示在“已设置”中。收藏仅用于单独筛选，不改变联网方式。")}</p><p>{t("可在“更多”或应用详情中收藏，不改变联网方式。新安装的软件自动加入“全部应用”，也可手动扫描。")}</p></HelpTip></span><div>
+          <div className="view-filters"><span>{searching ? t("全部应用中找到 {0} 项", [visible.length]) : view === 'recent' ? t('近 7 天新发现的应用') : view === 'configured' ? t("仅显示已设置专属分流的应用") : view === 'running' ? t("当前运行的应用") : t("本机 {0} 个应用", [applications.length])}<HelpTip title={searching ? t("搜索范围") : t("应用列表")}><p>{searching ? t("按名称、主进程、辅助进程和路径搜索全部应用，不受当前标签或系统工具折叠限制。下方筛选条件仍生效。") : view === 'recent' ? t('首次扫描的已有应用不计入。后续新发现的应用保留 7 天记录，不自动设置分流。') : t("选择直接联网或跟随代理组的应用显示在“已设置”中。收藏仅用于单独筛选，不改变联网方式。")}</p><p>{t("可在“更多”或应用详情中收藏，不改变联网方式。新安装的软件自动加入“全部应用”，也可手动扫描。")}</p></HelpTip></span><div>
             <Button icon={<StarOutlined />} type={favoritesOnly ? 'primary' : 'default'} aria-pressed={favoritesOnly} onClick={() => { setFavoritesOnly(value => !value); if (!favoritesOnly) setView('all'); setSelected([]) }}>{t("只看收藏")}</Button>
             <Select aria-label={t("联网方式筛选")} value={filter} onChange={value => { setFilter(value); setSelected([]) }} options={[{ value: 'all', label: t("全部联网方式") }, ...(['rule', 'direct', 'proxy'] as RouteMode[]).map(value => ({ value, label: t(routeLabels[value]) }))]} />
             <Select aria-label={t("应用分类筛选")} value={category} onChange={value => { setCategory(value); setSelected([]) }} options={[{ value: 'all', label: t("所有分类") }, ...[...new Set(applications.map(app => app.category))].map(value => ({ value, label: t(value) }))]} />
+            {hasFilters && <Button type="text" onClick={clearFilters}>{t('清除筛选')}</Button>}
           </div></div>
-          {(filter !== 'all' || category !== 'all' || favoritesOnly) && <div className="active-filters"><span>{t("筛选：")}{[filter !== 'all' && t(routeLabels[filter as RouteMode]), category !== 'all' && t(category), favoritesOnly && t("已收藏")].filter(Boolean).join(' · ')}</span><Button size="small" type="link" onClick={() => { setFilter('all'); setCategory('all'); setFavoritesOnly(false); setSelected([]) }}>{t("清除筛选")}</Button></div>}
           {view === 'running' && inventory.runningError && <Alert type="warning" title={t(inventory.runningError)} action={<Button onClick={() => void inventory.refreshRunning()}>{t("重试")}</Button>} />}
           {selected.length > 0 && <div className="bulk-toolbar"><span>{t("已选择 {0} 个应用", [selected.length])}</span><Button size="small" icon={<StarOutlined />} onClick={() => { inventory.addFavorites(applications.filter(app => selected.includes(app.id))); setSelected([]); void message.success(t("已加入收藏")) }}>{t("加入收藏")}</Button><Dropdown trigger={['click']} menu={{ items: (Object.keys(routeLabels) as RouteMode[]).map((mode) => ({ key: mode, label: t(routeLabels[mode]) })), onClick: ({ key }) => { changeMode(selected.map(String), key as RouteMode) } }}><Button size="small" disabled={routing.groupBusy || Boolean(routing.status?.untrackedRuleCount) || !routing.status?.connected || (Boolean(routing.status?.pending) && !applying)}>{t("批量应用连接方式")}</Button></Dropdown><Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setSelected([])}>{t("取消选择")}</Button></div>}
           {(primary.length > 0 || folded.length === 0) && <ApplicationTable groupBusy={routing.groupBusy} status={routing.status} busyIds={routing.busyIds} pendingRoutes={routing.pendingRoutes} failures={routing.failures} loading={!inventory.ready || (inventory.loading && !inventory.applications.length)} applications={primary} favorites={inventory.favorites} toggleFavorite={inventory.toggleFavorite} selected={selected} setSelected={setSelected} changeMode={changeMode} details={app => setDetailId(app.id)} remove={removeApplication} clearFilters={showAll} emptyDescription={searching ? t("没有匹配的应用，请尝试名称、进程或清除筛选") : view === 'configured' ? t("从全部应用选择联网方式，设置成功后会出现在这里") : t("没有找到匹配的应用")} />}
           {folded.length > 0 && <Collapse className="system-tools" items={[{ key: 'tools', label: t("系统工具与维护程序 · {0} 个", [folded.length]), children: <ApplicationTable groupBusy={routing.groupBusy} status={routing.status} busyIds={routing.busyIds} pendingRoutes={routing.pendingRoutes} failures={routing.failures} loading={false} applications={folded} favorites={inventory.favorites} toggleFavorite={inventory.toggleFavorite} selected={selected} setSelected={setSelected} changeMode={changeMode} details={app => setDetailId(app.id)} remove={removeApplication} clearFilters={showAll} /> }]} />}
           <div className="table-footer"><span>{t("当前视图 {0} 个 · 本机共 {1} 个", [visible.length, applications.length])}{inventory.loading ? t(" · 正在检查新应用…") : inventory.scannedAt ? t(" · 最近检查 {0}", [formatTime(inventory.scannedAt, { hour: '2-digit', minute: '2-digit' })]) : ''}</span><Button type="link" size="small" icon={<InfoCircleOutlined />} onClick={() => setPage('help')}>{t("联网方式说明")}</Button></div>
 
-        </section> : page === 'drafts' ? <DraftPage applications={applications} status={routing.status} onExport={exportDraft} onDetails={app => setDetailId(app.id)} /> : page === 'icons' ? <IconManagement /> : page === 'settings' ? <SettingsPage busy={applying} setBusy={setSettingsBusy} onImported={async () => { await inventory.reload(); await routing.refresh(); await initializeLanguage() }} /> : <HelpPage />}
+        </section> : page === 'drafts' ? <DraftPage applications={applications} status={routing.status} onExport={exportDraft} onDetails={app => setDetailId(app.id)} /> : page === 'icons' ? <IconManagement /> : page === 'settings' ? <SettingsPage busy={applying} setBusy={setSettingsBusy} onImported={async () => { await inventory.reload(); await routing.refresh(); await initializeLanguage() }} /> : <HelpPage onAction={helpAction} />}
       </main>
       {inventory.saveError && <footer className="workspace-footer"><span>{t("列表缓存未能保存，下次将重新扫描。")}</span></footer>}
     </div>

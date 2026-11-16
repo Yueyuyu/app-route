@@ -2,7 +2,7 @@ import { t } from '../i18n'
 import { Alert, App as AntApp, Button, Empty, Input, Modal, Select, Tabs, Tag, Tooltip } from 'antd'
 import { ReloadOutlined, SearchOutlined, UploadOutlined } from '@ant-design/icons'
 import { useRef, useState } from 'react'
-import { applicationIconCatalog, catalogIconUrl } from '../../core/applicationIcons'
+import { applicationIconCatalog, catalogIconUrl, listedApplicationIcons } from '../../core/applicationIcons'
 import { iconSourceLabels, type ApplicationIconView } from '../../shared/applicationIcon'
 import { useApplicationIcons } from '../hooks/useApplicationIcons'
 import { ApplicationIcon } from './ApplicationIcon'
@@ -35,10 +35,9 @@ export function IconManagement() {
   const [choiceId, setChoiceId] = useState<string>()
   const upload = useRef<HTMLInputElement>(null)
   const uploadTarget = useRef<ApplicationIconView | undefined>(undefined)
-  const all = icons.state?.applications ?? []
-  const local = all.filter(app => app.origin === 'scan' && app.available)
+  const all = listedApplicationIcons(icons.state?.applications ?? [])
   const needsAttention = (app: ApplicationIconView) => app.needsAttention || icons.failedImages.includes(app.icon)
-  const rows = all.filter(app => (app.origin !== 'scan' || app.available) &&
+  const rows = all.filter(app =>
     `${app.name} ${app.processes.join(' ')}`.toLowerCase().includes(search.toLowerCase()) &&
     (filter === 'all' || (filter === 'attention' ? needsAttention(app) : filter === 'failed' ? icons.failedImages.includes(app.icon) : app.source === filter)))
   const builtin = applicationIconCatalog.applications.filter(app => `${app.name} ${app.aliases.join(' ')} ${app.processes.join(' ')}`.toLowerCase().includes(search.toLowerCase()))
@@ -58,15 +57,17 @@ export function IconManagement() {
     }, t("已使用所选图标"))
   }
   const color = (app: ApplicationIconView) => needsAttention(app) ? 'orange' : app.source === 'custom' ? 'purple' : app.source === 'local' ? 'green' : 'blue'
+  function showIcons(nextFilter: string, nextTab = 'local') { setFilter(nextFilter); setTab(nextTab); setSearch(''); setPage(1) }
   return <section aria-label={t("图标管理")} className="icon-management">
     <div className="page-heading"><div><h1>{t("图标管理")}</h1><p>{t("补齐或替换应用图标，保存在本机。")}<HelpTip title={t("图标来源")}>{t("优先使用自定义图标，再从本机程序与公共库自动匹配。替换图标不改变联网方式，随时可以恢复自动选择。")}</HelpTip></p></div>
       <Button icon={<ReloadOutlined />} loading={icons.busy} onClick={() => void perform(icons.scan, t("已重新扫描并检查本机图标"))}>{t("检查并补齐")}</Button></div>
     <div className="icon-statistics">
-      <div><span>{t("本机应用")}</span><strong>{icons.state?.scannedAt ? local.length : '—'}</strong></div>
-      <div><span>{t("已有图标")}</span><strong>{local.filter(app => !needsAttention(app)).length}</strong></div>
-      <div><span>{t("待完善")}</span><strong className={local.some(needsAttention) ? 'icon-attention-count' : ''}>{local.filter(needsAttention).length}</strong></div>
-      <div><span>{t("公共图标")}</span><strong>{applicationIconCatalog.applications.length}</strong></div>
+      <button onClick={() => showIcons('all')}><span>{t('列表应用')}</span><strong>{icons.state ? all.length : '—'}</strong></button>
+      <div><span>{t("已有图标")}</span><strong>{all.filter(app => !needsAttention(app)).length}</strong></div>
+      <button aria-label={t('查看待完善图标')} onClick={() => showIcons('attention')}><span>{t("待完善")}</span><strong className={all.some(needsAttention) ? 'icon-attention-count' : ''}>{all.filter(needsAttention).length}</strong></button>
+      <button onClick={() => showIcons('all', 'builtin')}><span>{t("公共图标")}</span><strong>{applicationIconCatalog.applications.length}</strong></button>
     </div>
+    <p className="icon-count-scope secondary-copy">{t('统计包含当前扫描及手动添加的图标条目，不等于分流应用数。')}<HelpTip title={t('统计范围')}>{t('辅助程序可能各有图标；分流列表会合并同一应用的辅助程序。两页数量可能不同。')}</HelpTip></p>
     {icons.error && <Alert type="error" showIcon title={t(icons.error)} action={<Button size="small" onClick={() => void icons.refresh()}>{t("重试")}</Button>} />}
     {icons.state?.scanWarnings.map(warning => <Alert key={warning} type="warning" showIcon title={t(warning)} />)}
     <div className="icon-manager-toolbar"><Tabs activeKey={tab} onChange={key => { setTab(key); setPage(1); setSearch('') }} items={[{ key: 'local', label: t("本机应用") }, { key: 'builtin', label: t("公共图标库") }]} />

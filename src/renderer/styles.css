@@ -15,7 +15,7 @@ p { line-height: 1.75; }
 .sidebar { width: 232px; flex: 0 0 232px; background: #f6f8fc; border-right: 1px solid #e9edf5; display: flex; flex-direction: column; padding: 16px 14px 14px; position: fixed; inset: 0 auto 0 0; z-index: 10; }
 .sidebar > .brand { min-height: 80px; padding-inline: 10px; margin-bottom: 16px; }
 .sidebar .ant-menu, .navigation-drawer .ant-menu { background: transparent; border-inline-end: none !important; }
-.sidebar .ant-menu-item { margin: 5px 0; width: 100%; padding-left: 10px !important; height: 46px; line-height: 46px; }
+.sidebar .ant-menu-item { margin: 3px 0; width: 100%; padding-left: 10px !important; height: 44px; line-height: 44px; }
 .sidebar .ant-menu-item-icon { font-size: 17px !important; }
 .sidebar .ant-menu-title-content { margin-inline-start: 12px !important; font-weight: 500; font-size: 14px; }
 .sidebar-bottom { margin-top: auto; padding-top: 12px; border-top: 1px solid #e8edf5; }
@@ -94,13 +94,13 @@ p { line-height: 1.75; }
 .list-toolbar .ant-tabs { min-width: 0; }
 .list-toolbar .ant-tabs-nav { margin-bottom: 0; }
 .list-toolbar .ant-tabs-nav::before { display: none; }
-.list-toolbar .ant-tabs-tab { padding: 14px 0; font-size: 14px; }
+.list-toolbar .ant-tabs-tab { padding: 10px 0; font-size: 14px; }
 .list-toolbar .ant-tabs-tab b { font-size: 11px; font-weight: 500; margin-left: 4px; color: #8794a7; }
 .list-toolbar .ant-tabs-tab-active b { color: #3265ed; }
 .list-search { flex: 0 1 250px; min-width: 185px; }
 .list-search .ant-input-affix-wrapper { width: 100%; font-size: 13px; }
 .list-search .ant-input-prefix { color: #8b98ae; margin-right: 7px; }
-.view-filters { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; color: #77849a; font-size: 12px; }
+.view-filters { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #77849a; font-size: 12px; }
 .view-filters > span { display: flex; align-items: center; }
 .view-filters > div { display: flex; gap: 8px; }
 .view-filters .ant-select { width: 140px; }
@@ -189,7 +189,11 @@ p { line-height: 1.75; }
 
 /* 图标库与可撤销的选图弹窗。 */
 .icon-statistics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 20px 0; }
-.icon-statistics > div { border: 1px solid #e5eaf2; border-radius: 10px; background: #fff; padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.icon-statistics > div, .icon-statistics > button { border: 1px solid #e5eaf2; border-radius: 10px; background: #fff; padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; }
+.icon-statistics > button { cursor: pointer; }
+.icon-statistics > button:hover { border-color: #91b6f4; background: #f4f8ff; }
+.icon-count-scope { margin-top: -10px; }
+.help-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
 .icon-statistics span { color: #68768b; font-size: 12px; }
 .icon-statistics strong { color: #283c59; font-size: 26px; font-weight: 600; }
 .icon-statistics .icon-attention-count { color: #bf7c13; }
@@ -317,7 +321,7 @@ p { line-height: 1.75; }
   .icon-manager-search .ant-input-affix-wrapper { width: auto; flex: 1; min-width: 0; }
   .icon-grid { grid-template-columns: 1fr; }
   .icon-statistics { gap: 10px; }
-  .icon-statistics > div { padding: 14px; }
+  .icon-statistics > div, .icon-statistics > button { padding: 14px; }
   .icon-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .process-list { columns: 1; }
 }
