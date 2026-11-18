@@ -279,6 +279,7 @@ try {
     assert.equal(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'inventory.json'), 'utf8'), beforeUpgrade)
     await page.keyboard.press('Escape'); await page.locator('.about-app-modal').waitFor({ state: 'hidden' })
     await page.locator('.sidebar .sidebar-update').getByText('v9.1.0-preview.1', { exact: true }).waitFor()
+    assert.equal(await page.locator('.sidebar-update-action').innerText(), { 'zh-CN': '查看', en: 'View', ja: '表示', fr: 'Voir' }[locale], 'update action is translated in every language')
     await page.locator('.sidebar .sidebar-update').click()
     await page.locator('.update-version').getByText('9.1.0-preview.1', { exact: false }).waitFor()
     await page.keyboard.press('Escape'); await page.locator('.about-app-modal').waitFor({ state: 'hidden' })

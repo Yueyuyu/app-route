@@ -1,6 +1,7 @@
 /** 中文原句作为 gettext 风格键；译文顺序为 English、日本語、Français。
  * 修改原句时同步更新三种译文，保留 {0} 等插值参数。用户数据不进入此目录。 */
 export const messages: Record<string, readonly [string, string, string]> = {
+  "查看": ["View","表示","Voir"],
   "正在安装": ["Installing","インストール中","Installation en cours"],
   "可安装更新": ["Ready to install","インストール可能","Prêt à installer"],
   "更新下载中": ["Downloading update","更新をダウンロード中","Téléchargement"],
