@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { createHash } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
+import { extractWindowsTestCore } from './lib/testCoreArchive.mjs'
 
 // 仅供隔离 CI 验收，不分发此内核，也不替换用户的 Clash Party。
 if (!process.env.CI || !process.env.GITHUB_ENV) throw new Error('此准备脚本只用于 GitHub CI。')
@@ -21,9 +21,6 @@ const folder = path.resolve('.runtime/test-core'); await fs.mkdir(folder, { recu
 let core
 if (process.platform === 'win32') {
   const archive = path.join(folder, name); await fs.writeFile(archive, bytes)
-  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', "Expand-Archive -LiteralPath $env:APPROUTE_TEST_ARCHIVE -DestinationPath $env:APPROUTE_TEST_DIRECTORY -Force"], { env: { ...process.env, APPROUTE_TEST_ARCHIVE: archive, APPROUTE_TEST_DIRECTORY: folder }, windowsHide: true })
-  const files = (await fs.readdir(folder)).filter(file => file.endsWith('.exe'))
-  if (files.length !== 1) throw new Error('Ambiguous test core')
-  core = path.join(folder, files[0])
+  core = extractWindowsTestCore(archive, folder)
 } else { core = path.join(folder, 'mihomo'); await fs.writeFile(core, gunzipSync(bytes), { mode: 0o700 }) }
 await fs.appendFile(process.env.GITHUB_ENV, `APPROUTE_TEST_CORE=${core}\n`)
