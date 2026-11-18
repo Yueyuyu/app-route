@@ -70,6 +70,7 @@ jobs:
             dist/build-info.json
             output/packaged-check.json
             output/clean-install-check.json
+            output/auto-update-check.json
             output/runtime-selection-check.json
             output/recovery-fault-check.json
             output/installer-build-check.json

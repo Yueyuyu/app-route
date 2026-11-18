@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import assert from 'node:assert/strict'
 import http from 'node:http'
+import { createHash } from 'node:crypto'
 import { build } from 'rolldown'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
@@ -19,6 +20,8 @@ const finishEvidence = await startUiEvidence('settings')
 let passed = false
 await build({ input: 'tests/fixtures/settingsFixture.ts', platform: 'node', output: { file: path.join(fixture, 'settings-fixture.mjs'), format: 'esm' } })
 const importedFile = path.join(fixture, 'import.json'), exportedFile = path.join(fixture, 'export.json')
+const installerText = 'AppRoute UI fixture: verified download, never executable.'
+const installerHash = createHash('sha256').update(installerText).digest('hex')
 const controlRequests = [], controlFile = path.join(fixture, 'inspection.yaml')
 const controlServer = http.createServer((req, res) => {
   controlRequests.push({ method: req.method, url: req.url, authenticated: req.headers.authorization === 'Bearer ui-fixture-only' })
@@ -54,15 +57,21 @@ try {
   await desktop.evaluate(({ dialog, net, shell }, files) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [files.importedFile] })
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: files.exportedFile })
-    globalThis.appRouteUpdateRequests = []; globalThis.appRouteUpdateLinks = []
+    globalThis.appRouteUpdateRequests = []; globalThis.appRouteUpdateLinks = []; globalThis.appRouteInstallerFiles = []
     shell.openExternal = async url => { globalThis.appRouteUpdateLinks.push(url) }
+    shell.showItemInFolder = file => { globalThis.appRouteInstallerFiles.push(file) }
+    shell.openPath = async file => { globalThis.appRouteInstallerFiles.push(file); return '' }
     net.fetch = async (url, options) => {
+      if (/^https:\/\/github.com\/Yueyuyu\/app-route\/releases\/download\/v9/.test(url) && options.credentials === 'omit' && options.redirect === 'manual') {
+        globalThis.appRouteUpdateRequests.push(url)
+        return new Response(files.installerText)
+      }
       if (url !== 'https://api.github.com/repos/Yueyuyu/app-route/releases?per_page=100' || options.credentials !== 'omit' || options.body || options.headers.Authorization) throw new Error('unexpected update request')
       globalThis.appRouteUpdateRequests.push(url)
       const suffix = process.platform === 'win32' ? 'setup-x64.exe' : `mac-${process.arch}.dmg`
-      return Response.json(['9.0.0', '9.1.0-preview.1'].map(version => ({ tag_name: 'v' + version, draft: false, prerelease: version.includes('-'), published_at: '2026-11-16T00:00:00Z', body: 'Demo release notes\n<img src="https://example.invalid/not-loaded">', assets: [{ name: `AppRoute-${version}-${suffix}`, browser_download_url: `https://github.com/Yueyuyu/app-route/releases/download/v${version}/AppRoute-${version}-${suffix}`, size: 12345, state: 'uploaded', digest: 'sha256:' + 'a'.repeat(64) }] })))
+      return Response.json(['9.0.0', '9.1.0-preview.1'].map(version => ({ tag_name: 'v' + version, draft: false, prerelease: version.includes('-'), published_at: '2026-11-16T00:00:00Z', body: 'Demo release notes\n<img src="https://example.invalid/not-loaded">', assets: [{ name: `AppRoute-${version}-${suffix}`, browser_download_url: `https://github.com/Yueyuyu/app-route/releases/download/v${version}/AppRoute-${version}-${suffix}`, size: files.installerText.length, state: 'uploaded', digest: 'sha256:' + files.installerHash }] })))
     }
-  }, { importedFile, exportedFile })
+  }, { importedFile, exportedFile, installerText, installerHash })
   for (const [locale, label] of [['zh-CN', '简体中文'], ['en', 'English'], ['ja', '日本語'], ['fr', 'Français']]) {
     const tr = source => translate(locale, source)
     await page.locator('.language-switcher').click()
@@ -249,34 +258,44 @@ try {
     await page.locator('.update-notes').waitFor()
     assert.ok((await page.locator('.update-notes').innerText()).includes('<img'))
     assert.equal(await page.locator('.update-notes img').count(), 0, 'release notes are plain text')
-    await page.getByRole('button', { name: tr('备份并下载'), exact: true }).click()
-    await page.getByText(tr('升级前备份已保存，已打开对应安装包下载入口。'), { exact: true }).waitFor()
+    await page.locator('.update-panel .ant-collapse-header').click()
+    await page.getByRole('button', { name: tr(locale === 'zh-CN' ? '备份并下载' : '重新下载'), exact: true }).click()
+    await page.locator('.update-transfer-title').getByText(tr('安装包已就绪'), { exact: true }).waitFor()
     await page.locator('.upgrade-verification').getByText(translate(locale, '升级前备份已保存，等待安装 {0}。', ['9.1.0-preview.1']), { exact: true }).waitFor()
     const baseline = JSON.parse(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'upgrade.json'), 'utf8'))
     const upgradeBackup = JSON.parse(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'backups', baseline.backupId), 'utf8'))
     assert.equal(upgradeBackup.backupKind, 'before-upgrade')
     assert.equal(upgradeBackup.applications.length, 8)
     assert.equal(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'inventory.json'), 'utf8'), beforeUpgrade)
-    const links = await desktop.evaluate(() => globalThis.appRouteUpdateLinks)
-    assert.match(links.at(-1), /^https:\/\/github.com\/Yueyuyu\/app-route\/releases\/download\/v9\.1\.0-preview\.1\/AppRoute-9\.1\.0-preview\.1-(setup-x64\.exe|mac-(arm64|x64)\.dmg)$/)
+    const downloads = await desktop.evaluate(() => globalThis.appRouteUpdateRequests.filter(url => url.includes('/releases/download/')))
+    assert.match(downloads.at(-1), /^https:\/\/github.com\/Yueyuyu\/app-route\/releases\/download\/v9\.1\.0-preview\.1\/AppRoute-9\.1\.0-preview\.1-(setup-x64\.exe|mac-(arm64|x64)\.dmg)$/)
+    assert.equal(await desktop.evaluate(() => globalThis.appRouteUpdateLinks.some(url => url.includes('/releases/download/'))), false, 'download stays inside the app')
     assert.equal(await fs.stat(path.join(fixture, 'routing-request.json')).then(() => true, () => false), false, 'upgrade backup must not apply routing')
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false)
     await page.screenshot({ path: path.join(output, locale + '-update.png'), animations: 'disabled' })
     if (locale === 'zh-CN') {
       await fs.writeFile(path.join(fixture, 'block-upgrade'), 'fixture')
-      await page.getByRole('button', { name: tr('备份并下载'), exact: true }).click()
+      await page.getByRole('button', { name: tr(process.platform === 'darwin' ? '打开安装包' : '打开下载目录'), exact: true }).click()
       await page.getByText(tr('管理记录待核对，请先处理后再创建升级备份。'), { exact: true }).waitFor()
-      assert.equal(await desktop.evaluate(() => globalThis.appRouteUpdateLinks.length), links.length, 'backup failure prevents download')
+      assert.equal(await desktop.evaluate(() => globalThis.appRouteInstallerFiles.length), 0, 'failed fresh backup prevents installer handoff')
       await fs.unlink(path.join(fixture, 'block-upgrade'))
-      checks.push('failed upgrade backup prevents opening a download')
+      checks.push('failed fresh backup prevents installer handoff while keeping the current app open')
     }
+    await page.getByRole('button', { name: tr(process.platform === 'darwin' ? '打开安装包' : '打开下载目录'), exact: true }).click()
+    await page.getByText(tr(process.platform === 'darwin' ? '安装包已打开；请手动完成替换后重新打开 AppRoute。' : '下载目录已打开；请手动完成安装后重新打开 AppRoute。'), { exact: true }).waitFor()
+    const installer = await desktop.evaluate(() => globalThis.appRouteInstallerFiles.at(-1))
+    assert.ok(installer.startsWith(path.join(env.APPROUTE_DATA_DIR, 'updates') + path.sep))
+    assert.equal(createHash('sha256').update(await fs.readFile(installer)).digest('hex'), installerHash)
+    const installBaseline = JSON.parse(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'upgrade.json'), 'utf8'))
+    assert.notEqual(installBaseline.backupId, baseline.backupId, 'install refreshes the upgrade backup')
+    assert.equal(await fs.readFile(path.join(env.APPROUTE_DATA_DIR, 'inventory.json'), 'utf8'), beforeUpgrade)
     await page.keyboard.press('Escape'); await page.locator('.about-app-modal').waitFor({ state: 'hidden' })
     await page.locator('.sidebar .sidebar-update').getByText('v9.1.0-preview.1', { exact: true }).waitFor()
     await page.locator('.sidebar .sidebar-update').click()
     await page.locator('.update-version').getByText('9.1.0-preview.1', { exact: false }).waitFor()
     await page.keyboard.press('Escape'); await page.locator('.about-app-modal').waitFor({ state: 'hidden' })
     await page.locator('.sidebar-bottom').first().screenshot({ path: path.join(output, locale + '-sidebar-update.png'), animations: 'disabled' })
-    checks.push(locale + ': stable/preview channels, plain notes, trusted download after real backup, no routing changes')
+    checks.push(locale + ': channels, verified native download, refreshed backup and manual handoff, shared footer progress; no routing changes')
     await setDesktopViewport(desktop, page, { width: 1440, height: 1000 })
     nativeWindows.push({ locale, ...await checkDesktopMaximizeRestore(desktop, page) })
     await page.evaluate(() => window.scrollTo(0, 0))

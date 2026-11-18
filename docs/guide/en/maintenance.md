@@ -7,11 +7,11 @@
 3. Run the Windows installer, or replace AppRoute.app in Applications on Mac.
 4. Reopen it, verify the version and app settings, then run a fresh network check.
 
-There is no auto-update. Normal upgrades retain app preferences, routing records and recovery data. Do not delete user data to upgrade. On failure, preserve diagnostic information and report it. Downgrade data compatibility is not guaranteed.
+The published 0.2.0-preview.2 installer has no auto-update. Normal upgrades retain app preferences, routing records and recovery data. Do not delete user data to upgrade. On failure, preserve diagnostic information and report it. Downgrade data compatibility is not guaranteed.
 
 ## In-app update checks (source development version)
 
-This is not included in the 0.2.0-preview.2 installer. In newer source builds, open About → App updates, select stable releases or previews, and check the release notes, matching installer and SHA-256. Back up and download saves settings before opening the project download; you still run the installer manually. The next version checks existing settings without overwriting differences. A checksum does not replace publisher signing, and real network connections need separate verification.
+Not included in 0.2.0-preview.2. New source builds show the version, GitHub and a More menu in the sidebar. Background checks are infrequent and can be disabled. Choose stable or preview releases, then back up and download within the app; the file is verified and downloads can be cancelled or retried. Installed Windows copies offer Install and restart, with another backup before quitting, installing and reopening. On Mac, open the DMG, quit and replace the app manually; folder builds require manual installation. Failed backups or verification prevent installation. The new version compares settings without overwriting differences. Checksums do not replace signing; verify network connections separately.
 
 <a id="recovery"></a>
 

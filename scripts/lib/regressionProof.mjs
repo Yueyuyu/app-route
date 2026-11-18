@@ -1,5 +1,8 @@
 // 精确替换只在临时副本发生。实现变化后匹配失败，要求重新审查破坏点，不能悄悄跳过。
 export const regressionCases = [
+  { id: 'installer-download-digest', file: 'src/main/desktop/updateInstaller.ts',
+    before: "received !== release.size || hash.digest('hex') !== release.sha256", after: 'received !== release.size',
+    test: 'tests/updateInstaller.test.ts', name: '备份失败、下载长度或哈希错误均不留下可安装文件，错误信息不泄露本机路径' },
   { id: 'mihomo-capability-boundary', file: 'src/main/adapters/mihomoEndpointInspector.ts', before: "state: 'needs-setup'", after: "state: 'ready'",
     test: 'tests/mihomoInspection.test.ts', name: 'Mihomo 探测仅发固定回环 GET，接口可读不能宣称配置可写或 UDP 可用' },
   { id: 'remove-failed-domain-proxy', file: 'src/main/services/routingService.ts',

@@ -413,6 +413,10 @@ html:lang(en) .view-filters .ant-select, html:lang(fr) .view-filters .ant-select
 .update-controls .ant-radio-button-wrapper { white-space: normal; height: auto; line-height: 1.5; padding-block: 6px; }
 .update-result { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
 .update-download { margin-top: 16px; }
+.update-transfer { margin-top: 18px; padding: 14px; border: 1px solid #d8e5ff; border-radius: 10px; background: #f5f8ff; }
+.update-transfer-title { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.update-transfer-title > span { color: #667085; font-size: 12px; }
+.update-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .update-notes { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.7; max-height: 200px; overflow-y: auto; }
 .update-checksum { overflow-wrap: anywhere; user-select: text; }
 .update-panel > .ant-alert, .upgrade-verification { margin-top: 16px; }

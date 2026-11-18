@@ -28,7 +28,7 @@ const upgrade = new UpgradeVerificationService(settings)
 const history = new RoutingHistoryService(service)
 const temporary = new TemporaryRoutingService(service)
 let cachedScan: ApplicationScanResult | undefined
-let lastScan = 0, mutations = 0, disconnected = false
+let lastScan = 0, mutations = 0, disconnected = false, upgradePreparing = false
 const attempts = new Set<string>()
 async function scan(force = false) {
   if (!force && cachedScan && Date.now() - lastScan < 60000) return cachedScan
@@ -41,7 +41,14 @@ async function dispatch(action: DesktopAction, body: any = {}) {
     case 'integration.temporary-end': return temporary.end(body)
     case 'integration.history': return history.list()
     case 'integration.undo': return history.undo(body)
-    case 'updates.prepare': return upgrade.prepare(body.fromVersion, body.targetVersion)
+    case 'updates.prepare': {
+      if (body.installing === true) {
+        if (checking) throw new Error('后台操作尚未结束，请稍后更新。')
+        upgradePreparing = true
+      }
+      try { return await upgrade.prepare(body.fromVersion, body.targetVersion) }
+      catch (error) { upgradePreparing = false; throw error }
+    }
     case 'updates.status': return upgrade.check(body.currentVersion)
     case 'applications.scan': return scan(body.force === true)
     case 'applications.running': return runningApplications()
@@ -101,12 +108,12 @@ process.on('message', async (request: { id: number; action: DesktopAction; body?
   if (mutation) mutations++
   try { validateDesktopRequest(request.action, request.body); const value = await dispatch(request.action, request.body); if (process.connected) process.send?.({ id: request.id, value }) }
   catch (error) { if (process.connected) process.send?.({ id: request.id, error: safeDesktopError(error) }) }
-  finally { if (mutation) mutations--; if (disconnected && !mutations) process.exit(0) }
+  finally { if (mutation) mutations--; if (disconnected && !mutations && !checking) process.exit(0) }
 })
 // 托盘隐藏时仍补充已经明确设置过的应用；不为新扫描应用自动设置网络。
 let checking = false
 const monitor = setInterval(async () => {
-  if (mutations || checking || disconnected) return
+  if (mutations || checking || disconnected || upgradePreparing) return
   checking = true
   try {
     await service.reconcileInterrupted()
@@ -118,7 +125,7 @@ const monitor = setInterval(async () => {
     const app = status.managed.find(item => missing.some(p => p.applicationId === item.id) && item.processPaths?.length)
     if (!app) return
     const key = JSON.stringify([app.id, missing.filter(p => p.applicationId === app.id).map(p => p.process).sort()])
-    if (attempts.has(key) || mutations) return
+    if (attempts.has(key) || mutations || disconnected || upgradePreparing) return
     attempts.add(key); mutations++
     try { await service.applyAutomatically({ revision: status.revision, target: app.target, applications: [{ ...app, path: app.processPaths![0], source: 'scan', category: '已管理应用' }] }, 'helper') }
     finally { mutations-- }

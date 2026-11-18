@@ -7,11 +7,11 @@
 3. Exécutez l’installateur Windows ou remplacez AppRoute.app dans Applications sur Mac.
 4. Rouvrez, vérifiez la version et les réglages, puis refaites un diagnostic réseau.
 
-Il n’y a pas de mise à jour automatique. Les mises à jour normales conservent préférences, règles enregistrées et données de restauration. Ne supprimez pas les données utilisateur. En cas d’échec, conservez le diagnostic et signalez-le. La compatibilité des données lors d’un retour à une ancienne version n’est pas garantie.
+L’installateur publié 0.2.0-preview.2 ne propose pas de mise à jour automatique. Les mises à jour normales conservent préférences, règles enregistrées et données de restauration. Ne supprimez pas les données utilisateur. En cas d’échec, conservez le diagnostic et signalez-le. La compatibilité des données lors d’un retour à une ancienne version n’est pas garantie.
 
 ## Vérifier les mises à jour dans l’application (version source)
 
-Cette fonction ne figure pas dans l’installateur 0.2.0-preview.2. Dans les nouvelles versions source, ouvrez À propos → Mises à jour, choisissez les versions stables ou les préversions, puis consultez les notes, le programme adapté et son SHA-256. Sauvegarder et télécharger enregistre les paramètres avant d’ouvrir le téléchargement du projet ; vous lancez toujours l’installation manuellement. La nouvelle version compare les paramètres sans écraser les différences. Une empreinte ne remplace pas la signature de l’éditeur ; les connexions réelles restent à vérifier séparément.
+Non inclus dans 0.2.0-preview.2. Les nouvelles versions source affichent version, GitHub et menu d’options dans la barre latérale. Les recherches automatiques sont espacées et désactivables. Choisissez versions stables ou préversions, puis sauvegardez et téléchargez dans l’application : le fichier est vérifié, le téléchargement peut être annulé ou relancé. La version Windows installée propose Installer et redémarrer, avec une nouvelle sauvegarde avant fermeture, installation et réouverture. Sur Mac, ouvrez le DMG, quittez et remplacez l’application manuellement ; les versions exécutées depuis un dossier nécessitent aussi une installation manuelle. Un échec de sauvegarde ou de vérification bloque l’installation. La nouvelle version compare les paramètres sans écraser les différences. Les empreintes ne remplacent pas la signature ; vérifiez le réseau séparément.
 
 <a id="recovery"></a>
 

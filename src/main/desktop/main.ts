@@ -5,6 +5,8 @@ import { LanguagePreferencesStore } from './languagePreferences.ts'
 import { inspectMihomoFile } from '../adapters/mihomoEndpointInspector.ts'
 import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, protocol, session, shell, nativeImage, powerMonitor, clipboard, net } from 'electron'
 import { ReleaseUpdateService } from './releaseUpdates.ts'
+import { UpdateInstaller } from './updateInstaller.ts'
+import { launchWindowsUpdate, updateInstallation } from './windowsUpdate.ts'
 import { projectLink, versionSummary, type BuildInfo } from '../../shared/appInfo.ts'
 import { fork, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs/promises'
@@ -12,6 +14,7 @@ import path from 'node:path'
 import { desktopAssetPath, desktopOrigin, isTrustedDesktopSender, validateDesktopRequest } from './boundary.ts'
 import type { DesktopAction, DesktopDestination } from '../../shared/desktop.ts'
 import type { SettingsImportResult } from '../../shared/settings.ts'
+import type { UpdateChannel } from '../../shared/updates.ts'
 import { settingsFileLimit } from '../../core/settingsTransfer.ts'
 
 app.setName('AppRoute')
@@ -25,12 +28,14 @@ let systemLanguages: string[] = []
 const tr = (source: string) => translate(resolveLocale(language, systemLanguages), source)
 const languageSettings = () => ({ language, systemLanguages })
 let languageWrite: Promise<unknown> = Promise.resolve()
-const pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
+const pending = new Map<number, { action: DesktopAction; resolve: (value: any) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
 const resources = app.getAppPath()
-let updates: ReleaseUpdateService, installedBuild: BuildInfo
+let updates: ReleaseUpdateService, updateInstaller: UpdateInstaller, installedBuild: BuildInfo
+let installingUpdate = false, installerStarted = false
 const icon = path.join(resources, 'ui', process.platform === 'darwin' ? 'brand/app-route-512.png' : 'favicon.ico')
 function startBackend() {
   if (worker?.connected) return
+  if (worker && worker.exitCode === null) throw new Error(tr('桌面后台正在结束，请稍后重试。'))
   const child = fork(path.join(resources, 'backend.mjs'), [], { execPath: path.join(resources, 'runtime', nodeExecutableName()), execArgv: [], windowsHide: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined, NODE_OPTIONS: undefined } })
   worker = child
   child.on('message', (response: any) => { const task = pending.get(response.id); if (!task) return; clearTimeout(task.timer); pending.delete(response.id); response.error ? task.reject(new Error(response.error)) : task.resolve(response.value) })
@@ -38,12 +43,26 @@ function startBackend() {
   child.on('error', failed); child.on('exit', failed)
 }
 function request<T = any>(action: DesktopAction, body?: unknown): Promise<T> {
+  if (installingUpdate && action !== 'updates.prepare') return Promise.reject(new Error(tr('正在准备安装更新，请稍后操作。')))
   validateDesktopRequest(action, body); startBackend()
   return new Promise((resolve, reject) => {
     const id = ++sequence
     const timer = setTimeout(() => { pending.delete(id); reject(new Error(tr("操作超时，请检查当前状态；不要重复执行恢复中的分流。"))) }, 150000)
-    pending.set(id, { resolve, reject, timer }); worker!.send({ id, action, body }, error => { if (error) { clearTimeout(timer); pending.delete(id); reject(new Error(tr("无法连接桌面后台。"))) } })
+    pending.set(id, { action, resolve, reject, timer }); worker!.send({ id, action, body }, error => { if (error) { clearTimeout(timer); pending.delete(id); reject(new Error(tr("无法连接桌面后台。"))) } })
   })
+}
+async function stopBackendForUpdate() {
+  const child = worker
+  if (!child || child.exitCode !== null) return
+  await new Promise<void>((resolve, reject) => {
+    const stopped = () => { clearTimeout(timer); resolve() }
+    const timer = setTimeout(() => { child.removeListener('exit', stopped); reject(new Error('后台操作尚未结束，请稍后更新。')) }, 10000)
+    child.once('exit', stopped)
+    if (child.connected) child.disconnect()
+  })
+}
+function updateHasPendingMutation() {
+  return [...pending.values()].some(task => task.action.startsWith('settings.') || task.action === 'inventory.write' || task.action === 'language.write' || task.action === 'updates.prepare' || task.action.startsWith('integration.') && !['integration.status', 'integration.diagnose', 'integration.history'].includes(task.action))
 }
 function updateNativeLanguage() {
     const navigate = (destination: DesktopDestination) => { showWindow(); window!.webContents.send('approute:navigate', destination) }
@@ -83,6 +102,7 @@ function createWindow() {
   void window.loadURL(`${desktopOrigin}/index.html`)
 }
 async function restoreFromTray() {
+  if (installingUpdate) return
   showWindow()
   const answer = await dialog.showMessageBox(window!, { type: 'question', title: tr("恢复网络"), message: tr("停用全部 AppRoute 专属分流？"), detail: tr("保留 Clash Party 原有规则和代理配置。收藏与应用列表保留。"), buttons: [tr("取消"), tr("恢复网络")], defaultId: 0, cancelId: 0 })
   if (answer.response !== 1) return
@@ -93,14 +113,25 @@ async function restoreFromTray() {
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
   app.on('second-instance', showWindow)
-  app.on('before-quit', () => { quitting = true })
-  app.on('will-quit', () => { tray?.destroy(); worker?.disconnect() })
+  app.on('before-quit', event => { if (installingUpdate && !installerStarted) { event.preventDefault(); return }; quitting = true })
+  app.on('will-quit', () => { tray?.destroy(); if (worker?.connected) worker.disconnect() })
   app.on('activate', showWindow)
   void app.whenReady().then(async () => {
     systemLanguages = app.getPreferredSystemLanguages()
     language = await languageStore.read().catch(() => 'system' as const)
     installedBuild = await fs.readFile(path.join(resources, 'ui', 'build-info.json'), 'utf8').then(text => JSON.parse(text)).catch(() => ({ version: app.getVersion(), builtAt: '', revision: 'unknown', dirty: false }))
     updates = new ReleaseUpdateService(installedBuild.version, process.platform, process.arch, (input, init) => net.fetch(input as string, init))
+    const installation = await updateInstallation(process.platform, app.isPackaged, process.execPath)
+    updateInstaller = new UpdateInstaller({ root: appRouteDataDirectory(), platform: process.platform, arch: process.arch, installation,
+      fetch: (input, init) => net.fetch(input as string, init),
+      changed: value => { if (window && !window.isDestroyed()) window.webContents.send('approute:update-download', value) },
+      prepare: async (version, installing) => {
+        if (updateHasPendingMutation()) throw new Error('有分流或设置操作尚未完成，请稍后更新。')
+        await languageWrite
+        await request('updates.prepare', { fromVersion: installedBuild.version, targetVersion: version, installing: installing && installation === 'automatic' })
+        if (installing && installation === 'automatic') await stopBackendForUpdate()
+      },
+    })
     session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
     session.defaultSession.setPermissionCheckHandler(() => false)
     protocol.handle('approute', async req => {
@@ -119,15 +150,39 @@ else {
     ipcMain.handle('approute:request', async (event, action: unknown, body?: unknown) => {
       if (event.sender !== window?.webContents || !isTrustedDesktopSender(event.senderFrame?.url ?? '', event.senderFrame === event.sender.mainFrame)) throw new Error(tr("桌面请求来源无效。"))
       validateDesktopRequest(action, body)
+      if (installingUpdate && action !== 'updates.download-state') throw new Error(tr('正在准备安装更新，请稍后操作。'))
       if (action === 'updates.check') return updates.check((body as { channel?: unknown } | undefined)?.channel)
       if (action === 'updates.status') return request(action, { currentVersion: installedBuild.version })
-      if (action === 'updates.prepare') {
+      if (action === 'updates.download-state') return updateInstaller.snapshot()
+      if (action === 'updates.cancel') return updateInstaller.cancel()
+      if (action === 'updates.reveal') { await updateInstaller.showFile(file => shell.showItemInFolder(file)); return { opened: true } }
+      if (action === 'updates.download') {
         const input = body as { channel?: unknown; version?: unknown } | undefined
         const release = updates.selected(input?.channel, input?.version)
-        const result = await request(action, { fromVersion: installedBuild.version, targetVersion: release.version })
-        await shell.openExternal(release.downloadUrl)
-        return { ...result, opened: true }
+        return updateInstaller.start(release, input!.channel as UpdateChannel)
       }
+      if (action === 'updates.install') {
+        if (updateHasPendingMutation()) throw new Error(tr('有分流或设置操作尚未完成，请稍后更新。'))
+        const input = body as { channel?: unknown; version?: unknown } | undefined
+        installingUpdate = true
+        try {
+          await updates.check(input?.channel, true)
+          const release = updates.selected(input?.channel, input?.version)
+          await updateInstaller.install(release, async (file, mode) => {
+            if (mode === 'automatic') {
+              await launchWindowsUpdate(file)
+              installerStarted = true
+              setTimeout(() => app.quit(), 100)
+            } else if (process.platform === 'darwin') {
+              if (await shell.openPath(file)) throw new Error('安装包未能打开，请在下载目录中手动安装。')
+            } else shell.showItemInFolder(file)
+          })
+          return { started: installerStarted, manual: !installerStarted }
+        } finally {
+          if (!installerStarted) { installingUpdate = false; window?.webContents.send('approute:refresh') }
+        }
+      }
+      if (action === 'updates.prepare') throw new Error(tr('不支持的桌面操作。'))
       if (action === 'backend.pick-mihomo') {
         try {
           const chosen = await dialog.showOpenDialog(window!, { title: tr('选择运行配置并检查'), filters: [{ name: 'YAML / JSON', extensions: ['yaml', 'yml', 'json'] }], properties: ['openFile'] })

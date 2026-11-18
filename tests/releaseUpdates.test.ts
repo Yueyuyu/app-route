@@ -52,10 +52,11 @@ test('更新请求合并并限频，过期检查与任意下载版本被拒绝�
   const [first, second] = await Promise.all([service.check('preview'), service.check('preview')])
   assert.equal(calls, 1); assert.deepEqual(first, second)
   await service.check('preview'); assert.equal(calls, 1)
+  await service.check('preview', true); assert.equal(calls, 2, 'installation rechecks release metadata even while the display cache is fresh')
   assert.ok(service.selected('preview', '0.3.0-preview.10').downloadUrl.startsWith('https://github.com/Yueyuyu/app-route/releases/download/'))
   assert.throws(() => service.selected('preview', '9.0.0'))
   now += 16 * 60000; assert.throws(() => service.selected('preview', '0.3.0-preview.10'))
-  await service.check('preview'); assert.equal(calls, 2)
+  await service.check('preview'); assert.equal(calls, 3)
   await assert.rejects(service.check('unknown'))
 })
 test('更新接口限流、网络错误和超大响应不伪装成已经最新', async () => {
@@ -63,6 +64,7 @@ test('更新接口限流、网络错误和超大响应不伪装成已经最新',
   const limited = new ReleaseUpdateService('0.2.0', 'win32', 'x64', async () => { count++; return new Response('', { status: 429 }) }, () => now)
   assert.equal((await limited.check('preview')).reason, 'rate-limit')
   now += 60000; await limited.check('preview'); assert.equal(count, 1)
+  await limited.check('preview', true); assert.equal(count, 1, 'installation does not bypass a rate-limit cooldown')
   now += 15 * 60000; await limited.check('preview'); assert.equal(count, 2)
   for (const response of [new Response('{invalid'), new Response('x'.repeat(2 * 1024 * 1024 + 1)), new Response('', { status: 503 })]) {
     const service = new ReleaseUpdateService('0.2.0', 'win32', 'x64', async () => response)
@@ -97,6 +99,9 @@ test('升级备份只追加本机备份，升级核对不重放配置，发现�
   await assert.rejects(upgrade.prepare('0.2.0', '0.3.0'), /管理记录/)
   assert.equal((await upgrade.check('0.3.0')).state, 'unavailable')
   status.untrackedRuleCount = 0
+  status.pending = { id: 'fixture', deadline: Date.now() + 60000 }
+  await assert.rejects(upgrade.prepare('0.2.0', '0.3.0'), /尚未完成/)
+  status.pending = undefined
   await fs.appendFile(path.join(root, 'backups', result.backupId), ' ')
   assert.equal((await upgrade.check('0.3.0')).state, 'unavailable', 'changed backup is never trusted')
 })

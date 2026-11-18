@@ -15,6 +15,7 @@ import { HelpTip } from './components/HelpTip'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ConnectionStatus } from './components/ConnectionStatus'
 import { AboutApp } from './components/AboutApp'
+import { useReleaseUpdates } from './hooks/useReleaseUpdates'
 import { useNetworkDiagnostics } from './hooks/useNetworkDiagnostics'
 import { routeLabels, type Application, type Page, type RouteMode } from './types'
 
@@ -32,7 +33,8 @@ export default function App() {
   const applications = useMemo(() => inventoryWithRouting(inventory.applications, routing.status), [inventory.applications, routing.status])
   const target = routing.status?.proxyGroup
   const [settingsBusy, setSettingsBusy] = useState(false)
-  const applying = routing.busyIds.length > 0 || routing.groupBusy || settingsBusy
+  const updates = useReleaseUpdates()
+  const applying = routing.busyIds.length > 0 || routing.groupBusy || settingsBusy || updates.installing
   const { message, modal } = AntApp.useApp()
   useEffect(() => {
     if (routing.notice) void message.open({ key: 'routing-result', type: routing.notice.type, content: t(routing.notice.text), duration: routing.notice.type === 'error' ? 8 : 3 })

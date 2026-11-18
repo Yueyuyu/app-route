@@ -12,10 +12,13 @@ const UpdatePanel = deferredFeature(() => import('./UpdatePanel').then(module =>
 export function AboutApp() {
   const [open, setOpen] = useState(false)
   const [showUpdates, setShowUpdates] = useState(false)
-  const close = () => { setOpen(false); setShowUpdates(false) }
+  const close = () => { if (!updates.installing) { setOpen(false); setShowUpdates(false) } }
   const { message } = App.useApp()
   const updates = useReleaseUpdates()
   const available = updates.result?.state === 'available'
+  const transfer = updates.downloadState
+  const hasTransfer = ['preparing', 'downloading', 'verifying', 'ready', 'installing', 'error'].includes(transfer.phase)
+  const updateLabel = updates.installing ? '正在安装' : transfer.phase === 'ready' ? '可安装更新' : ['preparing', 'downloading', 'verifying'].includes(transfer.phase) ? '更新下载中' : transfer.phase === 'error' ? '下载未完成' : '有新版本'
   const show = (update = false) => { setShowUpdates(update); setOpen(true) }
   async function openLink(target: keyof typeof projectLinks) {
     try {
@@ -48,8 +51,8 @@ export function AboutApp() {
         } }}><button className="sidebar-icon-button" aria-label={t('更多应用选项')}><MoreOutlined /></button></Dropdown>
       </div>
     </div>
-    {available && <button className="sidebar-update" onClick={() => show(true)} aria-label={t('查看可用更新')}><span className="sidebar-update-icon"><ArrowUpOutlined /></span><span><strong>{t('有新版本')}</strong><small>v{updates.result!.release!.version}</small></span><span className="sidebar-update-action">{t('更新')}</span></button>}
-    <Modal className="about-app-modal" title={t(showUpdates ? '版本更新' : '关于 AppRoute')} open={open} onCancel={close} width={showUpdates ? 580 : 420} centered footer={<><Button onClick={() => setShowUpdates(value => !value)}>{t(showUpdates ? '关于 AppRoute' : '版本更新')}</Button><Button onClick={close}>{t('关闭')}</Button></>}>
+    {(available || hasTransfer) && <button className="sidebar-update" onClick={() => show(true)} aria-label={t('查看可用更新')}><span className="sidebar-update-icon"><ArrowUpOutlined /></span><span><strong>{t(updateLabel)}</strong><small>v{hasTransfer ? transfer.version : updates.result!.release!.version}</small></span><span className="sidebar-update-action">{transfer.phase === 'downloading' ? `${Math.floor(transfer.received / Math.max(1, transfer.total) * 100)}%` : t('查看')}</span></button>}
+    <Modal className="about-app-modal" title={t(showUpdates ? '版本更新' : '关于 AppRoute')} open={open} onCancel={close} closable={!updates.installing} keyboard={!updates.installing} maskClosable={!updates.installing} width={showUpdates ? 580 : 420} centered footer={<><Button disabled={updates.installing} onClick={() => setShowUpdates(value => !value)}>{t(showUpdates ? '关于 AppRoute' : '版本更新')}</Button><Button disabled={updates.installing} onClick={close}>{t('关闭')}</Button></>}>
       {!showUpdates && <div className="about-app-content"><Brand /><p className="about-app-version">{buildInfo.version}<Tag>{window.appRoute ? t('桌面应用') : t('开发预览')}</Tag></p>
         <p className="about-build-date">{t('构建于 {0}', [formatDateTime(buildInfo.builtAt)])}</p>
         <p>{t('为常用应用选择联网方式。')}</p>

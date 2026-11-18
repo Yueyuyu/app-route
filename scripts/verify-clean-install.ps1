@@ -11,6 +11,8 @@ $sentinel = Join-Path $dataRoot 'installation-sentinel.json'
 $before = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash
 & (Join-Path $PSScriptRoot 'verify-install-upgrade.ps1') -InstallerPath $InstallerPath
 & (Join-Path $PSScriptRoot 'verify-install-upgrade.ps1') -InstallerPath $InstallerPath
+node (Join-Path $PSScriptRoot 'verify-auto-update.mjs') $InstallerPath
+if ($LASTEXITCODE -ne 0) { throw 'Automatic update acceptance failed; preserve the CI installation for diagnosis.' }
 $uninstaller = Join-Path $installation 'Uninstall AppRoute.exe'
 if (-not (Test-Path -LiteralPath $uninstaller)) { throw 'Expected AppRoute uninstaller is missing.' }
 $output = Join-Path $projectRoot 'output'

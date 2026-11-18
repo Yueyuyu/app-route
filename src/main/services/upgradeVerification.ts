@@ -15,6 +15,7 @@ export class UpgradeVerificationService {
     if (typeof fromVersion !== 'string' || typeof targetVersion !== 'string' || !parseReleaseVersion(fromVersion) || !parseReleaseVersion(targetVersion) || compareReleaseVersions(targetVersion, fromVersion) <= 0) throw new Error('更新版本无效，请重新检查。')
     return withLock(path.join(this.settings.routing.root, 'settings-lock'), async () => {
       const status = await this.settings.routing.status()
+      if (status.pending) throw new Error('有分流或设置操作尚未完成，请稍后更新。')
       if (status.dataIssue || status.untrackedRuleCount) throw new Error('管理记录待核对，请先处理后再创建升级备份。')
       const snapshot = await this.settings.snapshot()
       const backupId = await this.settings.backups.create(snapshot, 'before-upgrade')

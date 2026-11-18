@@ -27,10 +27,10 @@ export class ReleaseUpdateService {
   constructor(version: string, platform: string, arch: string, fetch: typeof globalThis.fetch, now = Date.now) {
     this.version = version; this.platform = platform; this.arch = arch; this.fetch = fetch; this.now = now
   }
-  async check(channel: unknown): Promise<UpdateCheck> {
+  async check(channel: unknown, refresh = false): Promise<UpdateCheck> {
     if (!isUpdateChannel(channel)) throw new Error('不支持的更新通道。')
     const cached = this.cache.get(channel)
-    if (cached && cached.expires > this.now()) return cached.result
+    if (cached && cached.expires > this.now() && (!refresh || cached.result.reason === 'rate-limit')) return cached.result
     let flight = this.flights.get(channel)
     if (!flight) { flight = new SingleFlight(); this.flights.set(channel, flight) }
     return flight.run(async () => {
