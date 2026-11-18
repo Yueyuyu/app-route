@@ -71,8 +71,17 @@ try {
    const more = page.locator('.sidebar').getByRole('button', { name: translate(locale, '更多应用选项'), exact: true })
    for (const [label, target] of [['更新日志', 'https://github.com/Yueyuyu/app-route/releases'], ['在线文档', 'https://yueyuyu.github.io/app-route/']]) {
      await more.click()
-     await page.getByRole('menuitem', { name: translate(locale, label), exact: true }).click()
-     await waitForState('project link', () => desktop.evaluate(() => globalThis.appRouteTestLinks.at(-1)), value => value === target)
+     const item = page.getByRole('menuitem', { name: translate(locale, label), exact: true })
+     await item.waitFor({ state: 'visible' })
+     // Mac 小高度窗口会把菜单上翻；等待定位与展开动画结束，避免点击旧坐标。
+     await page.waitForFunction(() => {
+       const menu = [...document.querySelectorAll('.ant-dropdown')].find(element => !element.classList.contains('ant-dropdown-hidden'))
+       return menu && ![...menu.classList].some(name => /-(appear|enter|leave)(-|$)/.test(name))
+         && !menu.getAnimations({ subtree: true }).some(animation => animation.playState === 'running' || animation.pending)
+     })
+     await item.click()
+     await item.waitFor({ state: 'hidden' })
+     await waitForState('project link: ' + label, () => desktop.evaluate(() => globalThis.appRouteTestLinks.at(-1)), value => value === target)
    }
    await more.click(); await page.getByRole('menuitem', { name: translate(locale, '反馈问题'), exact: true }).waitFor()
    await page.keyboard.press('Escape')
