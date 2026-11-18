@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { _electron as electron } from 'playwright'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { waitForAntMotion } from './lib/antSelect.mjs'
 
 // 使用最终打包的主进程、预加载和后台；独立数据目录，CI 没有日常 Clash Party 配置。
 if (!process.env.CI) throw new Error('干净环境验收只在 CI 执行。')
@@ -33,9 +34,19 @@ try {
   assert.equal(state.platform, process.platform); assert.equal(state.language.language, 'system')
   await page.locator('.sidebar .about-app-trigger').click(); await page.locator('.about-build-date').waitFor()
   assert.ok((await page.locator('.about-app-version').innerText()).includes(info.version))
+  // 字体出现早于 Ant Dialog 的动画结束和焦点接管；Esc 必须发给已就绪的弹窗。
+  await waitForAntMotion(page, page.locator('.about-app-modal'))
+  await page.waitForFunction(() => Boolean(document.activeElement?.closest('.about-app-modal')))
   await page.keyboard.press('Escape'); await page.locator('.about-app-content').waitFor({ state: 'hidden' })
   assert.deepEqual(errors, [])
   await fs.mkdir('output', { recursive: true })
   await page.screenshot({ path: `output/packaged-${process.platform}-${process.arch}.png` })
   await fs.writeFile('output/packaged-check.json', JSON.stringify({ checkedAt: new Date().toISOString(), platform: process.platform, architecture: process.arch, build: info, cleanStart: true, backendReachable: true, aboutAndEscape: true, realClashRoutingVerified: false }, null, 2))
+} catch (error) {
+  const page = desktop?.windows()[0]
+  if (page) {
+    await page.screenshot({ path: `output/packaged-${process.platform}-${process.arch}-failure.png` }).catch(() => {})
+    await fs.writeFile('output/packaged-failure.json', JSON.stringify({ platform: process.platform, build: info, focus: await page.evaluate(() => ({ tag: document.activeElement?.tagName, inDialog: Boolean(document.activeElement?.closest('[role=dialog]')) })) }, null, 2)).catch(() => {})
+  }
+  throw error
 } finally { await desktop?.close() }
