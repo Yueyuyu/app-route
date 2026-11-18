@@ -23,7 +23,6 @@ const digest = createHash('sha256').update(bytes).digest('hex')
 const name = path.basename(installer), version = metadata.version
 assert.equal(name, `AppRoute-${version}-setup-x64.exe`)
 const downloadUrl = `https://github.com/Yueyuyu/app-route/releases/download/v${version}/${name}`
-await fs.writeFile(metadataFile, JSON.stringify({ ...metadata, version: '0.0.0' }))
 // 使用固定路径，只终止此 CI 安装目录内由本测试启动的主程序。
 function installedProcesses(stop = false) {
   const command = "$p = Get-Process -Name AppRoute -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $env:LOCALAPPDATA 'Programs\\AppRoute\\AppRoute.exe') }; " +
@@ -31,14 +30,23 @@ function installedProcesses(stop = false) {
   const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { encoding: 'utf8', windowsHide: true }).trim()
   return stop || !output ? [] : [].concat(JSON.parse(output))
 }
-let desktop, handoff = false, relaunchObserved = false
+let desktop, handoff = false, relaunchObserved = false, checkedRelease
+const launch = () => electron.launch({ executablePath, env: { ...process.env, APPROUTE_DATA_DIR: dataRoot, ELECTRON_RUN_AS_NODE: undefined }, timeout: 60000 })
 try {
   assert.equal(installedProcesses().length, 0)
-  desktop = await electron.launch({ executablePath, env: { ...process.env, APPROUTE_DATA_DIR: dataRoot, ELECTRON_RUN_AS_NODE: undefined }, timeout: 60000 })
-  const page = await desktop.firstWindow()
-  await page.locator('.sidebar .about-app-trigger').waitFor({ timeout: 60000 })
-  assert.equal((await page.evaluate(() => window.appRoute.request('updates.download-state'))).installation, 'automatic')
-  const oldPids = installedProcesses().map(item => item.Id)
+  // 先通过真实设置关闭自动检查，再启动全新主进程。否则慢启动可能先缓存公开
+  // 同版本的旧安装包信息，随后与本轮合成下载响应混用，触发正确的摘要拒绝。
+  desktop = await launch()
+  const preferencesPage = await desktop.firstWindow()
+  await preferencesPage.locator('.sidebar .about-app-trigger').click({ timeout: 60000 })
+  await preferencesPage.locator('.about-app-modal .ant-modal-footer button').first().click()
+  const automatic = preferencesPage.locator('.update-automatic [role=switch]')
+  await automatic.waitFor()
+  if (await automatic.getAttribute('aria-checked') === 'true') await automatic.click()
+  await preferencesPage.waitForFunction(() => localStorage.getItem('approute.update-check.v1') === 'off')
+  await desktop.close(); desktop = undefined
+  await fs.writeFile(metadataFile, JSON.stringify({ ...metadata, version: '0.0.0' }))
+  desktop = await launch()
   await desktop.evaluate(async ({ net }, fixture) => {
     const { createReadStream } = process.getBuiltinModule('node:fs')
     const { Readable } = process.getBuiltinModule('node:stream')
@@ -52,8 +60,15 @@ try {
       throw new Error('unexpected update URL')
     }
   }, { installer, version, name, downloadUrl, size: bytes.length, digest })
+  const page = await desktop.firstWindow()
+  await page.locator('.sidebar .about-app-trigger').waitFor({ timeout: 60000 })
+  assert.equal(await page.evaluate(() => localStorage.getItem('approute.update-check.v1')), 'off')
+  assert.equal((await page.evaluate(() => window.appRoute.request('updates.download-state'))).installation, 'automatic')
+  const oldPids = installedProcesses().map(item => item.Id)
   const check = await page.evaluate(() => window.appRoute.request('updates.check', { channel: 'preview' }))
   assert.equal(check.state, 'available')
+  checkedRelease = { version: check.release?.version, size: check.release?.size, sha256: check.release?.sha256 }
+  assert.deepEqual(checkedRelease, { version, size: bytes.length, sha256: digest }, 'release metadata must belong to this CI installer, not a cached public asset')
   await page.evaluate(version => window.appRoute.request('updates.download', { channel: 'preview', version }), version)
   await waitForState('native update download', async () => {
     const state = await page.evaluate(() => window.appRoute.request('updates.download-state'))
@@ -83,12 +98,16 @@ try {
   assert.notEqual(refreshed.backupId, prepared.backupId)
   installedProcesses(true)
   await waitForState('CI app exit', () => installedProcesses().length === 0, value => value, { timeout: 20000, interval: 250 })
-  desktop = await electron.launch({ executablePath, env: { ...process.env, APPROUTE_DATA_DIR: dataRoot, ELECTRON_RUN_AS_NODE: undefined }, timeout: 60000 })
+  desktop = await launch()
   const updatedPage = await desktop.firstWindow()
   await updatedPage.locator('.sidebar .about-app-trigger').waitFor({ timeout: 60000 })
   const preserved = await updatedPage.evaluate(() => window.appRoute.request('updates.status'))
   assert.equal(preserved.state, 'preserved')
   await fs.writeFile('output/auto-update-check.json', JSON.stringify({ platform: 'win32', version, sourceRevision: metadata.revision, nativeDownloadAndDigest: true, freshBackup: true, installerStarted: true, oldAppExited: true, automaticRelaunch: true, installedPayloadMatches: true, settingsPreserved: true, fixture: 'synthetic old version identity and GitHub response; actual NSIS installer and installed app; empty CI profile', checkedAt: new Date().toISOString() }, null, 2))
+} catch (error) {
+  const state = await desktop?.firstWindow().then(page => page.evaluate(() => window.appRoute.request('updates.download-state'))).catch(() => undefined)
+  await fs.writeFile('output/auto-update-failure.json', JSON.stringify({ expected: { version, size: bytes.length, sha256: digest }, checkedRelease, state, sourceRevision: metadata.revision }, null, 2))
+  throw error
 } finally {
   if (desktop) await desktop.close().catch(() => {})
   if (relaunchObserved) installedProcesses(true)
