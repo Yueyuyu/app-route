@@ -10,6 +10,7 @@ import { createDesktopSandbox } from './lib/testSandbox.mjs'
 import { startUiEvidence } from './lib/uiEvidence.mjs'
 import { translate } from '../src/shared/i18n/index.ts'
 import { checkDesktopMaximizeRestore, setDesktopViewport } from './lib/desktopViewport.mjs'
+import { chooseAntOption } from './lib/antSelect.mjs'
 
 // 真实 Electron 主进程、文件对话框调用、IPC、设置存储；路由只记录到隔离夹具。
 const root = process.cwd()
@@ -38,19 +39,7 @@ try {
   const page = await desktop.firstWindow()
   page.on('pageerror', error => errors.push(error.message))
   async function chooseBindingCandidate(modal, text) {
-    // 包括动画准备阶段；在缩放中的坐标打开下拉框会让弹层按错误宽度定位。
-    await modal.waitFor({ state: 'visible' })
-    await page.waitForFunction(() => {
-      const element = document.querySelector('.settings-binding-modal')
-      return element && ![...element.classList].some(name => /^ant-zoom-(appear|enter|leave)(-|$)/.test(name))
-        && getComputedStyle(element).transform === 'none' && !element.getAnimations().some(animation => animation.playState === 'running' || animation.pending)
-    })
-    await modal.locator('.import-candidate').click()
-    const option = page.locator('.ant-select-item-option-content').filter({ hasText: text })
-    const selectedLabel = await option.innerText()
-    await option.click()
-    await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
-    await modal.locator('.import-candidate').getByText(selectedLabel, { exact: true }).waitFor()
+    await chooseAntOption(page, modal.locator('.import-candidate'), new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   }
   await page.locator('.application-table button.application-name').first().waitFor()
   await setDesktopViewport(desktop, page, { width: 1440, height: 1000 })
@@ -74,8 +63,7 @@ try {
   }, { importedFile, exportedFile, installerText, installerHash })
   for (const [locale, label] of [['zh-CN', '简体中文'], ['en', 'English'], ['ja', '日本語'], ['fr', 'Français']]) {
     const tr = source => translate(locale, source)
-    await page.locator('.language-switcher').click()
-    await page.locator('.ant-select-item-option-content').getByText(label, { exact: true }).click()
+    await chooseAntOption(page, page.locator('.language-switcher'), label)
     await page.locator('.sidebar').getByText(tr('设置与备份'), { exact: true }).click()
     await page.getByRole('heading', { name: tr('设置与备份'), exact: true }).waitFor()
     const beforeInspection = controlRequests.length

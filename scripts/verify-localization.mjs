@@ -7,6 +7,7 @@ import { createDesktopSandbox, waitForState } from './lib/testSandbox.mjs'
 import { startUiEvidence } from './lib/uiEvidence.mjs'
 import { resolveLocale, translate } from '../src/shared/i18n/index.ts'
 import { assertDesktopWindowFilled, setDesktopViewport } from './lib/desktopViewport.mjs'
+import { chooseAntOption, waitForAntMotion } from './lib/antSelect.mjs'
 
 // 使用真实的桌面主进程/preload/UI 与独立演示后台，不接触用户配置或真实代理。
 const root = process.cwd()
@@ -53,8 +54,7 @@ try {
  }
  for (const [locale, labels] of Object.entries(translations)) {
    await page.locator('.list-search input').fill('Chrome')
-   await page.locator('.language-switcher').click()
-   await page.locator('.ant-select-item-option-content').getByText(labels[0], { exact: true }).click()
+   await chooseAntOption(page, page.locator('.language-switcher'), labels[0])
    await page.waitForFunction(expected => document.documentElement.lang === expected, locale)
    assert.equal(await desktop.evaluate(({ Menu }) => Menu.getApplicationMenu().items[1].label), { 'zh-CN': '编辑', en: 'Edit', ja: '編集', fr: 'Édition' }[locale])
    assert.equal(await page.locator('.list-search input').inputValue(), 'Chrome', 'language switch preserves the current filter')
@@ -73,12 +73,7 @@ try {
      await more.click()
      const item = page.getByRole('menuitem', { name: translate(locale, label), exact: true })
      await item.waitFor({ state: 'visible' })
-     // Mac 小高度窗口会把菜单上翻；等待定位与展开动画结束，避免点击旧坐标。
-     await page.waitForFunction(() => {
-       const menu = [...document.querySelectorAll('.ant-dropdown')].find(element => !element.classList.contains('ant-dropdown-hidden'))
-       return menu && ![...menu.classList].some(name => /-(appear|enter|leave)(-|$)/.test(name))
-         && !menu.getAnimations({ subtree: true }).some(animation => animation.playState === 'running' || animation.pending)
-     })
+     await waitForAntMotion(page, item)
      await item.click()
      await item.waitFor({ state: 'hidden' })
      await waitForState('project link: ' + label, () => desktop.evaluate(() => globalThis.appRouteTestLinks.at(-1)), value => value === target)
@@ -288,9 +283,7 @@ try {
    await exceptionSection.getByRole('button', { name: translate(locale, '编辑例外'), exact: true }).click()
    await exceptionModal.getByRole('button', { name: translate(locale, '添加例外'), exact: true }).click()
    await exceptionModal.getByRole('textbox', { name: translate(locale, '域名') + ' 1', exact: true }).fill('media.example.com')
-   await exceptionModal.locator('.ant-select').last().click()
-   await page.locator('.ant-select-item-option-content').getByText(translate(locale, '跟随代理组'), { exact: true }).click()
-   await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+   await chooseAntOption(page, exceptionModal.locator('.ant-select').last(), translate(locale, '跟随代理组'))
    await setDesktopViewport(desktop, page, { width: 1000, height: 760 })
    assert.equal(await exceptionModal.locator('.ant-modal-footer button').evaluateAll(buttons => buttons.some(button => button.getBoundingClientRect().bottom > innerHeight || button.getBoundingClientRect().right > innerWidth)), false)
    await layout(locale + '-domain-exceptions'); await screenshot(locale + '-domain-exceptions')
@@ -352,8 +345,7 @@ try {
  assert.equal(await desktop.evaluate(({ Menu }) => Menu.getApplicationMenu().items[1].label), 'Édition')
  results.push({ label: 'restart-language-persistence', passed: true })
  const systemLanguages = await desktop.evaluate(({ app }) => app.getPreferredSystemLanguages())
- await reopened.locator('.language-switcher').click()
- await reopened.locator('.ant-select-item-option').first().click()
+ await chooseAntOption(reopened, reopened.locator('.language-switcher'), translate('fr', '跟随系统'), translate(resolveLocale('system', systemLanguages), '跟随系统'))
  await reopened.waitForFunction(expected => document.documentElement.lang === expected, resolveLocale('system', systemLanguages))
  const preference = JSON.parse(await fs.readFile(path.join(env.LOCALAPPDATA, 'AppRoute/preferences.json'), 'utf8'))
  assert.equal(preference.language, 'system')
