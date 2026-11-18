@@ -57,9 +57,14 @@ export async function createDesktopSandbox(name, { root = process.cwd(), stage =
     const desktop = await electron.launch({ executablePath, args: [fixture], env, timeout: 30000 })
     desktops.add(desktop)
     // UI 只加载本地协议。记录被拒绝的请求，即使产品捕获错误也不能让测试误通过。
-    await desktop.evaluate(({ session, app }, expected) => {
+    await desktop.evaluate(({ session, app, net }, expected) => {
       if (app.getPath('userData') !== expected) throw new Error('测试 userData 未隔离')
       globalThis.appRouteExternalRequests = []
+      // 后台版本检查只使用虚构 Release；实际下载在更新专项验收中另行注入。
+      net.fetch = async (url, options) => {
+        if (url === 'https://api.github.com/repos/Yueyuyu/app-route/releases?per_page=100' && options?.credentials === 'omit') return Response.json([])
+        throw new Error('unexpected desktop network request in UI fixture')
+      }
       session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] }, (details, callback) => {
         globalThis.appRouteExternalRequests.push(new URL(details.url).protocol)
         callback({ cancel: true })

@@ -18,8 +18,8 @@ p { line-height: 1.75; }
 .sidebar .ant-menu-item { margin: 3px 0; width: 100%; padding-left: 10px !important; height: 44px; line-height: 44px; }
 .sidebar .ant-menu-item-icon { font-size: 17px !important; }
 .sidebar .ant-menu-title-content { margin-inline-start: 12px !important; font-weight: 500; font-size: 14px; }
-.sidebar-bottom { margin-top: auto; padding-top: 12px; border-top: 1px solid #e8edf5; }
-.integration-status { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 10px; border: 0; border-radius: 9px; background: transparent; color: #344054; text-align: left; cursor: pointer; transition: background-color 140ms ease-out; }
+.sidebar-bottom { margin-top: auto; padding: 6px; border: 1px solid #e7ecf4; border-radius: 12px; background: #eef2f8; }
+.integration-status { display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 6px 10px; border: 0; border-radius: 8px; background: transparent; color: #344054; text-align: left; cursor: pointer; transition: background-color 140ms ease-out; }
 .integration-status:hover, .integration-status:focus-visible, .integration-status[aria-expanded="true"] { background: #eaf0f9; }
 .connection-dot { display: inline-block; width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: #929cac; }
 .connection-dot.connected { background: #239568; }
@@ -27,10 +27,29 @@ p { line-height: 1.75; }
 .connection-dot.connecting { background: #5584d1; }
 .integration-status-copy { min-width: 0; flex: 1; }
 .integration-status strong { display: block; font-size: 13px; font-weight: 600; }
-.integration-status-copy > span { font-size: 12px; color: #667085; display: block; margin-top: 4px; line-height: 1.4; overflow-wrap: anywhere; }
+.integration-status-copy > span { font-size: 11px; color: #667085; display: flex; align-items: center; gap: 5px; margin-top: 3px; line-height: 1.4; overflow-wrap: anywhere; }
+.connection-client-icon { display: grid; place-items: center; flex: 0 0 30px; height: 30px; border-radius: 9px; background: #fff; color: #718097; font-size: 17px; }
+.connection-client-icon.connected { color: #258866; }
+.connection-client-icon.error { color: #b77e2c; }
+.connection-client-icon.connecting { color: #3265ed; }
+.integration-status-copy .connection-dot { width: 5px; height: 5px; flex-basis: 5px; }
 .integration-status-chevron { color: #8b98ae; font-size: 10px; }
-.about-app-trigger { display: flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; background: transparent; color: #748197; font-size: 11px; padding: 6px 10px; margin-top: 2px; cursor: pointer; }
-.about-app-trigger:hover { color: #3265ed; }
+.sidebar-tools { display: flex; align-items: center; justify-content: space-between; gap: 2px; padding: 5px 2px 0; border-top: 1px solid #dfe6f0; }
+.about-app-trigger { min-width: 0; border: 0; border-radius: 5px; background: transparent; color: #69778c; font-size: 10.5px; padding: 6px 4px; cursor: pointer; text-align: left; font-variant-numeric: tabular-nums; }
+.about-app-trigger span { display: block; overflow-wrap: anywhere; }
+.sidebar-tool-actions { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
+.sidebar-icon-button { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #718097; cursor: pointer; font-size: 16px; }
+.sidebar-icon-button:hover, .sidebar-icon-button[aria-expanded="true"], .about-app-trigger:hover { color: #3265ed; background: #e0e8f6; }
+.sidebar-bottom button:focus-visible { outline: 2px solid #3265ed; outline-offset: 2px; }
+.sidebar-icon-button:active, .about-app-trigger:active { background: #d4e1f7; }
+.sidebar-update { display: flex; align-items: center; gap: 7px; width: 100%; padding: 9px 7px; margin-top: 6px; background: #e1eaff; color: #2759cc; border: 0; border-radius: 7px; text-align: left; cursor: pointer; }
+.sidebar-update:hover { background: #d6e3ff; }
+.sidebar-update-icon { font-size: 15px; }
+.sidebar-update > span:nth-child(2) { min-width: 0; flex: 1; }
+.sidebar-update strong { display: block; font-size: 11px; font-weight: 600; }
+.sidebar-update small { display: block; font-size: 10px; margin-top: 2px; overflow-wrap: anywhere; opacity: .8; }
+.sidebar-update-action { font-size: 11px; }
+.update-automatic { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin: 14px 0; color: #667085; font-size: 12px; }
 .connection-quick { width: 290px; max-width: calc(100vw - 64px); color: #344054; }
 .connection-quick-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 4px 0 12px; }
 .connection-quick-heading strong { display: block; font-size: 15px; }

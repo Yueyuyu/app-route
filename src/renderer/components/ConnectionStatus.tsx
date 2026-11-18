@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from 'react'
 import { Button, Popover } from 'antd'
-import { CloseOutlined, RightOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ApiOutlined, CloseOutlined, RightOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { IntegrationStatus } from '../../shared/integration'
 import type { NetworkDiagnostics } from '../hooks/useNetworkDiagnostics'
 import { outletLabel, t } from '../i18n'
@@ -40,7 +40,7 @@ export function ConnectionStatus({ status, error, busy, diagnostics, onDetails }
     </section>}>
     <button ref={trigger} className="integration-status" aria-label={t('查看 Clash Party 连接状态')} aria-expanded={open} aria-controls={open ? panelId : undefined}
       onKeyDown={event => { if (event.key === 'Escape') close() }}>
-      <i className={`connection-dot ${state}`} /><span className="integration-status-copy"><strong>Clash Party</strong><span>{label}</span></span><RightOutlined className="integration-status-chevron" />
+      <span className={`connection-client-icon ${state}`}><ApiOutlined /></span><span className="integration-status-copy"><strong>Clash Party</strong><span><i className={`connection-dot ${state}`} />{label}</span></span><RightOutlined className="integration-status-chevron" />
     </button>
   </Popover>
 }

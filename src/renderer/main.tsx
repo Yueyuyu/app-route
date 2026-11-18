@@ -7,6 +7,7 @@ import jaJP from 'antd/locale/ja_JP'
 import frFR from 'antd/locale/fr_FR'
 import { initializeLanguage, useLanguage } from './i18n'
 import App from './App'
+import { ReleaseUpdatesProvider } from './hooks/useReleaseUpdates'
 import 'antd/dist/reset.css'
 import './styles.css'
 
@@ -23,6 +24,6 @@ function LocalizedApp() {
     Menu: { itemBg: 'transparent', itemSelectedBg: '#e7efff', itemSelectedColor: '#3265ed', itemColor: '#4b5565', itemHeight: 44, itemBorderRadius: 9 },
     Tabs: { horizontalItemGutter: 28, inkBarColor: '#3265ed', titleFontSize: 14 },
     Segmented: { trackBg: '#f5f6f8', itemSelectedBg: '#fff', itemSelectedColor: '#3265ed' },
-  } }}><AntApp><App /></AntApp></ConfigProvider>
+  } }}><AntApp><ReleaseUpdatesProvider><App /></ReleaseUpdatesProvider></AntApp></ConfigProvider>
 }
 void initializeLanguage().then(() => ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><LocalizedApp /></React.StrictMode>))

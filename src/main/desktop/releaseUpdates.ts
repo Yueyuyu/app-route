@@ -19,7 +19,7 @@ async function readMetadata(response: Response) {
   } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
 }
-/** 按用户操作查询公开发布信息；不读取账户令牌，不修改网络或自动运行安装器。 */
+/** 查询公开发布信息并合并前后台检查；不读取账户令牌，不修改网络或运行安装器。 */
 export class ReleaseUpdateService {
   private cache = new Map<UpdateChannel, { expires: number; result: UpdateCheck }>()
   private flights = new Map<UpdateChannel, SingleFlight<UpdateCheck>>()

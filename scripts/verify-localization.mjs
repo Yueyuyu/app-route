@@ -3,7 +3,7 @@ import path from 'node:path'
 import assert from 'node:assert/strict'
 import { _electron as electron } from 'playwright'
 import executablePath from 'electron'
-import { createDesktopSandbox } from './lib/testSandbox.mjs'
+import { createDesktopSandbox, waitForState } from './lib/testSandbox.mjs'
 import { startUiEvidence } from './lib/uiEvidence.mjs'
 import { resolveLocale, translate } from '../src/shared/i18n/index.ts'
 import { assertDesktopWindowFilled, setDesktopViewport } from './lib/desktopViewport.mjs'
@@ -65,6 +65,19 @@ try {
    assert.equal(await page.locator('.ant-breadcrumb').count(), 0)
    await applicationDensity(locale)
    const about = page.locator('.sidebar .about-app-trigger')
+   assert.match(await about.innerText(), /^v\d+\.\d+\.\d+/)
+   await page.locator('.sidebar').getByRole('button', { name: translate(locale, 'GitHub 仓库'), exact: true }).click()
+   await waitForState('GitHub link', () => desktop.evaluate(() => globalThis.appRouteTestLinks.at(-1)), value => value === 'https://github.com/Yueyuyu/app-route')
+   const more = page.locator('.sidebar').getByRole('button', { name: translate(locale, '更多应用选项'), exact: true })
+   for (const [label, target] of [['更新日志', 'https://github.com/Yueyuyu/app-route/releases'], ['在线文档', 'https://yueyuyu.github.io/app-route/']]) {
+     await more.click()
+     await page.getByRole('menuitem', { name: translate(locale, label), exact: true }).click()
+     await waitForState('project link', () => desktop.evaluate(() => globalThis.appRouteTestLinks.at(-1)), value => value === target)
+   }
+   await more.click(); await page.getByRole('menuitem', { name: translate(locale, '反馈问题'), exact: true }).waitFor()
+   await page.keyboard.press('Escape')
+   await page.getByRole('menuitem', { name: translate(locale, '反馈问题'), exact: true }).waitFor({ state: 'hidden' })
+   results.push({ label: locale + '-sidebar-version-and-project-links', passed: true })
    await about.click()
    await page.locator('.about-app-content').waitFor()
    assert.ok((await page.locator('.about-build-date').innerText()).match(/\d{4}/))

@@ -1,6 +1,15 @@
 /** 中文原句作为 gettext 风格键；译文顺序为 English、日本語、Français。
  * 修改原句时同步更新三种译文，保留 {0} 等插值参数。用户数据不进入此目录。 */
 export const messages: Record<string, readonly [string, string, string]> = {
+  "GitHub 仓库": ["GitHub repository", "GitHub リポジトリ", "Dépôt GitHub"],
+  "更多应用选项": ["More app options", "アプリのその他の操作", "Autres options"],
+  "更新日志": ["Release notes", "更新履歴", "Notes de version"],
+  "在线文档": ["Online documentation", "オンライン文書", "Documentation en ligne"],
+  "查看可用更新": ["View available update", "利用可能な更新を表示", "Voir la mise à jour disponible"],
+  "有新版本": ["Update available", "新しいバージョン", "Mise à jour disponible"],
+  "更新": ["Update", "更新", "Mettre à jour"],
+  "自动检查新版本": ["Check for updates automatically", "新しいバージョンを自動確認", "Rechercher automatiquement les mises à jour"],
+  "更新偏好未能保存，下次将使用默认设置。": ["Update preferences could not be saved. Defaults will be used next time.", "更新設定を保存できませんでした。次回は初期設定を使用します。", "Impossible d’enregistrer les préférences de mise à jour. Les valeurs par défaut seront utilisées au prochain démarrage."],
   "其他 Mihomo 客户端": ["Other Mihomo clients", "他の Mihomo クライアント", "Autres clients Mihomo"],
   "只读检查控制接口能力，当前分流仍由 Clash Party 管理。": ["Inspect control API capabilities without changes. Clash Party still manages routing.", "制御 API の機能を読み取り専用で確認します。現在のルーティングは Clash Party が管理します。", "Vérifiez les capacités de l’API sans modification. Clash Party gère toujours le routage."],
   "检查兼容性": ["Check compatibility", "互換性を確認", "Vérifier la compatibilité"],
