@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from 'react'
 import { Button, Popover } from 'antd'
-import { ApiOutlined, CloseOutlined, RightOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CloseOutlined, RightOutlined, ReloadOutlined, UpOutlined } from '@ant-design/icons'
 import type { IntegrationStatus } from '../../shared/integration'
 import type { NetworkDiagnostics } from '../hooks/useNetworkDiagnostics'
 import { outletLabel, t } from '../i18n'
@@ -38,9 +38,9 @@ export function ConnectionStatus({ status, error, busy, diagnostics, onDetails }
       {diagnostics.checks.length > 0 && <button className="diagnostic-summary" onClick={() => details('recovery')}><span>{t(diagnostics.staleReason ? '上次结果：通过 {0}/{1} 项' : '自检通过 {0}/{1} 项', [diagnostics.checks.filter(check => check.ok).length, diagnostics.checks.length])}</span><RightOutlined /></button>}
       <div className="connection-quick-actions"><Button onClick={() => details()}>{t('查看详情')}</Button><Button icon={<ReloadOutlined />} loading={diagnostics.busy} disabled={busy} onClick={() => void diagnostics.run()}>{t('网络自检')}</Button></div>
     </section>}>
-    <button ref={trigger} className="integration-status" aria-label={t('查看 Clash Party 连接状态')} aria-expanded={open} aria-controls={open ? panelId : undefined}
+    <button ref={trigger} className="integration-status" data-state={state} aria-label={t('查看 Clash Party 连接状态')} aria-expanded={open} aria-controls={open ? panelId : undefined}
       onKeyDown={event => { if (event.key === 'Escape') close() }}>
-      <span className={`connection-client-icon ${state}`}><ApiOutlined /></span><span className="integration-status-copy"><strong>Clash Party</strong><span><i className={`connection-dot ${state}`} />{label}</span></span><RightOutlined className="integration-status-chevron" />
+      <span className="integration-status-copy"><strong>Clash Party</strong><span><i className={`connection-dot ${state}`} />{label}</span></span><UpOutlined className="integration-status-chevron" />
     </button>
   </Popover>
 }
